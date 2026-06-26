@@ -1,0 +1,27 @@
+# Render Blueprint — AETHER Platform
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  # ── FastAPI Backend ────────────────────────────────────────────────────────
+  - type: web
+    name: aether-backend
+    runtime: docker
+    rootDir: aether/backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./aether.db
+      - key: DEFAULT_CITY
+        value: Kolkata
+      - key: APP_ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        # Update this after Vercel deploy with your actual Vercel URL
+        value: https://ethack.vercel.app,http://localhost:3000
+      # Optional — add these in Render dashboard for live data
+      # - key: CPCB_API_KEY
+      #   value: your_key_here
+      # - key: OPENAI_API_KEY
+      #   value: your_key_here
+    healthCheckPath: /api/health
