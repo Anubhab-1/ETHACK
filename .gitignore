@@ -1,0 +1,60 @@
+# ─── Python / Backend ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+venv/
+.venv/
+env/
+.env
+.env.*
+
+# ─── Databases ───────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ─── ML Models (large binaries — regenerate via /api/forecast/train) ─────────
+aether/backend/models/*.json
+aether/backend/models/*.pkl
+aether/backend/models/*.joblib
+
+# ─── Node / Frontend ─────────────────────────────────────────────────────────
+node_modules/
+aether/frontend/.next/
+aether/frontend/out/
+aether/frontend/build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── TypeScript build artifacts ───────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── OS / Editor ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Docker ──────────────────────────────────────────────────────────────────
+# docker-compose overrides with secrets
+docker-compose.override.yml
+
+# ─── Notebooks / Jupyter ────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ─── Certs / Keys ────────────────────────────────────────────────────────────
+*.pem
+*.key
+*.crt

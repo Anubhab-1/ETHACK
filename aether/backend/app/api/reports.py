@@ -1,0 +1,143 @@
+from __future__ import annotations
+"""AETHER — Citizen Incident Reporting endpoints."""
+from datetime import datetime
+from typing import List
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models import CitizenReport, Ward, EnforcementAction
+from app.schemas import CitizenReportIn, CitizenReportOut
+
+router = APIRouter()
+
+
+@router.get("/reports", response_model=List[CitizenReportOut])
+def get_reports(
+    city: str = Query("Kolkata"),
+    limit: int = Query(50, le=100),
+    db: Session = Depends(get_db)
+):
+    """Retrieve all citizen reports for a given city."""
+    # Outer join with Ward to get ward name
+    results = (
+        db.query(CitizenReport, Ward.name.label("ward_name"))
+        .outerjoin(Ward, CitizenReport.ward_id == Ward.id)
+        .filter(CitizenReport.city == city)
+        .order_by(CitizenReport.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    reports = []
+    for report, ward_name in results:
+        out = CitizenReportOut.model_validate(report)
+        out.ward_name = ward_name or f"Ward #{report.ward_id}"
+        reports.append(out)
+
+    return reports
+
+
+@router.post("/reports", response_model=CitizenReportOut)
+def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
+    """Create a new citizen report and automatically escalate if severity is high."""
+    ward = db.query(Ward).filter(Ward.id == report_in.ward_id).first()
+    if not ward:
+        raise HTTPException(status_code=404, detail="Ward not found")
+
+    new_report = CitizenReport(
+        ward_id=report_in.ward_id,
+        city=report_in.city,
+        reporter_name=report_in.reporter_name or "Anonymous",
+        report_type=report_in.report_type,
+        description=report_in.description,
+        severity=report_in.severity,
+        lat=report_in.lat,
+        lon=report_in.lon,
+        status="pending",
+        upvote_count=0,
+        created_at=datetime.utcnow()
+    )
+
+    db.add(new_report)
+    db.commit()
+    db.refresh(new_report)
+
+    # Escalation Logic: If severity is high, auto-trigger a municipal action
+    if report_in.severity.lower() == "high":
+        # Check if an open enforcement action already exists for this ward and type
+        existing = db.query(EnforcementAction).filter(
+            EnforcementAction.ward_id == report_in.ward_id,
+            EnforcementAction.target_type == report_in.report_type,
+            EnforcementAction.status == "open"
+        ).first()
+
+        if not existing:
+            action = EnforcementAction(
+                ward_id=report_in.ward_id,
+                city=report_in.city,
+                priority_score=85.0,
+                action_text=f"High-Severity Citizen Complaint: {report_in.report_type.replace('_', ' ').capitalize()} reported in {ward.name}. Details: {report_in.description[:60]}...",
+                target_type=report_in.report_type,
+                status="open",
+                alerts_sent=0,
+                alerts_confirmed=0,
+                created_at=datetime.utcnow()
+            )
+            db.add(action)
+            db.commit()
+
+    # Formulate output with ward name
+    out = CitizenReportOut.model_validate(new_report)
+    out.ward_name = ward.name
+    return out
+
+
+@router.post("/reports/{report_id}/upvote", response_model=CitizenReportOut)
+def upvote_report(report_id: int, db: Session = Depends(get_db)):
+    """Upvote a citizen report and auto-escalate if it reaches 5 upvotes."""
+    report = db.query(CitizenReport).filter(CitizenReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    report.upvote_count += 1
+
+    # Check if report has crossed verification threshold (5 upvotes)
+    if report.upvote_count >= 5 and report.status == "pending":
+        report.status = "verified"
+        
+        ward = db.query(Ward).filter(Ward.id == report.ward_id).first()
+        ward_name = ward.name if ward else f"Ward #{report.ward_id}"
+
+        # Escalate to enforcement queue
+        existing = db.query(EnforcementAction).filter(
+            EnforcementAction.ward_id == report.ward_id,
+            EnforcementAction.target_type == report.report_type,
+            EnforcementAction.status == "open"
+        ).first()
+
+        if existing:
+            # Boost priority
+            existing.priority_score = min(100.0, existing.priority_score + 15.0)
+            existing.action_text = f"Verified Community Incident (5+ upvotes): {report.report_type.replace('_', ' ').capitalize()} in {ward_name}. Boosted priority score."
+        else:
+            action = EnforcementAction(
+                ward_id=report.ward_id,
+                city=report.city,
+                priority_score=70.0,
+                action_text=f"Verified Community Incident (5+ upvotes): {report.report_type.replace('_', ' ').capitalize()} in {ward_name}.",
+                target_type=report.report_type,
+                status="open",
+                alerts_sent=0,
+                alerts_confirmed=0,
+                created_at=datetime.utcnow()
+            )
+            db.add(action)
+
+    db.commit()
+    db.refresh(report)
+
+    # Get ward name
+    ward = db.query(Ward).filter(Ward.id == report.ward_id).first()
+    out = CitizenReportOut.model_validate(report)
+    out.ward_name = ward.name if ward else f"Ward #{report.ward_id}"
+    return out

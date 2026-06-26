@@ -1,0 +1,273 @@
+@import "tailwindcss";
+
+/* ── AETHER Design System ─────────────────────────────────────────── */
+
+:root {
+  --aether-bg: #030712;
+  --aether-surface: #0d1117;
+  --aether-surface-2: #161b22;
+  --aether-border: rgba(255, 255, 255, 0.08);
+  --aether-text: #e6edf3;
+  --aether-muted: #8b949e;
+  --aether-accent: #f97316;
+  --aether-accent-2: #3b82f6;
+
+  /* AQI Colors */
+  --aqi-good: #00e400;
+  --aqi-satisfactory: #92d050;
+  --aqi-moderate: #ffff00;
+  --aqi-poor: #ff7e00;
+  --aqi-very-poor: #ff0000;
+  --aqi-severe: #7e0023;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--aether-bg);
+  color: var(--aether-text);
+}
+
+/* ── Glassmorphism Cards ────────────────────────────────────────────── */
+.glass-card {
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--aether-border);
+  border-radius: 12px;
+}
+
+.glass-panel {
+  background: rgba(22, 27, 34, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-left: 1px solid var(--aether-border);
+}
+
+/* ── Leaflet Map Override ───────────────────────────────────────────── */
+.leaflet-container {
+  background: #0d1117 !important;
+  font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background: #1f2937 !important;
+}
+
+.leaflet-control-zoom a {
+  background: #161b22 !important;
+  color: #e6edf3 !important;
+  border-color: #30363d !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #21262d !important;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+/* ── Animations ─────────────────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes ticker-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+.pulse-dot {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* ── Bottom Ticker ──────────────────────────────────────────────────── */
+.ticker-container {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.ticker-content {
+  display: inline-block;
+  animation: ticker-scroll 30s linear infinite;
+}
+
+/* ── Status Indicators ──────────────────────────────────────────────── */
+.status-live {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: pulse-glow 2s infinite;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+}
+
+/* ── Nav ────────────────────────────────────────────────────────────── */
+.nav-link {
+  @apply flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200;
+  color: var(--aether-muted);
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--aether-text);
+}
+
+.nav-link.active {
+  background: rgba(249, 115, 22, 0.12);
+  color: var(--aether-accent);
+}
+
+/* ── Leaflet Ant Path Animation ── */
+.leaflet-ant-path {
+  stroke-dasharray: 8, 12;
+  animation: ant-path-move 20s linear infinite;
+}
+
+@keyframes ant-path-move {
+  to {
+    stroke-dashoffset: -200;
+  }
+}
+
+/* ── Sentinel Sweep Scan Animation ── */
+@keyframes scan-line {
+  0% {
+    top: 0%;
+  }
+  50% {
+    top: 100%;
+  }
+  100% {
+    top: 0%;
+  }
+}
+
+.animate-scan {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  animation: scan-line 2.5s ease-in-out infinite;
+}
+
+/* ── Landing page glow effects ──────────────────────────────── */
+@keyframes float-up {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float {
+  animation: float-up 4s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+.feature-card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.feature-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(249, 115, 22, 0.1);
+}
+
+/* ── Progress bar animated fill ─────────────────────────────── */
+@keyframes fill-bar {
+  from { width: 0%; }
+  to { width: var(--fill-width); }
+}
+
+.progress-fill {
+  animation: fill-bar 1.5s ease-out forwards;
+}
+
+/* ── Shimmer loading ────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ── Enhanced glass card on hover ──────────────────────────── */
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Gradient text utility ──────────────────────────────────── */
+.gradient-text-orange {
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 40%, #fed7aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Ticker for mobile hiding ───────────────────────────────── */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
