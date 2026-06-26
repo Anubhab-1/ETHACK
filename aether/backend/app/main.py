@@ -139,17 +139,28 @@ async def lifespan(app: FastAPI):
         logger.error(f"Startup data error: {e}")
     finally:
         db.close()
-    
+
+    # Seed Knowledge Graph (in-memory graph of industries, violations, outcomes)
+    try:
+        from app.services.knowledge_graph import seed_knowledge_graph
+        from app.database import SessionLocal as KGSession
+        kg_db = KGSession()
+        seed_knowledge_graph(db=kg_db, city="Kolkata")
+        kg_db.close()
+        logger.info("🕸️  AETHER Knowledge Graph seeded (NetworkX — Neo4j-swappable)")
+    except Exception as e:
+        logger.warning(f"Knowledge graph seed failed (non-critical): {e}")
+
     # Start APScheduler background scheduler
     from apscheduler.schedulers.background import BackgroundScheduler
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_refresh, "interval", hours=1, id="cpcb_refresh")
     scheduler.start()
     logger.info("⏰ Background scheduler started (running every 1 hour)")
-    
-    logger.info("✅ AETHER ready!")
+
+    logger.info("✅ AETHER National v2.0 ready — 5-agent constitutional intelligence online!")
     yield
-    
+
     logger.info("AETHER shutting down background scheduler...")
     scheduler.shutdown()
     logger.info("AETHER shutting down...")
@@ -157,9 +168,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AETHER API",
-    description="Urban Air Quality Intelligence Platform — ET AI Hackathon 2026",
-    version="1.0.0",
+    title="AETHER API — National Edition",
+    description=(
+        "Urban Air Quality Intelligence Platform — ET AI Hackathon 2026\n\n"
+        "**v2.0 National Upgrade:** 5-agent constitutional intelligence, "
+        "causal impact analysis (synthetic control), in-memory knowledge graph (NetworkX/Neo4j-ready), "
+        "PINN dispersion simulation, PMF source apportionment with 95% CI, "
+        "OR-Tools inspector routing, RAG legal advisory."
+    ),
+    version="2.0.0",
     lifespan=lifespan,
 )
 
