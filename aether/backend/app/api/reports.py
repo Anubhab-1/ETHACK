@@ -141,3 +141,42 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
     out = CitizenReportOut.model_validate(report)
     out.ward_name = ward.name if ward else f"Ward #{report.ward_id}"
     return out
+
+
+@router.get("/reports/evidence-package/{industry_id}")
+def get_evidence_package(industry_id: str, violation_type: str = "cpcb_norm_violation", db: Session = Depends(get_db)):
+    """Generate an automated legal evidence package for an industrial site violation."""
+    from app.services.evidence_generator import generate_evidence_package
+    return generate_evidence_package(industry_id, violation_type, db)
+
+
+@router.post("/reports/inspector-routes")
+def post_inspector_routes(payload: dict):
+    """
+    Optimize routing for inspector dispatch using Google OR-Tools VRP.
+    Payload takes: locations (list of dict with lat, lon, id, priority),
+    n_inspectors (int), and time_budget_hours (float).
+    """
+    from app.services.route_optimizer import optimize_inspector_routes
+    locations = payload.get("locations", [])
+    n_inspectors = payload.get("n_inspectors", 3)
+    time_budget_hours = payload.get("time_budget_hours", 8.0)
+    return optimize_inspector_routes(locations, n_inspectors, time_budget_hours)
+
+
+@router.post("/reports/legal-query")
+def post_legal_query(payload: dict, db: Session = Depends(get_db)):
+    """Query regulatory frameworks (Air Act, CPCB, NGT) using TF-IDF RAG."""
+    from app.services.rag_legal import query_legal
+    question = payload.get("question", "")
+    limit = payload.get("limit", 3)
+    return query_legal(question, db, limit=limit)
+
+
+@router.get("/reports/violation-risk")
+def get_violation_risk(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
+    """Ranks wards by environmental violation risk using XGBoost & SHAP."""
+    from app.services.risk_scorer import predict_violation_risk
+    return predict_violation_risk(city, db)
+
+
