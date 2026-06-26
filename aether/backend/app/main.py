@@ -197,6 +197,7 @@ app.add_middleware(
 )
 
 from app.api import health, aqi, forecast, attribution, advisory, agents, diagnostics, simulation, reports
+from app.api import forecast_advanced, attribution_advanced, causal_impact, enforcement_advanced, agents_advanced
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(aqi.router, prefix="/api", tags=["AQI"])
@@ -207,6 +208,14 @@ app.include_router(agents.router, prefix="/api", tags=["Agents"])
 app.include_router(diagnostics.router, prefix="/api", tags=["Diagnostics"])
 app.include_router(simulation.router, prefix="/api", tags=["Simulation"])
 app.include_router(reports.router, prefix="/api", tags=["Citizen Reports"])
+
+# Advanced National Upgrade Routers
+app.include_router(forecast_advanced.router, tags=["Forecast Advanced"])
+app.include_router(attribution_advanced.router, tags=["Attribution Advanced"])
+app.include_router(causal_impact.router, tags=["Causal Impact"])
+app.include_router(enforcement_advanced.router, tags=["Enforcement Advanced"])
+app.include_router(agents_advanced.router, tags=["Agents Advanced"])
+
 
 
 
