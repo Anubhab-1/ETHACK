@@ -237,6 +237,7 @@ export default function LandingPage() {
           <Link href="/dashboard" className="hidden sm:flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">🗺️ Dashboard</Link>
           <Link href="/forecast" className="hidden sm:flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">📈 Forecast</Link>
           <Link href="/compare" className="hidden sm:flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">🏙️ Compare</Link>
+          <Link href="/commissioner" className="hidden sm:flex items-center gap-2 text-xs text-indigo-400 hover:text-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-900/20 border border-indigo-800/30 transition-all">🏛️ Commissioner</Link>
           <Link
             href="/dashboard"
             className="ml-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold rounded-lg shadow-lg shadow-orange-500/25 transition-all"
@@ -276,7 +277,7 @@ export default function LandingPage() {
           India's pollution crisis.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
           <Link
             href="/dashboard"
             className="px-8 py-3.5 bg-orange-500 hover:bg-orange-400 text-white font-bold rounded-xl text-base shadow-2xl shadow-orange-500/30 transition-all hover:scale-105 hover:shadow-orange-500/50"
@@ -289,6 +290,34 @@ export default function LandingPage() {
           >
             📈 72h Forecast →
           </Link>
+        </div>
+
+        {/* ── Role Selector ─────────────────────────────────────── */}
+        <div className="mb-12">
+          <p className="text-gray-500 text-xs uppercase tracking-widest mb-4">Select your role to enter</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            <Link href="/commissioner" className="group relative overflow-hidden rounded-2xl border border-indigo-700/40 bg-gradient-to-br from-indigo-950/60 to-slate-900/80 hover:border-indigo-500/70 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-indigo-500/20 text-left p-5 block">
+              <div className="text-3xl mb-2">🏛️</div>
+              <div className="text-white font-bold text-base">Commissioner</div>
+              <div className="text-indigo-300 text-xs mt-1 leading-relaxed">Policy ROI · Causal Impact Proof · Multi-City Intelligence · Agent Deliberation</div>
+              <div className="absolute top-3 right-3 text-xs text-indigo-400 bg-indigo-900/50 px-2 py-0.5 rounded-full border border-indigo-700/40">Decision Maker</div>
+              <div className="mt-3 text-indigo-400 text-xs group-hover:translate-x-1 transition-transform">Enter → </div>
+            </Link>
+            <Link href="/field-officer" className="group relative overflow-hidden rounded-2xl border border-emerald-700/40 bg-gradient-to-br from-emerald-950/60 to-slate-900/80 hover:border-emerald-500/70 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/20 text-left p-5 block">
+              <div className="text-3xl mb-2">🚔</div>
+              <div className="text-white font-bold text-base">Field Officer</div>
+              <div className="text-emerald-300 text-xs mt-1 leading-relaxed">OR-Tools Route · Evidence Capture · Show-Cause Notice · Priority Tasks</div>
+              <div className="absolute top-3 right-3 text-xs text-emerald-400 bg-emerald-900/50 px-2 py-0.5 rounded-full border border-emerald-700/40">Inspector</div>
+              <div className="mt-3 text-emerald-400 text-xs group-hover:translate-x-1 transition-transform">Enter → </div>
+            </Link>
+            <Link href="/citizen" className="group relative overflow-hidden rounded-2xl border border-rose-700/40 bg-gradient-to-br from-rose-950/60 to-slate-900/80 hover:border-rose-500/70 transition-all hover:scale-[1.02] hover:shadow-2xl hover:shadow-rose-500/20 text-left p-5 block">
+              <div className="text-3xl mb-2">👨‍👩‍👧</div>
+              <div className="text-white font-bold text-base">Citizen</div>
+              <div className="text-rose-300 text-xs mt-1 leading-relaxed">Hyperlocal AQI · 12 Languages · Health Advisory · Community Reporting</div>
+              <div className="absolute top-3 right-3 text-xs text-rose-400 bg-rose-900/50 px-2 py-0.5 rounded-full border border-rose-700/40">Public</div>
+              <div className="mt-3 text-rose-400 text-xs group-hover:translate-x-1 transition-transform">Enter → </div>
+            </Link>
+          </div>
         </div>
 
         {/* ── Live City AQI Selector ────────────────────────────── */}

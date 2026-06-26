@@ -138,7 +138,7 @@ export function AgentCommitteeModal({
   };
 
   // Animate agent turns sequentially
-  const allTurns = response?.agent_turns ?? response?.dialogue ?? [];
+  const allTurns: (AgentTurn | DialogueTurn)[] = (response?.agent_turns || response?.dialogue || []) as (AgentTurn | DialogueTurn)[];
 
   useEffect(() => {
     if (typingIndex === -1 || typingIndex >= allTurns.length) {
@@ -147,7 +147,7 @@ export function AgentCommitteeModal({
     }
 
     const currentTurn = allTurns[typingIndex];
-    const agentName = "agent" in currentTurn ? currentTurn.agent : currentTurn.agent;
+    const agentName = currentTurn?.agent || "Unknown";
     setTypingAgent(agentName);
 
     const delay = setTimeout(() => {

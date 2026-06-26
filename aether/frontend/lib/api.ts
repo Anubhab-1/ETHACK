@@ -307,5 +307,90 @@ export const api = {
     apiFetch<CitizenReport>(`/api/reports/${reportId}/upvote`, {
       method: "POST",
     }),
-};
 
+  // ── Aliases for new role-specific pages ──────────────────────────────────
+
+  /** Alias: getHeatmap (Commissioner / Citizen pages) */
+  getHeatmap: (city = "Kolkata") =>
+    apiFetch<{ points: HeatmapPoint[]; total_stations: number; city: string }>(
+      `/api/aqi/heatmap?city=${encodeURIComponent(city)}`
+    ).then(r => {
+      // Normalize: heatmap endpoint may return array or {points:[...]}
+      if (Array.isArray(r)) return { points: r, total_stations: (r as HeatmapPoint[]).length, city };
+      return r;
+    }),
+
+  /** Alias: askAdvisory (Citizen page) */
+  askAdvisory: (question: string, language = "en", lat?: number, lon?: number) =>
+    apiFetch<AdvisoryResponse>("/api/advisory/ask", {
+      method: "POST",
+      body: JSON.stringify({ question, language, lat, lon }),
+    }),
+
+  // ── New v2 National Upgrade endpoints ─────────────────────────────────────
+
+  /** Invoke an agent tool directly */
+  invokeAgentTool: (toolName: string, wardId: number, extra?: Record<string, unknown>) =>
+    apiFetch<Record<string, unknown>>(
+      `/api/agents/tools/invoke?tool_name=${encodeURIComponent(toolName)}&ward_id=${wardId}${
+        extra
+          ? Object.entries(extra)
+              .map(([k, v]) => `&${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+              .join("")
+          : ""
+      }`,
+      { method: "POST" }
+    ),
+
+  /** Causal impact analysis using synthetic control methodology */
+  getCausalImpact: (wardId: number, interventionType = "combined_emergency", preDays = 30, postDays = 14) =>
+    apiFetch<{
+      ward_id: number;
+      ward_name: string;
+      causal_estimate: {
+        average_treatment_effect_ugm3: number;
+        confidence_interval_95: [number, number];
+        p_value: number;
+        statistically_significant: boolean;
+        effect_magnitude: string;
+      };
+      time_series: { actual: number[]; counterfactual: number[]; dates: string[]; intervention_index: number };
+      interpretation: string;
+      health_impact: { hospital_admissions_prevented: number; economic_value_saved_lakhs_inr: number };
+    }>(
+      `/api/agents/causal-impact?ward_id=${wardId}&intervention_type=${encodeURIComponent(interventionType)}&pre_days=${preDays}&post_days=${postDays}`
+    ),
+
+  /** PMF source apportionment with 95% bootstrap CI */
+  getPMFAttribution: (wardId: number) =>
+    apiFetch<{
+      ward_id: number;
+      breakdown_with_ci: Record<string, { mean: number; ci_lower: number; ci_upper: number }>;
+      method: string;
+      primary_source: string;
+    }>(`/api/attribution/${wardId}/pmf`),
+
+  /** Ward knowledge graph (industries, violations, enforcement) */
+  getWardKnowledgeGraph: (wardId: number) =>
+    apiFetch<{
+      ward_id: number;
+      nodes: Record<string, unknown>[];
+      edges: { source: string; target: string; relation: string }[];
+      summary: { total_industries: number; total_violations: number };
+    }>(`/api/agents/knowledge-graph?ward_id=${wardId}`),
+
+  /** Top polluters ranked by PageRank */
+  getPageRankPolluters: (city = "Kolkata") =>
+    apiFetch<{
+      city: string;
+      top_polluters: {
+        industry_id: string;
+        name: string;
+        pagerank_score?: number;
+        influence_score?: number;
+        permit_status: string;
+        violations: number;
+      }[];
+      graph_stats: Record<string, unknown>;
+    }>(`/api/agents/pagerank-polluters?city=${encodeURIComponent(city)}`),
+};
