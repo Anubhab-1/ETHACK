@@ -163,11 +163,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — include localhost + all Vercel preview/production deployments
 origins = [o.strip() for o in settings.allowed_origins.split(",")]
+# Always allow localhost dev origins
+for dev_origin in ["http://localhost:3000", "http://127.0.0.1:3000"]:
+    if dev_origin not in origins:
+        origins.append(dev_origin)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.(vercel\.app|railway\.app|up\.railway\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
