@@ -4,7 +4,7 @@ AETHER — Pydantic Schemas for API request/response validation.
 Compatible with Python 3.8+
 """
 from datetime import datetime
-from typing import Optional, List, Dict, Literal
+from typing import Optional, List, Dict, Literal, Any
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -237,4 +237,51 @@ class CitizenReportOut(BaseModel):
     ward_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+# ── Agent Simulation ─────────────────────────────────────────────────────────
+
+class ToolCall(BaseModel):
+    tool_name: str
+    parameters: Dict[str, Any]
+    result: Optional[Dict[str, Any]] = None
+
+
+class AgentTurn(BaseModel):
+    agent: str
+    role: str
+    avatar: str
+    thought: str
+    tool_calls: List[ToolCall] = []
+    observation: str
+    recommendation: str
+
+
+class ConstitutionalCheck(BaseModel):
+    principle: str
+    status: str  # "PASS" | "WARN" | "FAIL"
+    note: str
+
+
+class CausalEvidence(BaseModel):
+    intervention_type: str
+    ate_ugm3: float
+    ci_lower: float
+    ci_upper: float
+    p_value: float
+    is_significant: bool
+    health_savings_lakhs: float
+
+
+class AgentSimulationResponse(BaseModel):
+    ward_id: int
+    ward_name: str
+    city: str
+    current_aqi: float
+    agent_turns: List[AgentTurn]
+    constitutional_checks: List[ConstitutionalCheck]
+    causal_evidence: Optional[CausalEvidence] = None
+    decree: str
+    # Legacy compatibility fields
+    dialogue: List[Dict] = []
 

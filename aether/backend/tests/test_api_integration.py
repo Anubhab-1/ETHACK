@@ -1,4 +1,4 @@
-﻿"""
+"""
 Integration tests for all major AETHER API endpoints.
 Uses FastAPI TestClient with in-memory SQLite database.
 """
@@ -130,3 +130,28 @@ class TestEnforcementEndpoints:
         data = resp.json()
         assert "temp_c" in data
         assert "wind_speed" in data
+
+
+class TestAgentsEndpoints:
+    def test_agents_simulation_basic(self, client):
+        resp = client.post("/api/agents/simulation?ward_id=1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ward_id"] == 1
+        assert "ward_name" in data
+        assert "agent_turns" in data
+        assert len(data["agent_turns"]) == 5
+        assert "decree" in data
+        assert "constitutional_checks" in data
+
+    def test_agents_simulation_nonexistent_ward(self, client):
+        resp = client.post("/api/agents/simulation?ward_id=99999")
+        assert resp.status_code == 404
+
+    def test_advanced_deliberation(self, client):
+        resp = client.post("/api/agents-advanced/deliberate/1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ward_id"] == "1"
+        assert "consensus" in data
+        assert "avg_agent_confidence" in data

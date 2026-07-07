@@ -1,4 +1,4 @@
-﻿"""
+"""
 AETHER test fixtures — in-memory SQLite database with seeded test data.
 """
 from __future__ import annotations
@@ -11,13 +11,19 @@ from app.database import Base, get_db
 from app.main import app
 
 
+from sqlalchemy.pool import StaticPool
+
 TEST_DB_URL = "sqlite:///:memory:"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def db_engine():
     """Create an in-memory SQLite engine for the test session."""
-    engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+    engine = create_engine(
+        TEST_DB_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
