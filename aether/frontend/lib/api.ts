@@ -145,18 +145,25 @@ export interface CitizenReportInput {
 
 // ── Generic fetch helper ──────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${await res.text()}`);
+async function apiFetch<T>(path: string, options?: RequestInit, timeoutMs = 20000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`API error ${res.status}: ${await res.text()}`);
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json() as Promise<T>;
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
@@ -314,17 +321,19 @@ export const api = {
 
   // ── Aliases for new role-specific pages ──────────────────────────────────
 
-  /** Alias: getHeatmap (Commissioner / Citizen pages) */
-  getHeatmap: (city = "Kolkata") =>
-    apiFetch<{ points: HeatmapPoint[]; total_stations: number; city: string }>(
+  /** Alias: getHeatmap — returns normalized {points, total_stations, city} shape */
+  getHeatmap: async (city = "Kolkata"): Promise<{ points: HeatmapPoint[]; total_stations: number; city: string }> => {
+    // Backend returns HeatmapPoint[] directly — normalize into consistent shape
+    const data = await apiFetch<HeatmapPoint[] | { points: HeatmapPoint[]; total_stations: number; city: string }>(
       `/api/aqi/heatmap?city=${encodeURIComponent(city)}`
-    ).then(r => {
-      // Normalize: heatmap endpoint may return array or {points:[...]}
-      if (Array.isArray(r)) return { points: r, total_stations: (r as HeatmapPoint[]).length, city };
-      return r;
-    }),
+    );
+    if (Array.isArray(data)) {
+      return { points: data, total_stations: data.length, city };
+    }
+    return data;
+  },
 
-  /** Alias: askAdvisory (Citizen page) */
+  /** Advisory — use this for all health advisory requests */
   askAdvisory: (question: string, language = "en", lat?: number, lon?: number) =>
     apiFetch<AdvisoryResponse>("/api/advisory/ask", {
       method: "POST",

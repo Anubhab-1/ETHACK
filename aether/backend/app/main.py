@@ -193,8 +193,9 @@ app.add_middleware(
     allow_origins=origins,
     allow_origin_regex=r"https://.*\.(vercel\.app|railway\.app|up\.railway\.app|onrender\.com)$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Restricted to only the HTTP methods this API actually uses
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID", "Accept"],
 )
 
 from app.api import health, aqi, forecast, attribution, advisory, agents, diagnostics, simulation, reports

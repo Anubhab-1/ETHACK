@@ -64,41 +64,42 @@ def _build_speciation_matrix(ward: Ward, db: Session) -> Optional[List[List[floa
     return matrix if len(matrix) >= 20 else None
 
 
-def _simple_nmf(X: List[List[float]], n_components: int = 5, max_iter: int = 200) -> Tuple[List[List[float]], List[List[float]]]:
+def _simple_nmf(X: List[List[float]], n_components: int = 5, max_iter: int = 200) -> tuple:
     """
-    Lightweight NMF (Non-negative Matrix Factorization) implementation.
-    No scipy/sklearn dependency — uses multiplicative updates.
+    Lightweight NMF (Non-negative Matrix Factorization) using numpy vectorized ops.
+    Replaces the previous pure-Python O(N³) triple-nested list comprehension
+    that was unacceptably slow for even moderate n_samples.
 
     X = W @ H
     W: (n_samples, n_components) — source contributions
     H: (n_components, n_features) — source profiles
 
-    Returns (W, H)
+    Returns (W, H) as numpy arrays.
     """
-    n = len(X)
-    m = len(X[0])
-    rng = random.Random(42)
+    import numpy as np
 
-    # Initialize W and H with random non-negative values
-    W = [[max(0.01, rng.gauss(1.0, 0.3)) for _ in range(n_components)] for _ in range(n)]
-    H = [[max(0.01, rng.gauss(1.0, 0.3)) for _ in range(m)] for _ in range(n_components)]
+    X_arr = np.array(X, dtype=float)
+    n, m = X_arr.shape
+    rng = np.random.default_rng(42)
+
+    # Initialize with small positive values
+    W = rng.uniform(0.5, 1.5, size=(n, n_components))
+    H = rng.uniform(0.5, 1.5, size=(n_components, m))
 
     eps = 1e-10
 
     for _ in range(max_iter):
-        # Update H: H = H * (W^T X) / (W^T W H + eps)
-        WtX = [[sum(W[i][k] * X[i][j] for i in range(n)) for j in range(m)] for k in range(n_components)]
-        WtWH = [[sum(sum(W[i][k] * W[i][l] for i in range(n)) * H[l][j] for l in range(n_components))
-                 for j in range(m)] for k in range(n_components)]
-        H = [[H[k][j] * WtX[k][j] / (WtWH[k][j] + eps) for j in range(m)] for k in range(n_components)]
+        # Update H: multiplicative rule — vectorized
+        numerator_H = W.T @ X_arr
+        denominator_H = W.T @ W @ H + eps
+        H *= numerator_H / denominator_H
 
-        # Update W: W = W * (X H^T) / (W H H^T + eps)
-        XHt = [[sum(X[i][j] * H[k][j] for j in range(m)) for k in range(n_components)] for i in range(n)]
-        WHHt = [[sum(sum(W[i][l] * H[l][j] * H[k][j] for j in range(m)) for l in range(n_components))
-                 for k in range(n_components)] for i in range(n)]
-        W = [[max(eps, W[i][k] * XHt[i][k] / (WHHt[i][k] + eps)) for k in range(n_components)] for i in range(n)]
+        # Update W: multiplicative rule — vectorized
+        numerator_W = X_arr @ H.T
+        denominator_W = W @ H @ H.T + eps
+        W *= numerator_W / denominator_W
 
-    return W, H
+    return W.tolist(), H.tolist()
 
 
 def _interpret_source_profiles(H: List[List[float]]) -> List[str]:
@@ -189,7 +190,16 @@ def run_pmf_attribution(
     for source in source_keys:
         vals = bootstrap_contributions.get(source, bootstrap_contributions.get(secondary_alias.get(source, ""), []))
         if not vals:
-            vals = [rng.uniform(5, 25) for _ in range(n_bootstrap)]  # fallback
+            # No NMF bootstrap data for this source category.
+            # Use a wide-CI placeholder and flag it as estimated rather than
+            # silently injecting random uniform values which would corrupt CI.
+            result[source] = {
+                "mean": 15.0,
+                "ci_lower": 5.0,
+                "ci_upper": 35.0,
+                "estimated": True,  # Explicitly flagged — not derived from measured data
+            }
+            continue
 
         vals.sort()
         mean_val = sum(vals) / len(vals)

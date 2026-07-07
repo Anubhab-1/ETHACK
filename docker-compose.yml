@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # ── TimescaleDB (Time-Series, Spatial & Hypertables) ─────────────────────────
   timescaledb:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:2.13.1-pg15
     ports:
       - "5432:5432"
     environment:
@@ -13,6 +13,11 @@ services:
     volumes:
       - tsdb_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aether -d aether_national"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # ── Neo4j (Knowledge Graph DB) ────────────────────────────────────────────────
   neo4j:
@@ -25,6 +30,11 @@ services:
     volumes:
       - neo4j_data:/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null -q http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
 
   # ── Qdrant (Vector Database for legal docs RAG) ──────────────────────────────
   qdrant:
@@ -35,6 +45,11 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null -q http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # ── Kafka Streaming Broker (Redpanda wrapper for low overhead) ──────────────
   kafka:
@@ -71,11 +86,15 @@ services:
       - ALLOWED_ORIGINS=http://localhost:3000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
-      - timescaledb
-      - neo4j
-      - qdrant
-      - kafka
+      timescaledb:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # ── Next.js Frontend ───────────────────────────────────────────────────────
   frontend:
@@ -87,7 +106,8 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
@@ -96,4 +116,3 @@ volumes:
   qdrant_data:
   kafka_data:
   sqlite_data:
-

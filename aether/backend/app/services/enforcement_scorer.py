@@ -165,9 +165,16 @@ def recompute_enforcement_queue(city: str, db: Session, limit: int = 20):
                 existing.action_text = action_text
 
         except Exception as e:
-            logger.warning(f"Error processing ward {ward.id}: {e}")
+            logger.warning("Error processing ward %s: %s", ward.id, e)
+            db.rollback()
             continue
 
-    db.commit()
-    logger.info(f"Enforcement queue updated: {created} new actions created")
+    try:
+        db.commit()
+        logger.info("Enforcement queue updated: %d new actions created for %s", created, city)
+    except Exception as e:
+        logger.error("Failed to commit enforcement queue update: %s", e)
+        db.rollback()
+        raise
+
     return created

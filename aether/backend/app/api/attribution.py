@@ -127,22 +127,29 @@ def get_enforcement_queue(
     status: str = Query("open"),
     db: Session = Depends(get_db),
 ):
-    """Get ranked enforcement action queue."""
-    actions = db.query(EnforcementAction).filter(
-        EnforcementAction.city == city,
-        EnforcementAction.status == status,
-    ).order_by(EnforcementAction.priority_score.desc()).limit(limit).all()
-    
+    """Get ranked enforcement action queue — O(1) queries via join."""
+    # Single JOIN query instead of N per-action Ward lookups
+    rows = (
+        db.query(EnforcementAction, Ward)
+        .outerjoin(Ward, EnforcementAction.ward_id == Ward.id)
+        .filter(
+            EnforcementAction.city == city,
+            EnforcementAction.status == status,
+        )
+        .order_by(EnforcementAction.priority_score.desc())
+        .limit(limit)
+        .all()
+    )
+
     result = []
-    for a in actions:
-        ward = db.query(Ward).filter(Ward.id == a.ward_id).first()
-        item = {
+    for a, ward in rows:
+        result.append({
             "id": a.id,
             "ward_id": a.ward_id,
             "ward_name": ward.name if ward else "Unknown",
             "ward_no": ward.ward_no if ward else 0,
-            "ward_lat": ward.lat if ward else 0,
-            "ward_lon": ward.lon if ward else 0,
+            "ward_lat": ward.lat if ward else 0.0,
+            "ward_lon": ward.lon if ward else 0.0,
             "city": a.city,
             "priority_score": a.priority_score,
             "action_text": a.action_text,
@@ -151,9 +158,8 @@ def get_enforcement_queue(
             "alerts_sent": a.alerts_sent or 0,
             "alerts_confirmed": a.alerts_confirmed or 0,
             "created_at": a.created_at.isoformat(),
-        }
-        result.append(item)
-    
+        })
+
     return result
 
 

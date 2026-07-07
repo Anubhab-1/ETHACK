@@ -4,8 +4,8 @@ AETHER — Pydantic Schemas for API request/response validation.
 Compatible with Python 3.8+
 """
 from datetime import datetime
-from typing import Optional, List, Dict
-from pydantic import BaseModel
+from typing import Optional, List, Dict, Literal
+from pydantic import BaseModel, Field, field_validator
 
 
 # ── Station ────────────────────────────────────────────────────────────────────
@@ -130,6 +130,11 @@ class AttributionResponse(BaseModel):
 class EnforcementActionOut(BaseModel):
     id: int
     ward_id: int
+    # ward_name is resolved at the API layer via join; optional for safety
+    ward_name: Optional[str] = None
+    ward_no: Optional[int] = None
+    ward_lat: Optional[float] = None
+    ward_lon: Optional[float] = None
     city: str
     priority_score: float
     action_text: str
@@ -154,11 +159,25 @@ class EnforcementStats(BaseModel):
 # ── Advisory ───────────────────────────────────────────────────────────────────
 
 class AdvisoryRequest(BaseModel):
-    question: str
-    language: str = "en"  # 'en', 'bn', 'hi'
+    question: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="User's air quality question (max 500 characters)",
+    )
+    language: Literal["en", "bn", "hi"] = "en"
     lat: Optional[float] = None
     lon: Optional[float] = None
     session_id: Optional[str] = None
+
+    @field_validator("question")
+    @classmethod
+    def sanitize_question(cls, v: str) -> str:
+        """Strip leading/trailing whitespace and reject empty input."""
+        v = v.strip()
+        if not v:
+            raise ValueError("Question must not be empty")
+        return v
 
 
 class AdvisoryResponse(BaseModel):

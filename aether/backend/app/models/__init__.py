@@ -4,14 +4,19 @@ AETHER — SQLAlchemy ORM Models
 All database tables for the platform.
 Python 3.8 compatible.
 """
-from datetime import datetime
-from typing import Optional, List
+from datetime import datetime, timezone
+from typing import Optional
 from sqlalchemy import (
     Integer, String, Float, Text, DateTime, Boolean,
-    ForeignKey
+    ForeignKey, Index
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+
+
+def _now() -> datetime:
+    """Return current UTC time. Replaces deprecated datetime.utcnow()."""
+    return datetime.now(timezone.utc)
 
 
 class Station(Base):
@@ -44,6 +49,11 @@ class Reading(Base):
     o3: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     aqi: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Compound index: accelerates "latest reading per station" subqueries
+    __table_args__ = (
+        Index("ix_readings_station_time", "station_id", "measured_at"),
+    )
 
 
 class Weather(Base):
@@ -101,7 +111,7 @@ class Attribution(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ward_id: Mapped[int] = mapped_column(Integer, ForeignKey("wards.id"), index=True)
-    computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    computed_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     traffic_pct: Mapped[float] = mapped_column(Float, default=0.0)
     industrial_pct: Mapped[float] = mapped_column(Float, default=0.0)
     construction_pct: Mapped[float] = mapped_column(Float, default=0.0)
@@ -110,6 +120,11 @@ class Attribution(Base):
     primary_source: Mapped[str] = mapped_column(String(50))
     confidence: Mapped[float] = mapped_column(Float)
     explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Compound index: accelerates latest-attribution-per-ward lookups
+    __table_args__ = (
+        Index("ix_attribution_ward_time", "ward_id", "computed_at"),
+    )
 
 
 class EnforcementAction(Base):
@@ -124,8 +139,13 @@ class EnforcementAction(Base):
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)
     alerts_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
     alerts_confirmed: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Compound index: accelerates city+status filter (most common query pattern)
+    __table_args__ = (
+        Index("ix_enforcement_city_status", "city", "status"),
+    )
 
 
 class Document(Base):
