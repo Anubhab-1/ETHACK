@@ -1,6 +1,12 @@
 from __future__ import annotations
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
+from dotenv import load_dotenv
+
+# Forcibly load local .env variables to override any system-wide environment variables
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+load_dotenv(env_path, override=True)
 
 
 class Settings(BaseSettings):
