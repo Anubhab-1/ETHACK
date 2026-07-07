@@ -103,6 +103,10 @@ def seed_kolkata_wards(db: Session):
             population = random.randint(40000, 200000)
             school_count = max(1, int(population / 20000))
             hospital_count = max(0, int(population / 50000))
+            elderly_percentage = round(random.uniform(5.0, 16.0), 2)
+            child_percentage = round(random.uniform(4.0, 12.0), 2)
+            low_income_percentage = round(random.uniform(10.0, 45.0), 2)
+            svi_index = round((elderly_percentage * 0.4 + child_percentage * 0.4 + low_income_percentage * 0.2) / 100.0, 4)
 
             ward = Ward(
                 ward_no=ward_no,
@@ -116,6 +120,10 @@ def seed_kolkata_wards(db: Session):
                 road_density=round(road_density, 2),
                 industrial_score=round(industrial_score, 1),
                 construction_count=construction_count,
+                elderly_percentage=elderly_percentage,
+                child_percentage=child_percentage,
+                low_income_percentage=low_income_percentage,
+                svi_index=svi_index,
             )
             db.add(ward)
             ward_no += 1
@@ -147,6 +155,11 @@ def seed_delhi_wards(db: Session):
     ]
     
     for i, z in enumerate(delhi_zones):
+        elderly_percentage = round(random.uniform(5.0, 16.0), 2)
+        child_percentage = round(random.uniform(4.0, 12.0), 2)
+        low_income_percentage = round(random.uniform(10.0, 45.0), 2)
+        svi_index = round((elderly_percentage * 0.4 + child_percentage * 0.4 + low_income_percentage * 0.2) / 100.0, 4)
+
         ward = Ward(
             ward_no=i + 1,
             name=z["name"],
@@ -159,6 +172,10 @@ def seed_delhi_wards(db: Session):
             road_density=round(random.uniform(0.5, 1.0), 2),
             industrial_score=float(z["ind"]),
             construction_count=random.randint(2, 10),
+            elderly_percentage=elderly_percentage,
+            child_percentage=child_percentage,
+            low_income_percentage=low_income_percentage,
+            svi_index=svi_index,
         )
         db.add(ward)
     
@@ -186,6 +203,11 @@ def seed_mumbai_wards(db: Session):
     ]
     
     for i, z in enumerate(mumbai_zones):
+        elderly_percentage = round(random.uniform(5.0, 16.0), 2)
+        child_percentage = round(random.uniform(4.0, 12.0), 2)
+        low_income_percentage = round(random.uniform(10.0, 45.0), 2)
+        svi_index = round((elderly_percentage * 0.4 + child_percentage * 0.4 + low_income_percentage * 0.2) / 100.0, 4)
+
         ward = Ward(
             ward_no=i + 1,
             name=z["name"],
@@ -198,6 +220,10 @@ def seed_mumbai_wards(db: Session):
             road_density=round(random.uniform(0.4, 0.9), 2),
             industrial_score=float(z["ind"]),
             construction_count=random.randint(5, 20),
+            elderly_percentage=elderly_percentage,
+            child_percentage=child_percentage,
+            low_income_percentage=low_income_percentage,
+            svi_index=svi_index,
         )
         db.add(ward)
     

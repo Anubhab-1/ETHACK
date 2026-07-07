@@ -73,7 +73,10 @@ def generate_advisory_with_llm(request: AdvisoryRequest, aqi: float | None, cate
     
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=settings.openai_api_key)
+        client = OpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_api_base or None
+        )
         
         lang_map = {"en": "English", "bn": "Bengali", "hi": "Hindi"}
         lang = lang_map.get(request.language, "English")
@@ -85,7 +88,7 @@ Current AQI: {aqi or 'Unknown'} ({category})
 Base your advice only on the air quality data provided."""
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=settings.llm_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": request.question},
@@ -214,7 +217,10 @@ def get_briefing(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     if settings.openai_api_key:
         try:
             from openai import OpenAI
-            client = OpenAI(api_key=settings.openai_api_key)
+            client = OpenAI(
+                api_key=settings.openai_api_key,
+                base_url=settings.openai_api_base or None
+            )
             
             system_prompt = f"""You are AETHER, the Chief Environmental Intelligence Agent.
 Write a strategic "AI Executive Briefing" for the City Commissioner of {city}.
@@ -231,7 +237,7 @@ Current Parameters:
 """
             prompt = "Generate the Commissioner's strategic air quality morning brief."
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=settings.llm_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},

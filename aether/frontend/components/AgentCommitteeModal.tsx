@@ -226,7 +226,7 @@ export function AgentCommitteeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-[#0d1117] border border-slate-700/60 rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Header */}

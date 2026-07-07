@@ -183,8 +183,12 @@ def update_enforcement_status(
 
 @router.post("/enforcement/{action_id}/broadcast")
 def broadcast_alerts(action_id: int, db: Session = Depends(get_db)):
-    """Broadcast localized alerts to residents in the ward. Simulates IVR / WhatsApp alerts."""
+    """Broadcast localized alerts to residents in the ward. Simulates and sends IVR / WhatsApp / SMS alerts."""
     import random
+    import requests
+    from app.config import get_settings
+    
+    settings = get_settings()
     action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -193,6 +197,41 @@ def broadcast_alerts(action_id: int, db: Session = Depends(get_db)):
     action.alerts_sent = random.randint(120, 240)
     action.alerts_confirmed = 0
     action.status = "deployed"
+    
+    # Attempt real Twilio SMS if credentials are configured
+    twilio_status = "simulated"
+    if (settings.twilio_account_sid and settings.twilio_auth_token and 
+            settings.twilio_from_number and settings.twilio_to_number):
+        try:
+            from app.models import Ward
+            from app.services.attributor import get_current_aqi_for_ward
+            ward = db.query(Ward).filter(Ward.id == action.ward_id).first()
+            aqi_val = get_current_aqi_for_ward(ward, db) if ward else "N/A"
+            
+            message_body = (
+                f"KMC Alert: Ward {ward.ward_no if ward else '?' } ({ward.name if ward else '?'}) "
+                f"AQI is severe ({round(aqi_val) if isinstance(aqi_val, (int, float)) else aqi_val}). "
+                f"Enforcement action '{action.target_type}' deployed. Citizens advised to wear masks and limit outdoor activities."
+            )
+            
+            url = f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json"
+            auth = (settings.twilio_account_sid, settings.twilio_auth_token)
+            data = {
+                "From": settings.twilio_from_number,
+                "To": settings.twilio_to_number,
+                "Body": message_body
+            }
+            res = requests.post(url, auth=auth, data=data, timeout=10)
+            if res.status_code == 201:
+                twilio_status = f"sent_sms_sid_{res.json().get('sid')}"
+                logger.info(f"Twilio alert sent successfully: {twilio_status}")
+            else:
+                twilio_status = f"failed_http_{res.status_code}"
+                logger.warning(f"Twilio API failed with status {res.status_code}: {res.text}")
+        except Exception as e:
+            twilio_status = f"error_{str(e)}"
+            logger.error(f"Error invoking Twilio alert gateway: {e}")
+
     db.commit()
     db.refresh(action)
     return {
@@ -200,6 +239,7 @@ def broadcast_alerts(action_id: int, db: Session = Depends(get_db)):
         "status": action.status,
         "alerts_sent": action.alerts_sent,
         "alerts_confirmed": action.alerts_confirmed,
+        "twilio_status": twilio_status,
         "updated": True
     }
 

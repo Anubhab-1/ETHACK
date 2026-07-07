@@ -76,6 +76,10 @@ class Ward(Base):
     industrial_score: Mapped[float] = mapped_column(Float, default=0.0)
     construction_count: Mapped[int] = mapped_column(Integer, default=0)
     geojson: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    elderly_percentage: Mapped[float] = mapped_column(Float, default=0.0)
+    child_percentage: Mapped[float] = mapped_column(Float, default=0.0)
+    low_income_percentage: Mapped[float] = mapped_column(Float, default=0.0)
+    svi_index: Mapped[float] = mapped_column(Float, default=0.0)
 
 
 class Forecast(Base):

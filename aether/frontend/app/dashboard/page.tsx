@@ -331,17 +331,24 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-screen bg-gray-950 overflow-hidden">
       {/* ── Top Navigation Bar ────────────────────────────────────────── */}
-      <header className="flex-none z-50 flex items-center justify-between px-4 py-3 glass-panel border-b border-white/8">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="text-orange-500 font-black text-xl tracking-tight cursor-pointer hover:text-orange-400 transition-colors" onClick={() => window.location.href = '/'}>
-            ⬡ AETHER
+      <header className="flex-none z-[1100] flex flex-col lg:flex-row items-center justify-between px-4 py-3 gap-3 lg:gap-0 bg-gray-950/95 backdrop-blur-md border-b border-white/8 shadow-md">
+        {/* Logo and Mobile controls */}
+        <div className="flex items-center justify-between w-full lg:w-auto">
+          <div className="flex items-center gap-3">
+            <div className="text-orange-500 font-black text-xl tracking-tight cursor-pointer hover:text-orange-400 transition-colors" onClick={() => window.location.href = '/'}>
+              ⬡ AETHER
+            </div>
+            <span className="hidden sm:block text-gray-500 text-xs font-medium">Air Quality Intelligence</span>
           </div>
-          <span className="hidden sm:block text-gray-500 text-xs">Air Quality Intelligence</span>
+          {/* Live indicator (mobile) */}
+          <div className="flex lg:hidden items-center gap-1.5 text-xs text-gray-500 bg-gray-900/50 px-2.5 py-1 rounded-full border border-white/5">
+            <div className="status-live animate-pulse" />
+            <span>Live</span>
+          </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex items-center gap-1">
+        {/* Navigation scrollbar */}
+        <nav className="flex items-center gap-1 overflow-x-auto w-full lg:w-auto whitespace-nowrap scrollbar-none py-1 lg:py-0 border-y border-white/5 lg:border-none">
           <Link href="/dashboard" className="nav-link active">
             <span>🗺️</span> Dashboard
           </Link>
@@ -362,18 +369,18 @@ export default function DashboardPage() {
           </Link>
         </nav>
 
-        {/* City Selector + AQI */}
-        <div className="flex items-center gap-3">
-          {/* Live indicator */}
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <div className="status-live" />
+        {/* Selector + API keys / actions */}
+        <div className="flex items-center justify-between lg:justify-end gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap">
+          {/* Live indicator (desktop) */}
+          <div className="hidden lg:flex items-center gap-1.5 text-xs text-gray-500">
+            <div className="status-live animate-pulse" />
             <span>Live</span>
           </div>
 
           {/* City AQI badge */}
           {cityAvgAQI !== null && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 hidden sm:block">City avg</span>
+            <div className="flex items-center gap-2 bg-gray-900/40 px-2 py-1 rounded-lg border border-white/5">
+              <span className="text-[10px] text-gray-500 hidden sm:block uppercase tracking-wider">City avg</span>
               <AQIBadge aqi={cityAvgAQI} size="sm" />
             </div>
           )}
@@ -394,19 +401,19 @@ export default function DashboardPage() {
               }
               setBriefingOpen(false);
             }}
-            className="text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-orange-500"
+            className="text-xs sm:text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-orange-500 cursor-pointer font-medium"
           >
             {CITIES.map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
 
-           {/* AI Executive Briefing button */}
+          {/* AI Executive Briefing button */}
           <button
             onClick={loadBriefing}
-            className="text-xs bg-orange-500 hover:bg-orange-400 text-white font-semibold py-1.5 px-3 rounded-lg flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all border border-orange-400/40 cursor-pointer"
+            className="text-xs bg-orange-500 hover:bg-orange-400 text-white font-semibold py-1.5 px-2.5 rounded-lg flex items-center gap-1 shadow-lg shadow-orange-500/20 transition-all border border-orange-400/40 cursor-pointer"
           >
-            ✨ AI Briefing
+            ✨ <span>AI Briefing</span>
           </button>
 
           {/* Sensor Diagnostics Button */}
@@ -416,25 +423,26 @@ export default function DashboardPage() {
               setBriefingOpen(false);
               setCalibrationOpen(false);
             }}
-            className="text-xs bg-gray-800 border border-gray-700 hover:border-orange-500 text-orange-400 hover:text-orange-300 font-semibold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="text-xs bg-gray-800 border border-gray-700 hover:border-orange-500 text-orange-400 hover:text-orange-300 font-semibold py-1.5 px-2.5 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
           >
-            🔧 Sensor Health
+            🔧 <span>Sensor Health</span>
           </button>
 
+          <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+            {/* Alert Notification Bell */}
+            <AlertNotificationSystem liveAQI={liveData} city={city} />
 
-          {/* Alert Notification Bell */}
-          <AlertNotificationSystem liveAQI={liveData} city={city} />
-
-          {/* Refresh button */}
-          <button
-            onClick={loadData}
-            className="p-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-orange-400 hover:border-orange-500 transition-colors"
-            title="Refresh data"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+            {/* Refresh button */}
+            <button
+              onClick={loadData}
+              className="p-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-400 hover:text-orange-400 hover:border-orange-500 transition-colors cursor-pointer"
+              title="Refresh data"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -481,20 +489,20 @@ export default function DashboardPage() {
 
           {/* Station count badge */}
           {!loading && (
-            <div className="absolute top-3 left-3 z-[400] glass-card px-3 py-1.5 text-xs text-gray-400">
+            <div className="absolute top-3 left-3 z-[800] glass-card px-3 py-1.5 text-xs text-gray-400">
               {liveData.length} stations · {heatmapData.length} wards monitored
             </div>
           )}
 
           {/* Last updated */}
           {lastUpdated && (
-            <div className="absolute top-3 right-3 z-[400] glass-card px-3 py-1.5 text-xs text-gray-500">
+            <div className="absolute top-3 right-3 z-[800] glass-card px-3 py-1.5 text-xs text-gray-500">
               Updated {lastUpdated.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
             </div>
           )}
 
           {/* Floating Digital Twin Policy Panel */}
-          <div className="absolute top-14 right-3 z-[400] glass-card p-4 w-72 space-y-3.5 border border-white/5 shadow-2xl bg-gray-950/90">
+          <div className="absolute top-14 right-3 z-[800] glass-card p-4 w-72 max-w-[calc(100vw-24px)] space-y-3.5 border border-white/5 shadow-2xl bg-gray-950/90">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-xs text-orange-400 uppercase tracking-wider">Digital Twin Sim</h3>
               {simulating ? (
@@ -600,7 +608,7 @@ export default function DashboardPage() {
 
           {/* AI Strategic Executive Briefing Overlay */}
           {briefingOpen && (
-            <div className="absolute top-14 left-3 z-[450] glass-card p-4 w-80 max-h-[80%] overflow-y-auto border border-white/10 shadow-2xl flex flex-col gap-3 animate-slide-up">
+            <div className="absolute top-14 left-3 z-[950] glass-card p-4 w-80 max-w-[calc(100vw-24px)] max-h-[80%] overflow-y-auto border border-white/10 shadow-2xl flex flex-col gap-3 animate-slide-up">
               <div className="flex items-center justify-between border-b border-white/5 pb-2">
                 <h3 className="font-bold text-xs text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
                   ✨ AI Strategic Briefing
@@ -648,7 +656,7 @@ export default function DashboardPage() {
 
           {/* Sensor Diagnostics Overlay */}
           {diagnosticsOpen && (
-            <div className="absolute top-14 left-3 z-[450] w-85 max-h-[80%] overflow-y-auto animate-slide-up">
+            <div className="absolute top-14 left-3 z-[950] w-85 max-w-[calc(100vw-24px)] max-h-[80%] overflow-y-auto animate-slide-up">
               <div className="relative bg-gray-950 border border-white/10 rounded-2xl shadow-2xl p-1.5">
                 <button
                   onClick={() => setDiagnosticsOpen(false)}
@@ -674,7 +682,7 @@ export default function DashboardPage() {
 
           {/* Satellite Calibration Overlay */}
           {calibrationOpen && (
-            <div className="absolute top-14 left-3 z-[450] w-85 max-h-[80%] overflow-y-auto animate-slide-up">
+            <div className="absolute top-14 left-3 z-[950] w-85 max-w-[calc(100vw-24px)] max-h-[80%] overflow-y-auto animate-slide-up">
               <div className="relative bg-gray-950 border border-white/10 rounded-2xl shadow-2xl p-1.5">
                 <button
                   onClick={() => setCalibrationOpen(false)}
@@ -689,7 +697,7 @@ export default function DashboardPage() {
 
 
           {/* Floating Weather Layer Control Panel */}
-          <div className="absolute bottom-16 right-3 z-[400] glass-card p-4 w-56 text-xs space-y-3 border border-white/5 shadow-lg bg-gray-950/90">
+          <div className="absolute bottom-16 right-3 z-[800] glass-card p-4 w-56 max-w-[calc(100vw-24px)] text-xs space-y-3 border border-white/5 shadow-lg bg-gray-950/90">
             <p className="text-gray-400 font-bold text-[9px] uppercase tracking-wider text-orange-500">Map Layers & Controls</p>
             
             <div className="space-y-2">
@@ -825,7 +833,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Left Side Info Column (Legend, Health Impact, Satellite HUD) */}
-          <div className="absolute bottom-16 left-3 z-[400] w-56 flex flex-col gap-3 pointer-events-auto">
+          <div className="absolute bottom-16 left-3 z-[800] w-56 max-w-[calc(100vw-24px)] flex flex-col gap-3 pointer-events-auto">
             {/* Sentinel-5P Downlink Telemetry HUD */}
             {showDownlinkHUD && (
               <div className="glass-card p-3 border border-orange-500/25 shadow-2xl text-[10px] space-y-1.5 animate-slide-up bg-gray-950/95">
@@ -882,8 +890,8 @@ export default function DashboardPage() {
 
         {/* ── Intelligence Side Panel ────────────────────────────────── */}
         <div
-          className={`flex-none transition-all duration-300 ease-in-out glass-panel overflow-y-auto ${
-            sidebarOpen ? "w-80 xl:w-96" : "w-0"
+          className={`absolute md:relative right-0 top-0 bottom-0 transition-all duration-300 ease-in-out glass-panel overflow-y-auto ${
+            sidebarOpen ? "w-full md:w-80 xl:w-96 opacity-100 z-[990]" : "w-0 opacity-0 pointer-events-none z-[-1]"
           }`}
           style={{ borderLeft: sidebarOpen ? "1px solid rgba(255,255,255,0.08)" : "none" }}
         >
@@ -930,6 +938,32 @@ export default function DashboardPage() {
                         </span>
                       )}
                     </div>
+
+                    {/* SVI Details */}
+                    {selectedWard.svi_index !== undefined && (
+                      <div className="bg-orange-950/20 border border-orange-900/40 rounded-xl p-3 space-y-2 mt-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-orange-400">Social Vulnerability Index (SVI):</span>
+                          <span className="font-mono font-black text-orange-300">
+                            {(selectedWard.svi_index * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-[9px] text-gray-400">
+                          <div className="bg-gray-900/50 p-1.5 rounded text-center border border-white/5">
+                            <span className="block text-[11px] font-bold text-gray-300">{selectedWard.elderly_percentage}%</span>
+                            Elderly (&gt;65)
+                          </div>
+                          <div className="bg-gray-900/50 p-1.5 rounded text-center border border-white/5">
+                            <span className="block text-[11px] font-bold text-gray-300">{selectedWard.child_percentage}%</span>
+                            Children (&lt;5)
+                          </div>
+                          <div className="bg-gray-900/50 p-1.5 rounded text-center border border-white/5">
+                            <span className="block text-[11px] font-bold text-gray-300">{selectedWard.low_income_percentage}%</span>
+                            Low Income
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t border-white/8" />

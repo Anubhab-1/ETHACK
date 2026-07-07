@@ -416,13 +416,15 @@ export default function AdvisoryPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col h-screen overflow-hidden">
       {/* ── Header ── */}
-      <header className="border-b border-white/8 px-6 py-3 flex items-center justify-between glass-panel flex-none z-50">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
-          <span className="text-gray-700">·</span>
-          <h1 className="font-bold text-sm text-gray-200">Citizen Advisory</h1>
+      <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100]">
+        <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
+            <span className="text-gray-700">·</span>
+            <h1 className="font-bold text-sm text-gray-200">Citizen Advisory</h1>
+          </div>
         </div>
-        <nav className="hidden sm:flex items-center gap-1">
+        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
           <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
           <Link href="/forecast" className="nav-link">📈 Forecast</Link>
           <Link href="/enforcement" className="nav-link">⚡ Enforcement</Link>
@@ -503,7 +505,7 @@ export default function AdvisoryPage() {
               
               {/* Ward Mini-Forecast Overlay */}
               {selectedWardDetail && (
-                <div className="absolute top-4 left-4 z-[400] glass-card p-4 w-72 space-y-3 bg-gray-950/95 border border-white/10 shadow-2xl animate-slide-up">
+                <div className="absolute top-4 left-4 z-[800] glass-card p-4 w-72 max-w-[calc(100vw-32px)] space-y-3 bg-gray-950/95 border border-white/10 shadow-2xl animate-slide-up">
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-bold text-gray-100 text-xs">{selectedWardDetail.name}</h3>

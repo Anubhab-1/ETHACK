@@ -98,6 +98,96 @@ export default function FieldOfficerPage() {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: "escalated" } : t));
   };
 
+  const downloadPDF = (task: InspectionTask) => {
+    import("jspdf").then((module) => {
+      const jsPDF = module.default;
+      const doc = new jsPDF();
+
+      // Header Bar Background
+      doc.setFillColor(3, 7, 18);
+      doc.rect(0, 0, 210, 35, "F");
+
+      // Header Text
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(15);
+      doc.text("KOLKATA MUNICIPAL CORPORATION", 15, 14);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(249, 115, 22);
+      doc.text("EMERGENCY ENVIRONMENTAL INSPECTION & ENFORCEMENT DISPATCH", 15, 21);
+      
+      doc.setDrawColor(249, 115, 22);
+      doc.setLineWidth(0.8);
+      doc.line(15, 28, 195, 28);
+
+      // Section: Case Info
+      doc.setTextColor(20, 20, 20);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("OFFICIAL ENFORCEMENT DISPATCH ORDER", 15, 45);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const startY = 53;
+      const rowHeight = 7.5;
+      
+      const fields = [
+        ["Dispatch Reference:", `AETHER-DISPATCH-${task.id}-${Date.now().toString().slice(-5)}`],
+        ["Assignee Inspector:", "Lead Environmental Officer, Team 4A"],
+        ["Target Area:", `${task.ward_name} (Ward #${task.ward_id})`],
+        ["Establishment Type:", task.industry_type],
+        ["Reported Violation:", task.violation_type.replace(/_/g, " ").toUpperCase()],
+        ["Risk Assessment Priority:", task.priority_score > 0.8 ? "CRITICAL (Level P1)" : "HIGH (Level P2)"],
+        ["Current Ward AQI Level:", `${task.aqi} (PM2.5 Dominant)`],
+        ["Unit Permit Status:", task.permit_status.toUpperCase()],
+        ["Est. Travel Distance:", `${task.distance_km} km away (~${task.estimated_time_min} mins)`]
+      ];
+
+      fields.forEach((field, index) => {
+        const y = startY + index * rowHeight;
+        doc.setFont("helvetica", "bold");
+        doc.text(field[0], 15, y);
+        doc.setFont("helvetica", "normal");
+        doc.text(field[1], 65, y);
+      });
+
+      // Section: Mandated Actions
+      const nextSectionY = startY + fields.length * rowHeight + 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("MUNICIPAL INJUNCTION PROTOCOL", 15, nextSectionY);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      const protocols = [
+        "1. Issue Immediate Stop-Work Order to establishment under Air Act 1981 Section 31A.",
+        "2. Record GPS-stamped visual evidence of emissions, dust leakage, or open burning.",
+        "3. Verify active emission scrubbers (CEMS units) and permit validation codes.",
+        "4. Enforce mandatory water-sprinkling and construction net enclosures (if dust violation).",
+        "5. Issue warning card and SCN (Show Cause Notice) with a 7-day compliance window."
+      ];
+
+      protocols.forEach((proto, index) => {
+        doc.text(proto, 15, nextSectionY + 8 + index * 7);
+      });
+
+      // Footer
+      const footerY = 270;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(15, footerY - 5, 195, footerY - 5);
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.text("Prepared by AETHER Automated Municipal Dispatch Engine. Authorized for immediate field enforcement.", 15, footerY);
+      
+      // Save PDF
+      doc.save(`AETHER_Dispatch_${task.id}.pdf`);
+    }).catch(err => {
+      console.error("Failed to load jsPDF:", err);
+      alert("Error generating dispatch PDF. Please check console logs.");
+    });
+  };
+
   const generateNotice = async (task: InspectionTask) => {
     setNoticeTarget(task);
     setGeneratingNotice(true);
@@ -235,6 +325,13 @@ export default function FieldOfficerPage() {
                     >
                       Pre-Generate Notice
                     </button>
+                    <button
+                      onClick={() => downloadPDF(task)}
+                      className="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs py-1.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-1"
+                      title="Download Dispatch PDF"
+                    >
+                      📄 PDF
+                    </button>
                   </div>
                 )}
                 {task.status === "in_progress" && (
@@ -246,13 +343,20 @@ export default function FieldOfficerPage() {
                       }}
                       className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs py-1.5 rounded-lg"
                     >
-                      📸 Capture Evidence
+                      📸 Evidence
                     </button>
                     <button
                       onClick={() => markComplete(task.id)}
                       className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-1.5 rounded-lg"
                     >
-                      ✅ Mark Complete
+                      ✅ Complete
+                    </button>
+                    <button
+                      onClick={() => downloadPDF(task)}
+                      className="px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs py-1.5 rounded-lg flex items-center justify-center gap-1"
+                      title="Download Dispatch PDF"
+                    >
+                      📄 PDF
                     </button>
                     <button
                       onClick={() => escalate(task.id)}

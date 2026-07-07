@@ -79,6 +79,10 @@ class WardOut(BaseModel):
     population: Optional[int] = None
     school_count: int
     hospital_count: int
+    elderly_percentage: float
+    child_percentage: float
+    low_income_percentage: float
+    svi_index: float
 
     model_config = {"from_attributes": True}
 

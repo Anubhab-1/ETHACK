@@ -213,13 +213,15 @@ export default function ComparePage() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
-      <header className="border-b border-white/8 px-6 py-3 flex items-center justify-between glass-panel flex-none z-50 sticky top-0">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
-          <span className="text-gray-700">·</span>
-          <h1 className="font-bold text-sm text-gray-200">Multi-City Intelligence</h1>
+      <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100] sticky top-0 shadow-md">
+        <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
+            <span className="text-gray-700">·</span>
+            <h1 className="font-bold text-sm text-gray-200">Multi-City Intelligence</h1>
+          </div>
         </div>
-        <nav className="hidden sm:flex items-center gap-1">
+        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
           <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
           <Link href="/forecast" className="nav-link">📈 Forecast</Link>
           <Link href="/enforcement" className="nav-link">⚡ Enforcement</Link>
@@ -230,7 +232,7 @@ export default function ComparePage() {
         <button
           onClick={loadCityData}
           disabled={loading}
-          className="px-3 py-1.5 text-xs rounded bg-gray-800 border border-gray-700 hover:text-orange-400 hover:border-orange-500 transition-colors disabled:opacity-50 font-semibold cursor-pointer"
+          className="px-3 py-1.5 text-xs rounded bg-gray-800 border border-gray-700 hover:text-orange-400 hover:border-orange-500 transition-colors disabled:opacity-50 font-semibold cursor-pointer w-full sm:w-auto mt-1 sm:mt-0"
         >
           {loading ? "Refreshing..." : "⟳ Refresh All"}
         </button>

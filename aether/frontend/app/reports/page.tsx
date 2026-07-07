@@ -155,13 +155,15 @@ export default function CitizenReportsPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       {/* Header Nav */}
-      <header className="border-b border-white/8 px-6 py-3 flex items-center justify-between glass-panel sticky top-0 z-50 flex-none">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
-          <span className="text-gray-700">·</span>
-          <h1 className="font-bold text-sm text-gray-200">Citizen Reports</h1>
+      <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md sticky top-0 z-[1100] shadow-md flex-none">
+        <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
+            <span className="text-gray-700">·</span>
+            <h1 className="font-bold text-sm text-gray-200">Citizen Reports</h1>
+          </div>
         </div>
-        <nav className="hidden sm:flex items-center gap-1">
+        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
           <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
           <Link href="/forecast" className="nav-link">📈 Forecast</Link>
           <Link href="/enforcement" className="nav-link">⚡ Enforcement</Link>
@@ -169,7 +171,7 @@ export default function CitizenReportsPage() {
           <Link href="/reports" className="nav-link active">📢 Citizen Hub</Link>
           <Link href="/advisory" className="nav-link">💬 Advisory</Link>
         </nav>
-        <div>
+        <div className="flex items-center justify-end w-full sm:w-auto mt-1 sm:mt-0">
           <select
             value={city}
             onChange={(e) => setCity(e.target.value)}

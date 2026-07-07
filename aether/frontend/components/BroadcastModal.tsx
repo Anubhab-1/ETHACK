@@ -240,7 +240,7 @@ export function BroadcastModal({
   const confirmPercent = alertsSent > 0 ? Math.round((alertsConfirmed / alertsSent) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
       <div className="relative w-full max-w-md bg-gray-950 border border-white/10 rounded-3xl overflow-hidden shadow-2xl p-5 flex flex-col items-center animate-scale-in">
         
         {/* Modal Close */}

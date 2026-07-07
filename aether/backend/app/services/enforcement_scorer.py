@@ -65,12 +65,14 @@ def compute_priority(
     # Severity: how bad is it now + forecast
     severity = (current_aqi * 0.3) + (forecast_24h * 0.4)
 
-    # Exposure: population + vulnerable facilities
+    # Exposure: population + vulnerable facilities + social vulnerability index (SVI)
     population_score = (ward.population or 100000) / 100000
+    svi = getattr(ward, "svi_index", 0.0) or 0.0
     exposure = (
-        population_score * 0.15 +
-        min(ward.school_count * 2, 20) * 0.05 +
-        min(ward.hospital_count * 3, 15) * 0.05
+        population_score * 0.10 +
+        min(ward.school_count * 2, 20) * 0.04 +
+        min(ward.hospital_count * 3, 15) * 0.04 +
+        svi * 10.0 * 0.07
     )
 
     # Actionability

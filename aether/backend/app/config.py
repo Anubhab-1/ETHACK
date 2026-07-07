@@ -10,7 +10,16 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000"
     cpcb_api_key: str = ""
     openai_api_key: str = ""
+    openai_api_base: str = "https://api.openai.com/v1"
+    llm_model: str = "gpt-4o-mini"
     default_city: str = "Kolkata"
+    sql_echo: bool = False
+
+    # Twilio SMS Config
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
+    twilio_to_number: str = ""
 
     # CPCB API
     cpcb_resource_id: str = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
@@ -29,6 +38,10 @@ class Settings(BaseSettings):
             self.cpcb_api_key = ""
         if "your_" in self.openai_api_key:
             self.openai_api_key = ""
+        if "your_" in self.twilio_account_sid:
+            self.twilio_account_sid = ""
+        if "your_" in self.twilio_auth_token:
+            self.twilio_auth_token = ""
 
 
 @lru_cache()

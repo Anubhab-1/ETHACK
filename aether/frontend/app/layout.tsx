@@ -29,6 +29,25 @@ export default function RootLayout({
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           crossOrigin=""
         />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#f97316" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(
+                    function(reg) { console.log('PWA ServiceWorker registered:', reg.scope); },
+                    function(err) { console.log('PWA ServiceWorker failed:', err); }
+                  );
+                });
+              }
+            `
+          }}
+        />
       </head>
       <body className={`${inter.className} bg-gray-950 text-gray-100 antialiased`}>
         {children}

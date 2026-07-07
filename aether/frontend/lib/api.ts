@@ -39,6 +39,10 @@ export interface WardDetail {
   population: number | null;
   school_count: number;
   hospital_count: number;
+  elderly_percentage: number;
+  child_percentage: number;
+  low_income_percentage: number;
+  svi_index: number;
   aqi: number | null;
   category: string | null;
   primary_source: string | null;
