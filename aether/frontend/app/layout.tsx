@@ -34,20 +34,41 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#f97316" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(reg) { console.log('PWA ServiceWorker registered:', reg.scope); },
-                    function(err) { console.log('PWA ServiceWorker failed:', err); }
-                  );
-                });
-              }
-            `
-          }}
-        />
+        {process.env.NODE_ENV === "production" ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js').then(
+                      function(reg) { console.log('PWA ServiceWorker registered:', reg.scope); },
+                      function(err) { console.log('PWA ServiceWorker failed:', err); }
+                    );
+                  });
+                }
+              `
+            }}
+          />
+        ) : (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for (let registration of registrations) {
+                      registration.unregister().then(function(success) {
+                        if (success) {
+                          console.log('Development mode: active service worker cleared.');
+                          window.location.reload();
+                        }
+                      });
+                    }
+                  });
+                }
+              `
+            }}
+          />
+        )}
       </head>
       <body className={`${inter.className} bg-gray-950 text-gray-100 antialiased`}>
         {children}
