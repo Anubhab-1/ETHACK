@@ -18,7 +18,7 @@ services:
         value: production
       - key: ALLOWED_ORIGINS
         # Update this after Vercel deploy with your actual Vercel URL
-        value: https://ethack.vercel.app,http://localhost:3000
+        value: https://ethack-weld.vercel.app,http://localhost:3000
       # Optional — add these in Render dashboard for live data
       # - key: CPCB_API_KEY
       #   value: your_key_here

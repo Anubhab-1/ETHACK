@@ -290,6 +290,7 @@ export default function AdvisoryPage() {
   const [liveData, setLiveData] = useState<LiveAQIPoint[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   const [loadingMap, setLoadingMap] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedWardId, setSelectedWardId] = useState<number | null>(null);
   const [selectedWardDetail, setSelectedWardDetail] = useState<WardDetail | null>(null);
 
@@ -304,22 +305,25 @@ export default function AdvisoryPage() {
   }, [liveData]);
 
   // Load Map Wards and Live Readings
+  const loadMapData = async () => {
+    setLoadingMap(true);
+    setError(null);
+    try {
+      const [live, heatmap] = await Promise.all([
+        api.liveAQI(city),
+        api.heatmap(city),
+      ]);
+      setLiveData(live);
+      setHeatmapData(heatmap);
+    } catch (e) {
+      console.error("Failed to load map data:", e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
+    } finally {
+      setLoadingMap(false);
+    }
+  };
+
   useEffect(() => {
-    const loadMapData = async () => {
-      setLoadingMap(true);
-      try {
-        const [live, heatmap] = await Promise.all([
-          api.liveAQI(city),
-          api.heatmap(city),
-        ]);
-        setLiveData(live);
-        setHeatmapData(heatmap);
-      } catch (e) {
-        console.error("Failed to load map data:", e);
-      } finally {
-        setLoadingMap(false);
-      }
-    };
     loadMapData();
   }, [city]);
 
@@ -404,12 +408,14 @@ export default function AdvisoryPage() {
   const handleMapWardClick = useCallback(async (wardId: number) => {
     setSelectedWardId(wardId);
     setSelectedWardDetail(null);
+    setError(null);
     try {
       const detail = await api.wardDetail(wardId);
       setSelectedWardDetail(detail);
       setLocation({ lat: detail.lat, lon: detail.lon });
     } catch (e) {
       console.error("Failed to load ward detail on click:", e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
     }
   }, []);
 
@@ -575,6 +581,27 @@ export default function AdvisoryPage() {
               )}
             </button>
           </div>
+
+          {error && (
+            <div className="flex-none px-6 py-3 border-b border-red-500/20 bg-red-950/20 text-red-200 flex items-center justify-between gap-4 animate-slide-up">
+              <div className="flex items-center gap-2 text-xs">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+              <button
+                onClick={() => {
+                  setError(null);
+                  loadMapData();
+                  if (selectedWardId) {
+                    handleMapWardClick(selectedWardId);
+                  }
+                }}
+                className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold rounded transition-all cursor-pointer flex-none"
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
           {/* ── CHAT TAB ── */}
           {rightTab === "chat" && (

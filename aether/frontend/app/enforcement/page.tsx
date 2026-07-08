@@ -36,6 +36,7 @@ export default function EnforcementPage() {
   const [actions, setActions] = useState<EnforcementAction[]>([]);
   const [stats, setStats] = useState<EnforcementStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("open");
   const [recomputing, setRecomputing] = useState(false);
   const [selectedAction, setSelectedAction] = useState<EnforcementAction | null>(null);
@@ -45,6 +46,7 @@ export default function EnforcementPage() {
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const loadData = async () => {
+    setError(null);
     try {
       const [acts, st] = await Promise.all([
         api.enforcement(city, 30, statusFilter),
@@ -55,6 +57,7 @@ export default function EnforcementPage() {
       setLastSync(new Date());
     } catch (e) {
       console.error(e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
     } finally {
       setLoading(false);
     }
@@ -62,6 +65,7 @@ export default function EnforcementPage() {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     loadData();
   }, [city, statusFilter]);
 
@@ -253,7 +257,22 @@ export default function EnforcementPage() {
         </div>
 
         {/* ── Action Cards ─────────────────────────────────────────── */}
-        {loading ? (
+        {error ? (
+          <div className="flex flex-col items-center justify-center min-h-[300px] border border-red-500/30 bg-red-950/20 rounded-2xl p-8 max-w-md mx-auto text-center animate-slide-up">
+            <span className="text-4xl mb-4 block">⚠️</span>
+            <p className="text-gray-200 font-semibold mb-4">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                setLoading(true);
+                loadData();
+              }}
+              className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-all cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="text-center py-20">
             <div className="w-10 h-10 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-gray-500 text-sm">Loading enforcement queue for {city}...</p>

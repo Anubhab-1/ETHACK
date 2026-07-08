@@ -108,9 +108,11 @@ const DistTooltip = ({ active, payload, label }: any) => {
 export default function ComparePage() {
   const [metrics, setMetrics] = useState<Record<string, CityMetrics>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadCityData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const results: Record<string, CityMetrics> = {};
 
@@ -176,6 +178,7 @@ export default function ComparePage() {
       setMetrics(results);
     } catch (e) {
       console.error("Failed to load multi-city compare data:", e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
     } finally {
       setLoading(false);
     }
@@ -239,7 +242,21 @@ export default function ComparePage() {
       </header>
 
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 overflow-y-auto">
-        {loading ? (
+        {error ? (
+          <div className="flex flex-col items-center justify-center min-h-[400px] border border-red-500/30 bg-red-950/20 rounded-2xl p-8 max-w-md mx-auto text-center">
+            <span className="text-4xl mb-4 block">⚠️</span>
+            <p className="text-gray-200 font-semibold mb-4">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                loadCityData();
+              }}
+              className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-all cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        ) : loading ? (
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <div className="w-12 h-12 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-gray-400 text-sm">Aggregating atmospheric census records...</p>

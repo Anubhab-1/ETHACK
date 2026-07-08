@@ -129,6 +129,7 @@ export default function LandingPage() {
   const [activeCity, setActiveCity] = useState("Kolkata");
   const [liveData, setLiveData] = useState<Record<string, LiveAQIPoint[]>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [particleFrame, setParticleFrame] = useState(0);
   const [stats, setStats] = useState({
     peopleMonitored: 68400000,
@@ -143,40 +144,44 @@ export default function LandingPage() {
     return () => clearInterval(id);
   }, []);
 
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [liveRes, heatmapRes] = await Promise.all([
+        Promise.all(CITIES.map(async (c) => ({ city: c, data: await api.liveAQI(c) }))),
+        Promise.all(CITIES.map(async (c) => ({ city: c, data: await api.heatmap(c) })))
+      ]);
+
+      const map: Record<string, LiveAQIPoint[]> = {};
+      let stationCount = 0;
+      liveRes.forEach(({ city, data }) => {
+        map[city] = data;
+        stationCount += data.length;
+      });
+      setLiveData(map);
+
+      let critWards = 0;
+      heatmapRes.forEach(({ data }) => {
+        critWards += data.filter((w) => w.aqi > 300).length;
+      });
+
+      setStats({
+        peopleMonitored: 68400000, // Combined city populations
+        criticalWards: critWards > 0 ? critWards : 12,
+        totalStations: stationCount > 0 ? stationCount : 24,
+        accuracy: 94,
+      });
+    } catch (e) {
+      console.error(e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load live AQI data and heatmap data for all cities to compute stats dynamically
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [liveRes, heatmapRes] = await Promise.all([
-          Promise.all(CITIES.map(async (c) => ({ city: c, data: await api.liveAQI(c) }))),
-          Promise.all(CITIES.map(async (c) => ({ city: c, data: await api.heatmap(c) })))
-        ]);
-
-        const map: Record<string, LiveAQIPoint[]> = {};
-        let stationCount = 0;
-        liveRes.forEach(({ city, data }) => {
-          map[city] = data;
-          stationCount += data.length;
-        });
-        setLiveData(map);
-
-        let critWards = 0;
-        heatmapRes.forEach(({ data }) => {
-          critWards += data.filter((w) => w.aqi > 300).length;
-        });
-
-        setStats({
-          peopleMonitored: 68400000, // Combined city populations
-          criticalWards: critWards > 0 ? critWards : 12,
-          totalStations: stationCount > 0 ? stationCount : 24,
-          accuracy: 94,
-        });
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
   }, []);
 
@@ -246,6 +251,25 @@ export default function LandingPage() {
           </Link>
         </div>
       </nav>
+
+      {error && (
+        <div className="relative z-50 max-w-4xl mx-auto mt-4 px-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl border border-red-500/30 bg-red-950/20 text-red-200 animate-slide-up">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">⚠️</span>
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+            <button
+              onClick={() => {
+                load();
+              }}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-all cursor-pointer flex-none"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Hero Section ────────────────────────────────────────── */}
       <section className="relative z-10 pt-20 pb-16 px-6 text-center max-w-6xl mx-auto">

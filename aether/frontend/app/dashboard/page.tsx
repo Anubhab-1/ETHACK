@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [attribution, setAttribution] = useState<AttributionResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cityAvgAQI, setCityAvgAQI] = useState<number | null>(null);
@@ -77,6 +78,8 @@ export default function DashboardPage() {
   const [calibrationOpen, setCalibrationOpen] = useState(false);
 
   const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const [live, heatmap, weather, reports] = await Promise.all([
         api.liveAQI(city),
@@ -108,6 +111,7 @@ export default function DashboardPage() {
       setTickerItems(tickerData);
     } catch (e) {
       console.error("Failed to load AQI data:", e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
     } finally {
       setLoading(false);
     }
@@ -458,7 +462,23 @@ export default function DashboardPage() {
               <div className="absolute inset-0 bg-orange-500/5 animate-pulse" />
             </div>
           )}
-          {loading ? (
+          {error ? (
+            <div className="flex items-center justify-center h-full w-full bg-gray-950/80 absolute inset-0 z-50">
+              <div className="text-center glass-card p-6 border border-red-500/30 bg-red-950/20 max-w-md rounded-2xl">
+                <span className="text-4xl mb-4 block">⚠️</span>
+                <p className="text-gray-200 font-semibold mb-4">{error}</p>
+                <button
+                  onClick={() => {
+                    setError(null);
+                    loadData();
+                  }}
+                  className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-all cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center animate-slide-up">
                 <div className="w-16 h-16 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />

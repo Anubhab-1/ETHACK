@@ -5,6 +5,18 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+if (typeof window !== "undefined") {
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      console.warn(
+        "⚠️ WARNING: AETHER Frontend is running in PRODUCTION mode, but NEXT_PUBLIC_API_URL is undefined. API_BASE is falling back to http://localhost:8000."
+      );
+    }
+  } else if (process.env.NODE_ENV === "development") {
+    console.log(`[AETHER Debug] API_BASE resolved to: ${API_BASE}`);
+  }
+}
+
 export interface LiveAQIPoint {
   station_id: number;
   station_code: string;
@@ -145,7 +157,7 @@ export interface CitizenReportInput {
 
 // ── Generic fetch helper ──────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, options?: RequestInit, timeoutMs = 20000): Promise<T> {
+async function apiFetch<T>(path: string, options?: RequestInit, timeoutMs = 8000): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

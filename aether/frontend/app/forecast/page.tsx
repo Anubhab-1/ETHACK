@@ -26,6 +26,7 @@ export default function ForecastPage() {
   const [selectedWard, setSelectedWard] = useState<WardDetail | null>(null);
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
 
   // Intervention simulation states (Digital Twin)
@@ -34,53 +35,59 @@ export default function ForecastPage() {
   const [industrialRestriction, setIndustrialRestriction] = useState(0); // 0% to 100%
 
   // Load wards for selected city
-  useEffect(() => {
-    const loadWards = async () => {
-      setLoading(true);
-      try {
-        const wardList = await api.wards(city);
-        // Sort alphabetically by ward name
-        const sorted = [...wardList].sort((a, b) => a.name.localeCompare(b.name));
-        setWards(sorted);
-        if (sorted.length > 0) {
-          setSelectedWardId(sorted[0].id);
-        } else {
-          setSelectedWardId("");
-          setSelectedWard(null);
-          setForecast([]);
-        }
-      } catch (e) {
-        console.error("Failed to load wards:", e);
-      } finally {
-        setLoading(false);
+  const loadWards = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const wardList = await api.wards(city);
+      // Sort alphabetically by ward name
+      const sorted = [...wardList].sort((a, b) => a.name.localeCompare(b.name));
+      setWards(sorted);
+      if (sorted.length > 0) {
+        setSelectedWardId(sorted[0].id);
+      } else {
+        setSelectedWardId("");
+        setSelectedWard(null);
+        setForecast([]);
       }
-    };
+    } catch (e) {
+      console.error("Failed to load wards:", e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadWards();
   }, [city]);
 
   // Load forecast for selected ward
-  useEffect(() => {
+  const loadForecast = async () => {
     if (!selectedWardId) return;
-    const loadForecast = async () => {
-      setForecastLoading(true);
-      try {
-        const [wardDetail, attr] = await Promise.all([
-          api.wardDetail(Number(selectedWardId)),
-          api.attribution(Number(selectedWardId)),
-        ]);
-        
-        // Merge attribution data so Digital Twin policy simulation runs
-        wardDetail.attribution = attr.breakdown;
-        setSelectedWard(wardDetail);
+    setForecastLoading(true);
+    setError(null);
+    try {
+      const [wardDetail, attr] = await Promise.all([
+        api.wardDetail(Number(selectedWardId)),
+        api.attribution(Number(selectedWardId)),
+      ]);
+      
+      // Merge attribution data so Digital Twin policy simulation runs
+      wardDetail.attribution = attr.breakdown;
+      setSelectedWard(wardDetail);
 
-        const fcRes = await api.forecast(wardDetail.lat, wardDetail.lon, city);
-        setForecast(fcRes.forecasts);
-      } catch (e) {
-        console.error("Failed to load forecast:", e);
-      } finally {
-        setForecastLoading(false);
-      }
-    };
+      const fcRes = await api.forecast(wardDetail.lat, wardDetail.lon, city);
+      setForecast(fcRes.forecasts);
+    } catch (e) {
+      console.error("Failed to load forecast:", e);
+      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
+    } finally {
+      setForecastLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadForecast();
   }, [selectedWardId, city]);
 
@@ -327,7 +334,25 @@ export default function ForecastPage() {
 
         {/* Right Main Panel Column (8 cols) */}
         <div className="lg:col-span-8 space-y-6">
-          {forecastLoading ? (
+          {error ? (
+            <div className="glass-card p-12 flex flex-col items-center justify-center min-h-[400px] border border-red-500/30 bg-red-950/20 text-center">
+              <span className="text-4xl mb-4 block">⚠️</span>
+              <p className="text-gray-200 font-semibold mb-4">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  if (wards.length === 0) {
+                    loadWards();
+                  } else {
+                    loadForecast();
+                  }
+                }}
+                className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-all cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          ) : forecastLoading ? (
             <div className="glass-card p-12 flex flex-col items-center justify-center min-h-[400px]">
               <div className="w-12 h-12 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
               <p className="text-gray-400 text-sm">Synthesizing predictive models...</p>
