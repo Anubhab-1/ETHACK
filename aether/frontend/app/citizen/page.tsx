@@ -11,7 +11,7 @@
  * - Alert history panel
  */
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { api, HeatmapPoint } from "@/lib/api";
 import Link from "next/link";
 
 const LANGUAGES = [
@@ -137,11 +137,9 @@ export default function CitizenPage() {
           const points = heatmap.points || [];
           if (points.length === 0) throw new Error("No data");
           // Find nearest ward
-          const nearest = points.reduce((best: { aqi: number; ward_name: string }, p: { lat: number; lon: number; ward_name: string; aqi: number }) => {
+          const nearest = points.reduce((best: HeatmapPoint, p: HeatmapPoint) => {
             const d = Math.sqrt((p.lat - latitude) ** 2 + (p.lon - longitude) ** 2);
-            const bd = Math.sqrt((best as unknown as { lat: number; lon: number }).lat
-              ? ((best as unknown as { lat: number }).lat - latitude) ** 2 + ((best as unknown as { lon: number }).lon - longitude) ** 2
-              : Infinity);
+            const bd = Math.sqrt((best.lat - latitude) ** 2 + (best.lon - longitude) ** 2);
             return d < bd ? p : best;
           });
           setAqi(nearest.aqi);
