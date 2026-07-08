@@ -157,7 +157,7 @@ export interface CitizenReportInput {
 
 // ── Generic fetch helper ──────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, options?: RequestInit, timeoutMs = 8000): Promise<T> {
+async function apiFetch<T>(path: string, options?: RequestInit, timeoutMs = 10000): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

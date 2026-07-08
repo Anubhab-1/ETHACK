@@ -317,7 +317,7 @@ export default function AdvisoryPage() {
       setHeatmapData(heatmap);
     } catch (e) {
       console.error("Failed to load map data:", e);
-      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
+      setError("Couldn't reach the AETHER backend. Note: Render free tier takes ~50s to wake up on initial load. Please wait a moment and click Retry.");
     } finally {
       setLoadingMap(false);
     }
@@ -415,7 +415,7 @@ export default function AdvisoryPage() {
       setLocation({ lat: detail.lat, lon: detail.lon });
     } catch (e) {
       console.error("Failed to load ward detail on click:", e);
-      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
+      setError("Couldn't reach the AETHER backend. Note: Render free tier takes ~50s to wake up on initial load. Please wait a moment and click Retry.");
     }
   }, []);
 

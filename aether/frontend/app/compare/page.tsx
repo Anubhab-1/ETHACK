@@ -178,7 +178,7 @@ export default function ComparePage() {
       setMetrics(results);
     } catch (e) {
       console.error("Failed to load multi-city compare data:", e);
-      setError("Couldn't reach the AETHER backend. Retry or check your connection.");
+      setError("Couldn't reach the AETHER backend. Note: Render free tier takes ~50s to wake up on initial load. Please wait a moment and click Retry.");
     } finally {
       setLoading(false);
     }
