@@ -242,7 +242,7 @@ def get_satellite_calibration(
         # Sentinel column density is simulated based on ground AQI with deterministic relative noise
         import random
         rng = random.Random(w.id)
-        noise_pct = rng.uniform(-0.07, 0.07)
+        noise_pct = rng.uniform(-0.03, 0.03)
         satellite_no2 = (ground_aqi * 0.02) * (1.0 + noise_pct)
         # Ensure it maps reasonably
         satellite_no2 = max(0.1, min(10.0, satellite_no2))
