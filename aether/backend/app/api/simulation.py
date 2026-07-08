@@ -84,6 +84,25 @@ def evaluate_simulation(
     # 3. Get all wards in the same city to assess downwind drift
     wards = db.query(Ward).filter(Ward.city == city).all()
     
+    # Batch-fetch all stations and latest readings to prevent N+1 queries
+    stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+    station_ids = [s.id for s in stations]
+    latest_readings = {}
+    if station_ids:
+        from sqlalchemy import func
+        subq = (
+            db.query(Reading.station_id, func.max(Reading.measured_at).label("max_measured"))
+            .filter(Reading.station_id.in_(station_ids))
+            .group_by(Reading.station_id)
+            .subquery()
+        )
+        latest_rows = (
+            db.query(Reading)
+            .join(subq, (Reading.station_id == subq.c.station_id) & (Reading.measured_at == subq.c.max_measured))
+            .all()
+        )
+        latest_readings = {r.station_id: r.aqi for r in latest_rows if r.aqi is not None}
+
     # Pre-calculate active ward AQIs and attributions
     now = datetime.utcnow()
     time_features = {
@@ -96,7 +115,7 @@ def evaluate_simulation(
     current_aqis = {}
     attributions = {}
     for w in wards:
-        aqi = get_current_aqi_for_ward(w, db)
+        aqi = get_current_aqi_for_ward(w, db, stations=stations, latest_readings=latest_readings)
         current_aqis[w.id] = aqi
         # Run local source attribution to check weights
         attributions[w.id] = attribute_sources(w, aqi, {"wind_speed": wind_speed, "wind_dir": wind_dir}, time_features)
@@ -198,9 +217,28 @@ def get_satellite_calibration(
     if not wards:
         raise HTTPException(status_code=404, detail="No wards found for city")
         
+    # Batch-fetch all stations and latest readings to prevent N+1 queries
+    stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+    station_ids = [s.id for s in stations]
+    latest_readings = {}
+    if station_ids:
+        from sqlalchemy import func
+        subq = (
+            db.query(Reading.station_id, func.max(Reading.measured_at).label("max_measured"))
+            .filter(Reading.station_id.in_(station_ids))
+            .group_by(Reading.station_id)
+            .subquery()
+        )
+        latest_rows = (
+            db.query(Reading)
+            .join(subq, (Reading.station_id == subq.c.station_id) & (Reading.measured_at == subq.c.max_measured))
+            .all()
+        )
+        latest_readings = {r.station_id: r.aqi for r in latest_rows if r.aqi is not None}
+
     points = []
     for w in wards:
-        ground_aqi = get_current_aqi_for_ward(w, db)
+        ground_aqi = get_current_aqi_for_ward(w, db, stations=stations, latest_readings=latest_readings)
         # Sentinel column density is simulated based on industrial score and road density
         satellite_no2 = (ground_aqi * 0.35 + (w.lat * 1000 % 100)) * 0.05
         # Ensure it maps reasonably

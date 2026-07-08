@@ -67,33 +67,7 @@ def get_aqi_for_location(lat: float | None, lon: float | None, db: Session) -> t
             return aqi, cat
     return aqi, "Severe"
 
-# Pre-written advisory templates for offline/no-key mode
-ADVISORY_TEMPLATES = {
-    "en": {
-        "Good": "Air quality is Good (AQI {aqi}). It's safe for outdoor activities. Enjoy the fresh air!",
-        "Satisfactory": "Air quality is Satisfactory (AQI {aqi}). Most people can enjoy outdoor activities. Sensitive individuals may feel slight discomfort.",
-        "Moderate": "Air quality is Moderate (AQI {aqi}). People with respiratory conditions should limit prolonged outdoor exposure. Others can continue normal activities.",
-        "Poor": "Air quality is Poor (AQI {aqi}). Avoid prolonged outdoor activities, especially for children and the elderly. Wear an N95 mask if going out.",
-        "Very Poor": "Air quality is Very Poor (AQI {aqi}). Avoid going outdoors. Keep windows closed. Use air purifiers if available.",
-        "Severe": "HEALTH EMERGENCY — AQI {aqi} is Severe. Stay indoors. All outdoor activities should be cancelled. Seek medical attention if experiencing breathing difficulty.",
-    },
-    "bn": {
-        "Good": "বায়ু মান ভালো (AQI {aqi})। বাইরে যাওয়া নিরাপদ। তাজা বাতাস উপভোগ করুন!",
-        "Satisfactory": "বায়ু মান সন্তোষজনক (AQI {aqi})। বেশিরভাগ মানুষ বাইরের কার্যক্রম উপভোগ করতে পারেন। সংবেদনশীল ব্যক্তিরা সামান্য অস্বস্তি অনুভব করতে পারেন।",
-        "Moderate": "বায়ু মান মাঝারি (AQI {aqi})। শ্বাসকষ্টের সমস্যা থাকলে দীর্ঘ সময় বাইরে থাকা এড়িয়ে চলুন।",
-        "Poor": "বায়ু মান খারাপ (AQI {aqi})। শিশু ও বয়স্কদের বাইরে যাওয়া এড়ানো উচিত। বাইরে গেলে N95 মাস্ক পরুন।",
-        "Very Poor": "বায়ু মান অত্যন্ত খারাপ (AQI {aqi})। ঘরের বাইরে যাবেন না। জানালা বন্ধ রাখুন।",
-        "Severe": "স্বাস্থ্য জরুরি অবস্থা — AQI {aqi} অত্যন্ত বিপজ্জনক। ঘরের ভেতরে থাকুন। শ্বাসকষ্ট হলে অবিলম্বে চিকিৎসা নিন।",
-    },
-    "hi": {
-        "Good": "वायु गुणवत्ता अच्छी है (AQI {aqi})। बाहरी गतिविधियां सुरक्षित हैं।",
-        "Satisfactory": "वायु गुणवत्ता संतोषजनक है (AQI {aqi})। संवेदनशील व्यक्तियों को थोड़ी सावधानी बरतनी चाहिए।",
-        "Moderate": "वायु गुणवत्ता मध्यम है (AQI {aqi})। सांस की समस्या वाले लोग लंबे समय बाहर न रहें।",
-        "Poor": "वायु गुणवत्ता खराब है (AQI {aqi})। बच्चों और बुजुर्गों को बाहर जाने से बचना चाहिए। मास्क पहनें।",
-        "Very Poor": "वायु गुणवत्ता बहुत खराब है (AQI {aqi})। बाहर न जाएं। खिड़कियां बंद रखें।",
-        "Severe": "स्वास्थ्य आपातकाल — AQI {aqi} गंभीर है। घर के अंदर रहें। सांस लेने में तकलीफ हो तो तुरंत डॉक्टर से मिलें।",
-    }
-}
+
 
 
 def generate_advisory_with_llm(request: AdvisoryRequest, aqi: float | None, category: str) -> str:
@@ -106,7 +80,9 @@ def generate_advisory_with_llm(request: AdvisoryRequest, aqi: float | None, cate
         from openai import OpenAI
         client = OpenAI(
             api_key=settings.openai_api_key,
-            base_url=settings.openai_api_base or None
+            base_url=settings.openai_api_base or None,
+            timeout=5.0,
+            max_retries=0
         )
         
         lang_map = {"en": "English", "bn": "Bengali", "hi": "Hindi"}
@@ -126,6 +102,7 @@ Base your advice only on the air quality data provided."""
             ],
             max_tokens=200,
             temperature=0.3,
+            timeout=5.0,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -253,7 +230,9 @@ def get_briefing(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
             from openai import OpenAI
             client = OpenAI(
                 api_key=settings.openai_api_key,
-                base_url=settings.openai_api_base or None
+                base_url=settings.openai_api_base or None,
+                timeout=5.0,
+                max_retries=0
             )
             
             system_prompt = f"""You are AETHER, the Chief Environmental Intelligence Agent.
@@ -278,6 +257,7 @@ Current Parameters:
                 ],
                 max_tokens=250,
                 temperature=0.3,
+                timeout=5.0,
             )
             briefing_markdown = response.choices[0].message.content.strip()
         except Exception as e:

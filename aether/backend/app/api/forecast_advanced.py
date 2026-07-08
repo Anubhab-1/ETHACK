@@ -38,11 +38,19 @@ async def get_historical_aqi(stations: List[Station], db: Session, hours: int = 
     # We want to build an array of shape (n_stations, hours)
     aqi_matrix = np.zeros((n_stations, hours))
     
+    station_ids = [s.id for s in stations]
+    all_readings = db.query(Reading).filter(
+        Reading.station_id.in_(station_ids),
+        Reading.measured_at >= since
+    ).order_by(Reading.measured_at.asc()).all()
+    
+    from collections import defaultdict
+    station_to_readings = defaultdict(list)
+    for r in all_readings:
+        station_to_readings[r.station_id].append(r)
+        
     for i, station in enumerate(stations):
-        readings = db.query(Reading).filter(
-            Reading.station_id == station.id,
-            Reading.measured_at >= since
-        ).order_by(Reading.measured_at.asc()).limit(hours).all()
+        readings = station_to_readings[station.id][:hours]
         
         # Fill in readings
         aqi_values = [r.aqi for r in readings if r.aqi is not None]

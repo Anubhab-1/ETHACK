@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import CitizenReport, Ward, EnforcementAction
-from app.schemas import CitizenReportIn, CitizenReportOut
+from app.schemas import CitizenReportIn, CitizenReportOut, InspectorRoutesInput, LegalQueryInput
 
 router = APIRouter()
 
@@ -151,26 +151,22 @@ def get_evidence_package(industry_id: str, violation_type: str = "cpcb_norm_viol
 
 
 @router.post("/reports/inspector-routes")
-def post_inspector_routes(payload: dict):
+def post_inspector_routes(payload: InspectorRoutesInput):
     """
     Optimize routing for inspector dispatch using Google OR-Tools VRP.
     Payload takes: locations (list of dict with lat, lon, id, priority),
     n_inspectors (int), and time_budget_hours (float).
     """
     from app.services.route_optimizer import optimize_inspector_routes
-    locations = payload.get("locations", [])
-    n_inspectors = payload.get("n_inspectors", 3)
-    time_budget_hours = payload.get("time_budget_hours", 8.0)
-    return optimize_inspector_routes(locations, n_inspectors, time_budget_hours)
+    locations = [loc.model_dump() for loc in payload.locations]
+    return optimize_inspector_routes(locations, payload.n_inspectors, payload.time_budget_hours)
 
 
 @router.post("/reports/legal-query")
-def post_legal_query(payload: dict, db: Session = Depends(get_db)):
+def post_legal_query(payload: LegalQueryInput, db: Session = Depends(get_db)):
     """Query regulatory frameworks (Air Act, CPCB, NGT) using TF-IDF RAG."""
     from app.services.rag_legal import query_legal
-    question = payload.get("question", "")
-    limit = payload.get("limit", 3)
-    return query_legal(question, db, limit=limit)
+    return query_legal(payload.question, db, limit=payload.limit)
 
 
 @router.get("/reports/violation-risk")

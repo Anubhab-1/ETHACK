@@ -248,10 +248,16 @@ def get_current_weather_for_ward(ward: Ward, db: Session) -> Dict:
     }
 
 
-def get_current_aqi_for_ward(ward: Ward, db: Session) -> float:  # noqa
+def get_current_aqi_for_ward(
+    ward: Ward,
+    db: Session,
+    stations: Optional[List[Station]] = None,
+    latest_readings: Optional[Dict[int, float]] = None
+) -> float:  # noqa
     """Get interpolated AQI for a ward using nearest stations."""
-    # Get all stations in the same city
-    stations = db.query(Station).filter(Station.city == ward.city, Station.active == True).all()
+    # Get all stations in the same city if not pre-fetched
+    if stations is None:
+        stations = db.query(Station).filter(Station.city == ward.city, Station.active == True).all()
     if not stations:
         return 150.0  # Default moderate
 
@@ -269,13 +275,20 @@ def get_current_aqi_for_ward(ward: Ward, db: Session) -> float:  # noqa
     weights = []
     aqis = []
     for dist, st in nearest:
-        reading = db.query(Reading).filter(
-            Reading.station_id == st.id
-        ).order_by(Reading.measured_at.desc()).first()
-        if reading and reading.aqi:
-            w = 1.0 / max(dist, 0.001)
-            weights.append(w)
-            aqis.append(reading.aqi)
+        if latest_readings is not None:
+            aqi_val = latest_readings.get(st.id)
+            if aqi_val is not None:
+                w = 1.0 / max(dist, 0.001)
+                weights.append(w)
+                aqis.append(aqi_val)
+        else:
+            reading = db.query(Reading).filter(
+                Reading.station_id == st.id
+            ).order_by(Reading.measured_at.desc()).first()
+            if reading and reading.aqi:
+                w = 1.0 / max(dist, 0.001)
+                weights.append(w)
+                aqis.append(reading.aqi)
     
     if not aqis:
         return 150.0

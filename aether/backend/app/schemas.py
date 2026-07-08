@@ -282,6 +282,26 @@ class AgentSimulationResponse(BaseModel):
     constitutional_checks: List[ConstitutionalCheck]
     causal_evidence: Optional[CausalEvidence] = None
     decree: str
-    # Legacy compatibility fields
     dialogue: List[Dict] = []
+
+
+# ── Inspector Routing & Legal Query ───────────────────────────────────────────
+
+class InspectorLocation(BaseModel):
+    id: int
+    lat: float
+    lon: float
+    priority: Optional[float] = 0.0
+
+
+class InspectorRoutesInput(BaseModel):
+    locations: List[InspectorLocation]
+    n_inspectors: int = Field(3, ge=1, le=10)
+    time_budget_hours: float = Field(8.0, ge=1.0, le=24.0)
+
+
+class LegalQueryInput(BaseModel):
+    question: str = Field(..., min_length=1, max_length=500)
+    limit: int = Field(3, ge=1, le=10)
+
 

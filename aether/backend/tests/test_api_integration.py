@@ -155,3 +155,66 @@ class TestAgentsEndpoints:
         assert data["ward_id"] == "1"
         assert "consensus" in data
         assert "avg_agent_confidence" in data
+
+
+class TestSimulationEndpoints:
+    def test_evaluate_simulation(self, client):
+        resp = client.post("/api/simulation/evaluate", json={
+            "ward_id": 1,
+            "traffic_reduction": 20,
+            "construction_halt": True,
+            "industrial_restriction": 15
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["target_ward_id"] == 1
+        assert "results" in data
+        assert len(data["results"]) > 0
+
+    def test_satellite_calibration(self, client):
+        resp = client.get("/api/simulation/calibrate?city=Kolkata")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "r_squared" in data
+        assert "points" in data
+        assert len(data["points"]) > 0
+
+
+class TestReportsAdvancedEndpoints:
+    def test_inspector_routes_validation_success(self, client):
+        resp = client.post("/api/reports/inspector-routes", json={
+            "locations": [
+                {"id": 1, "lat": 22.57, "lon": 88.36, "priority": 1.0},
+                {"id": 2, "lat": 22.58, "lon": 88.37, "priority": 2.0}
+            ],
+            "n_inspectors": 2,
+            "time_budget_hours": 6.0
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "routes" in data
+
+    def test_inspector_routes_validation_failure(self, client):
+        resp = client.post("/api/reports/inspector-routes", json={
+            "locations": [],
+            "n_inspectors": 2,
+            "time_budget_hours": 30.0
+        })
+        assert resp.status_code == 422
+
+    def test_legal_query_validation_success(self, client):
+        resp = client.post("/api/reports/legal-query", json={
+            "question": "What is the penalty for burning garbage?",
+            "limit": 3
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+
+    def test_legal_query_validation_failure(self, client):
+        resp = client.post("/api/reports/legal-query", json={
+            "question": "a" * 501,
+            "limit": 3
+        })
+        assert resp.status_code == 422
+
