@@ -5,7 +5,7 @@
  * policy intervention simulation (Digital Twin mode), and CSV export.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { api, WardDetail, ForecastPoint } from "@/lib/api";
 import { AQIBadge } from "@/components/AQIBadge";
@@ -36,7 +36,7 @@ export default function ForecastPage() {
   const [industrialRestriction, setIndustrialRestriction] = useState(0); // 0% to 100%
 
   // Load wards for selected city
-  const loadWards = async () => {
+  const loadWards = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -57,14 +57,14 @@ export default function ForecastPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [city]);
 
   useEffect(() => {
     loadWards();
-  }, [city]);
+  }, [loadWards]);
 
   // Load forecast for selected ward
-  const loadForecast = async () => {
+  const loadForecast = useCallback(async () => {
     if (!selectedWardId) return;
     setForecastLoading(true);
     setError(null);
@@ -86,11 +86,11 @@ export default function ForecastPage() {
     } finally {
       setForecastLoading(false);
     }
-  };
+  }, [selectedWardId, city]);
 
   useEffect(() => {
     loadForecast();
-  }, [selectedWardId, city]);
+  }, [loadForecast]);
 
   // Reset simulation sliders when ward changes
   useEffect(() => {

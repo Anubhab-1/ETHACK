@@ -5,7 +5,7 @@
  * upvote active complaints, and track municipal validation in real-time.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api, CitizenReport, WardDetail } from "@/lib/api";
 import { AppShell } from "@/components/AppShell";
@@ -40,7 +40,7 @@ export default function CitizenReportsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Load reports and wards on city change
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [reportsData, wardsData] = await Promise.all([
@@ -57,13 +57,13 @@ export default function CitizenReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [city]);
 
   useEffect(() => {
     loadData();
     setWizardStep(1);
     setFormSuccess(false);
-  }, [city]);
+  }, [city, loadData]);
 
   // Handle Upvote action
   const handleUpvote = async (id: number) => {

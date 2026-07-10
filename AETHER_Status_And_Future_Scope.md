@@ -1,167 +1,238 @@
-# AETHER — Project Status & Future Scope
+# AETHER - Project Status and Future Scope
 ## ET AI Hackathon 2026 | Problem Statement 5
 
-> [!NOTE]
-> This document provides a comprehensive audit of the **AETHER Urban Air Quality Intelligence Platform**, summarizing what has been built, what remains of the original scope, and a curated list of high-impact "hackathon-winning" extras to set the project apart.
+> This document is the current product snapshot for AETHER: what is already built, what has been upgraded recently, and what should be done next to maximize judging impact.
 
 ---
 
-## 📊 Development Progress at a Glance
+## 1. Project Position
 
-```
-Backend Foundation & Services   ████████████████████ 100%
-API Layer & Routing             ████████████████████ 100%
-Database & Data Pipelines       ████████████████████ 100%
-Core Frontend UI / Situation    ████████████████░░░░  80%
-Advanced ML & Background Jobs   ████████░░░░░░░░░░░░  40%
-```
+AETHER is an urban air quality intelligence platform for Problem Statement 5:
+"AI-Powered Urban Air Quality Intelligence for Smart City Intervention."
 
----
+The platform already covers the core hackathon story well:
 
-## 🟢 1. What is Built (Current State)
+- live air-quality monitoring
+- ward-level hotspot intelligence
+- source attribution
+- 72-hour forecasting
+- intervention simulation
+- enforcement prioritization
+- citizen advisory
+- citizen incident reporting
+- multi-agent decision support
 
-The foundation, databases, background mathematical models, and the core frontend interactive dashboard are complete and running. 
-
-### 🖥️ Backend Architecture (`/backend`)
-FastAPI backend fully written in Python 3.8+ compatible type-hinting:
-- **Database Schema (`models.py`, `schemas.py`)**: 
-  - Relational SQLite database using SQLAlchemy 2.0.
-  - Schemas map out `Station`, `Reading` (hourly timeseries), `Ward` (geospatial census metrics), `Forecast` (ML predictions), `Attribution` (pollution sources), `EnforcementAction` (audit trail), and `AdvisoryLog` (chatbot history).
-- **Live Ingestion Engines (`services/fetch_cpcb.py`, `fetch_weather.py`)**:
-  - Real CPCB sensor data fetcher with automatic caching and failover seed data.
-  - Real-time weather parameters (wind speed/direction, temperature, humidity, pressure) pulled dynamically via the Open-Meteo API.
-- **Geospatial Ward Attribution (`services/attributor.py`)**:
-  - Custom heuristic model that estimates percentage contributions from: **Traffic**, **Industrial**, **Construction**, **Biomass**, and **Residential** sources.
-  - Computes percentages dynamically based on a ward's OpenStreetMap land-use profile, road density, active construction sites, wind directions (e.g., blowing pollutants downwind), and temporal parameters (e.g., rush hour).
-- **Hyperlocal Forecaster (`services/forecaster.py`)**:
-  - Integrates an XGBoost framework for predictive AQI (24h, 48h, 72h targets) using historical lags, wind vectors, and seasonal markers. 
-  - Provides a statistical moving-average fallback if the model is not yet trained.
-- **Enforcement Priority Engine (`services/enforcement_scorer.py`)**:
-  - Dynamically scores and ranks wards (0–100) based on target population exposure, presence of schools/hospitals, AQI severity, and downwind vulnerability vectors.
-  - Generates custom action descriptions (e.g., "Deploy anti-smog guns to Ward 58 due to upwind dust dispersal").
-- **Interactive API Endpoints (`api/`)**:
-  - `/api/health` — Full diagnostic health endpoint.
-  - `/api/aqi/live` — Live CPCB station metrics per city.
-  - `/api/aqi/heatmap` — Calculates a live spatial grid across 144 Kolkata wards using IDW (Inverse Distance Weighting) interpolation from active sensors.
-  - `/api/forecast` — 72-hour predict values.
-  - `/api/attribution/{ward_id}` — Live source breakdown.
-  - `/api/advisory/ask` — Multilingual chatbot endpoint (RAG-ready, templated fallback) supporting English, Bengali, and Hindi.
-
-### 🌐 Frontend Interface (`/frontend`)
-Modern, high-performance web experience built with Next.js (App Router), React, Tailwind CSS:
-- **Live Situation Room (`/dashboard`)**:
-  - Full-width interactive Map (`AetherMap.tsx` using Leaflet and Dark Matter CartoDB tiles).
-  - Renders all 144 Kolkata wards with color-coded AQI choropleth zones and real-time station markers.
-  - Interactive right sidebar loads dynamically on ward click: shows CPCB AQI gauges, source attribution progress bars (`SourceBreakdown.tsx`), 72h forecasts (`ForecastChart.tsx` using Recharts), and immediate actions.
-  - Interactive header and live scrolling ticker updating current enforcement deployments.
-- **Action Control Center (`/enforcement`)**:
-  - A real-time priority list showing active, deployed, and resolved environmental issues. 
-  - Allows administrative users to toggle status (e.g., "Deploy Inspectors" or "Mark Resolved") with instant visual updates.
-- **Citizen Health Advisor (`/advisory`)**:
-  - Multi-language support (English, বাংলা, हिन्दी).
-  - Quick-action buttons (e.g., "Safe for elderly?", "Outdoor exercises?") that generate targeted responses based on current ward pollution levels.
+This means the project is no longer in a "basic prototype" stage. It is now in the more valuable phase:
+hardening the demo, improving decision-support clarity, and sharpening the judge-facing story.
 
 ---
 
-## 🟡 2. What is Left to Build (Planned Scope)
+## 2. Current Build Status
 
-These items are part of the original project proposal but are not yet implemented or completed:
+### Backend
 
-1. **`app/forecast/page.tsx` (Deep Dive Forecast Page)**:
-   - A dedicated page to allow users to search for any ward/station and view an expanded hour-by-hour forecast grid.
-   - Interactive toggles to export predictions as JSON/CSV or images for government reporting.
-2. **`app/compare/page.tsx` (Multi-City Compare)**:
-   - A comparative page highlighting Delhi, Mumbai, and Kolkata side-by-side.
-   - Allows users to compare intervention history, average AQI trends, and effectiveness indices.
-3. **ML Training Endpoint (`POST /api/forecast/train`)**:
-   - An API handler that takes stored reading logs, builds the XGBoost feature matrix, trains the regressor, and saves the weights to disk (`xgboost_aqi_model.json`).
-4. **APScheduler Background Jobs**:
-   - Setting up a background thread in FastAPI (`main.py`) to run the CPCB ingestion and forecast refresh every hour automatically.
-5. **Sentinel-5P NO₂ Map Overlay**:
-   - Adding a toggle on the map component to overlay satellite tropospheric NO₂ imagery (can be mocked as a secondary raster tile service or built with Google Earth Engine API).
-6. **Docker Containers**:
-   - Generating standard `Dockerfile` files for frontend and backend + a unified `docker-compose.yml` for single-command local deployments.
+The backend is functionally strong and already supports the main product narrative.
 
----
+- FastAPI application with working route structure in `aether/backend/app/main.py`
+- live and fallback AQI ingestion
+- ward-level attribution logic
+- forecast services and advanced forecast routes
+- enforcement scoring and action flows
+- diagnostics, reports, advisory, simulation, and agent flows
+- APScheduler-based refresh loop already present
+- database-backed entities for stations, wards, reports, and operational workflows
 
-## 🚀 3. Extra Ideas (Outside the Original Plan)
-*Add these features to make AETHER stand out as a premier hackathon submission.*
+### Frontend
 
-### 🛠️ 3.1 Digital Twin Mode (Intervention Simulator)
-*Make the dashboard interactive for planners by simulating policies before enacting them.*
-* **Concept:** Add a **"Simulate Intervention"** panel in the dashboard sidebar.
-* **Mechanism:** Let planners toggle scenarios (e.g., *"Halt construction in Ward 58"* or *"Restrict industrial emissions by 50%"*).
-* **Impact:** The frontend immediately sends the mock overrides to `/api/attribution/{ward_id}`. The backend recalculates the ward's AQI and downwind impact, dynamically lowering the predicted 24h/48h AQI. The charts and maps update in real-time to show the projected success of the policy.
+The frontend is now significantly stronger than the original scope document suggested.
 
-### 🛰️ 3.2 Dynamic Wind-Dispersion Overlay
-*Show users where the air is blowing.*
-* **Concept:** Overlay vector particle animations on the dark Leaflet map showing real-time wind speed and direction.
-* **Mechanism:** Use wind data from the Open-Meteo API. Render animated canvas particles over the map (using libraries like `leaflet-velocity` or custom canvas rendering) to visually link hotspot wards to downwind vulnerability flags.
+- cinematic landing page
+- full dashboard / situation room
+- digital twin controls
+- intervention ROI output
+- guided demo presets
+- judge-mode walkthrough banner
+- forecast page
+- compare page
+- enforcement command center
+- advisory experience
+- citizen reports portal
+- role-oriented pages such as commissioner and field officer
 
-### 🚨 3.3 Automated Emergency Alert System (SMS/WhatsApp Mock)
-*Close the loop from diagnosis to citizen notification.*
-* **Concept:** In the `/enforcement` dashboard, add an **"Issue Alert"** button for wards with Severe AQI.
-* **Mechanism:** Clicking this triggers an endpoint that "sends" emergency health alerts (rendered as simulated SMS/WhatsApp mock cards in the UI or utilizing a free service like Twilio).
-* **Impact:** Demonstrates an end-to-end municipal warning protocol targeting school administrators and hospitals in the affected radius.
+### Validation
 
-### 📊 3.4 Vulnerability-Weighted Priority Index (Social Demographics)
-*Protect the people who need it most.*
-* **Concept:** Incorporate socio-demographic indicators into the enforcement ranking calculation.
-* **Mechanism:** Add demographic data to the `wards` table:
-  - Percentage of population over 65
-  - Percentage of population under 5
-  - Density of low-income housing
-* **Impact:** Wards with high concentrations of vulnerable residents will rank higher for intervention than industrial parks with low population density, showcasing empathetic, data-driven AI routing.
+Current validation status is strong:
 
-### 🖨️ 3.5 Municipal Dispatch Generator (PDF Export)
-*Convert digital data into field action.*
-* **Concept:** Allow inspectors to print/export specific actions from the Enforcement Queue.
-* **Mechanism:** Clicking "Export Dispatch Order" generates a PDF (using `jsPDF` or backend library) containing a mini map snippet, current ward AQI, source attribution breakdown, and checklist instructions.
-* **Impact:** Bridging the gap between software engineers and municipal field personnel.
+- backend tests: `53 passed`
+- frontend lint: passing
+- frontend production build: passing
 
-### 🔍 3.6 Sensor Diagnostic & Outlier Detection
-*Keep the data clean.*
-* **Concept:** A backend script that detects sensor failures (e.g., flatlines, stuck values, impossible jumps) using simple statistical checks.
-* **Mechanism:** Add a dynamic health indicator for each station on the map (Green = Active, Yellow = Warning/Outlier detected, Red = Offline).
-* **Impact:** Highly valued by municipal engineers who spend hours identifying malfunctioning monitoring hardware.
+This is a very good position for a hackathon project.
 
 ---
 
-## 🟢 4. Completed Feature Upgrades
+## 3. What Is Already Implemented
 
-All three targeted feature upgrade packages are now fully implemented, type-checked, and passing all functional audits:
+The following items are built and usable in the codebase:
 
-### 📱 Option A: Mobile-First PWA Support (Complete)
-* **Manifest Config**: Created `manifest.json` setting up standard PWA attributes.
-* **Branded App Launcher Icons**: Programmatically generated high-resolution glowing geometric hexagon icons (`icon-192x192.png` and `icon-512x512.png`) aligned with the AETHER brand.
-* **Service Worker Caching**: Deployed `sw.js` to handle asset caching and provide a clean offline fallback screen.
-* **Integration**: Injected Apple meta tags and inline registration logic within the global Next.js `layout.tsx` shell.
-
-### 🧬 Option B: Social Vulnerability Index (SVI) (Complete)
-* **Demographic Database Schema**: Updated the SQL `wards` database model with `elderly_percentage`, `child_percentage`, `low_income_percentage`, and `svi_index` attributes.
-* **Seeder Integration**: Enriched ward seeders for Kolkata, Delhi, and Mumbai to calculate SVI dynamically:
-  $$\text{SVI} = 0.4 \cdot \text{elderly\%} + 0.4 \cdot \text{child\%} + 0.2 \cdot \text{low\_income\%}$$
-* **Priority Enforcement Scorer**: Configured the enforcement router to calculate population exposure utilizing the demographic SVI scores, ensuring that interventions prioritize wards with high concentrations of vulnerable citizens.
-* **Dashboard Sidebar Card**: Added an aesthetic, glowing SVI demographic breakdown module in the selected ward sidebar.
-
-### 🚨 Option C: Twilio Gateway & PDF Dispatch Orders (Complete)
-* **Twilio Alert Gateway**: Added Twilio REST API integration in `attribution.py`'s alert broadcast route, enabling real-time emergency warning SMS alerts when credentials are configured in `.env`.
-* **jsPDF Work-Order Dispatches**: Integrated client-side PDF compilation in the `/field-officer` portal. Inspectors can click "PDF" to download a clean, structured Municipal Injunction Dispatch Order outlining routes, priority indices, current AQI, and standard stop-work protocols.
+- dashboard map and ward drilldown
+- live AQI summaries for multiple cities
+- digital twin intervention controls
+- ROI and health-impact estimates for intervention scenarios
+- guided demo presets for common emergency narratives
+- judge-mode quick-start workflow
+- 72-hour forecast interface
+- multi-city comparison interface
+- citizen-facing multilingual advisory
+- citizen pollution incident reporting
+- enforcement prioritization and response workflow
+- agent committee experience
+- sensor diagnostics and satellite calibration views
+- Docker setup and deployment-related files
+- PWA-related assets
 
 ---
 
-## 🗺️ 5. Final Submission Next Steps
+## 4. Recent Upgrades Completed
 
-With all code features complete and 27/27 API endpoints passing the audit, the final next steps for the hackathon are:
+These are the most important upgrades recently added or improved:
 
-1. **Spin up the Docker Orchestration Stack**:
-   * Run `docker-compose up --build` at the project root to build and start the Next.js frontend, FastAPI backend, TimescaleDB, Neo4j, Qdrant, and Redpanda containers.
-2. **Add Real API Keys (Optional)**:
-   * Populate `CPCB_API_KEY`, `OPENAI_API_KEY`, and `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` in the backend `.env` file to show off real-time sensor fetching, LLM situational briefings, and live citizen warning SMS dispatches.
-3. **Record the Demo Video / Pitch Deck**:
-   * Focus on AETHER's unique winning differentiators:
-     - **Digital Twin Policy Simulator**: Shows the downwind impact cone of traffic/construction bans in real-time.
-     - **Empathetic AI Routing (SVI)**: Moving beyond raw AQI numbers to prioritize child, elderly, and low-income demographics.
-     - **Telemetry Health Diagnostics**: Hardware flatline/drift detection overlay.
-     - **PWA Field Dispatch**: Closes the loop from administrative planning to real-world inspector alerts and official PDF work orders.
+### Frontend reliability and polish
 
+- refactored `AppShell` to avoid render-time component creation issues
+- cleaned hook dependency problems across major pages and components
+- restored a fully green frontend lint state
+- kept the frontend build stable after the refactors
+
+### Deployment safety
+
+- hardened the frontend API base behavior in `aether/frontend/lib/api.ts`
+- removed the risky production fallback behavior that could silently point to `localhost`
+
+### Decision-support clarity
+
+- added an intervention ROI panel to the dashboard sidebar
+- translated simulation outputs into commissioner-readable recommendations
+- surfaced projected AQI reduction, health savings, and avoided burden more clearly
+
+### Demo acceleration
+
+- added guided intervention presets to the digital twin panel
+- added a judge-mode walkthrough with one-click actions
+- made it faster to showcase the strongest product path during evaluation
+
+---
+
+## 5. Current Gaps
+
+The biggest remaining gaps are no longer "missing pages." They are mostly product-hardening and storytelling gaps.
+
+### Product / technical gaps
+
+- no dedicated frontend test suite yet
+- no polished benchmark/accuracy presentation for forecast quality
+- no strong runtime explanation of model confidence versus baselines
+- no explicit "why this ward first" evidence chain view combining forecast, attribution, SVI, and enforcement score in one place
+
+### Demo / narrative gaps
+
+- documentation was outdated and did not reflect the actual product state
+- the presentation layer can still better connect:
+  signal -> diagnosis -> intervention -> impact -> governance action
+
+### Maintenance gaps
+
+- backend still shows a Pydantic deprecation warning path that should eventually be modernized
+
+---
+
+## 6. Best Next Steps
+
+These are the highest-value next actions from here.
+
+### Priority 1 - Frontend smoke testing
+
+Add lightweight UI test coverage for:
+
+- dashboard load
+- hotspot ward selection
+- forecast view load
+- advisory interaction
+- enforcement action flow
+
+Reason:
+the backend is already tested, but the judge experience is mostly frontend-driven.
+
+### Priority 2 - Evidence chain panel
+
+Build a compact "why this action" panel that combines:
+
+- current AQI
+- forecast risk
+- attribution driver
+- SVI / vulnerable population context
+- recommended enforcement action
+
+Reason:
+this will make the platform feel more like a real municipal decision system.
+
+### Priority 3 - Demo script alignment
+
+Create a short built-in guided demo path across:
+
+- hotspot ward
+- emergency preset
+- ROI panel
+- AI briefing
+- committee decree
+- enforcement follow-through
+
+Reason:
+you already have the pieces; this step turns them into a smooth pitch flow.
+
+### Priority 4 - Accuracy and credibility layer
+
+Show forecast or attribution quality framing more explicitly:
+
+- baseline comparison
+- confidence explanation
+- what is simulated versus what is observed
+
+Reason:
+judges reward not only visual polish, but also technical credibility.
+
+---
+
+## 7. Recommended Judge Flow
+
+Use this order during the live demo:
+
+1. Open the dashboard and launch judge mode.
+2. Focus the worst AQI ward.
+3. Apply the emergency intervention preset.
+4. Show the ROI panel and projected AQI improvement.
+5. Open the AI briefing.
+6. Convene the AI committee.
+7. Move to enforcement to show operational follow-through.
+
+This sequence gives a strong end-to-end story:
+detect -> understand -> simulate -> justify -> decide -> act.
+
+---
+
+## 8. Final Assessment
+
+AETHER is now in a strong hackathon position.
+
+It already demonstrates:
+
+- business relevance
+- technical breadth
+- operational thinking
+- user-facing clarity
+- a credible smart-city intervention story
+
+The project does not need major new surfaces to look complete.
+The best remaining work is to improve trust, demo smoothness, and explanation quality.
+
+If executed well, the current build can present as more than a prototype - it can present as a decision-support platform.

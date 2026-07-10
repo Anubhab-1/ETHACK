@@ -4,7 +4,7 @@
  * Computes and displays ground-to-satellite telemetry calibration regression.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import {
   ScatterChart,
@@ -40,7 +40,7 @@ export function SatelliteCalibration({ city }: SatelliteCalibrationProps) {
   const [auditing, setAuditing] = useState(false);
   const [auditLogs, setAuditLogs] = useState<string[]>([]);
 
-  const loadCalibration = async () => {
+  const loadCalibration = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.simulationCalibrate(city);
@@ -50,11 +50,11 @@ export function SatelliteCalibration({ city }: SatelliteCalibrationProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [city]);
 
   useEffect(() => {
     loadCalibration();
-  }, [city]);
+  }, [loadCalibration]);
 
   const runAudit = () => {
     setAuditing(true);

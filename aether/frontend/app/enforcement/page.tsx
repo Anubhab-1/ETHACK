@@ -5,7 +5,7 @@
  * animated status pipeline, and integrated broadcast system.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { api, EnforcementAction, EnforcementStats } from "@/lib/api";
 import { AQIBadge } from "@/components/AQIBadge";
@@ -47,7 +47,7 @@ export default function EnforcementPage() {
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setError(null);
     try {
       const [acts, st] = await Promise.all([
@@ -63,13 +63,13 @@ export default function EnforcementPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [city, statusFilter]);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
     loadData();
-  }, [city, statusFilter]);
+  }, [loadData]);
 
   const handleStatusUpdate = async (actionId: number, newStatus: string) => {
     if (newStatus === "deployed") setDeployingId(actionId);

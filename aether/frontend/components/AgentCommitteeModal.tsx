@@ -9,7 +9,7 @@
  * - Final Commissioner decree with legal basis
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
 
 interface AgentCommitteeModalProps {
@@ -138,7 +138,10 @@ export function AgentCommitteeModal({
   };
 
   // Animate agent turns sequentially
-  const allTurns: (AgentTurn | DialogueTurn)[] = (response?.agent_turns || response?.dialogue || []) as (AgentTurn | DialogueTurn)[];
+  const allTurns = useMemo<(AgentTurn | DialogueTurn)[]>(
+    () => (response?.agent_turns || response?.dialogue || []) as (AgentTurn | DialogueTurn)[],
+    [response?.agent_turns, response?.dialogue]
+  );
 
   useEffect(() => {
     if (typingIndex === -1 || typingIndex >= allTurns.length) {

@@ -17,9 +17,14 @@ function useAnimatedCount(target: number, duration = 800) {
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number | null>(null);
   const fromRef = useRef(0);
+  const valueRef = useRef(0);
 
   useEffect(() => {
-    fromRef.current = value;
+    valueRef.current = value;
+  }, [value]);
+
+  useEffect(() => {
+    fromRef.current = valueRef.current;
     startRef.current = null;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 

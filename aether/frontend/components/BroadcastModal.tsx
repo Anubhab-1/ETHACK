@@ -6,7 +6,7 @@
  * to increment citizen alert acknowledgments in real-time.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { getAQIColor } from "@/lib/aqi-colors";
 
@@ -52,8 +52,6 @@ export function BroadcastModal({
   // IVR Simulated State
   const [ivrState, setIvrState] = useState<"idle" | "calling" | "active" | "completed">("idle");
   const [callDuration, setCallDuration] = useState(0);
-  const [ivrSpeech, setIvrSpeech] = useState<SpeechSynthesisUtterance | null>(null);
-
   // Meteorological Alert Messages
   const alertTexts: Record<string, string> = {
     en: `Emergency Air Quality Warning for Ward ${wardNo}, ${wardName}. The current AQI has spiked to ${Math.round(aqi)} (Severe). We advise children and the elderly to stay indoors. School outdoor activities are suspended.`,
@@ -64,7 +62,7 @@ export function BroadcastModal({
   const currentMessage = alertTexts[language] || alertTexts.en;
 
   // 1. Core Broadcast Trigger
-  const triggerBroadcast = async () => {
+  const triggerBroadcast = useCallback(async () => {
     setBroadcasting(true);
     try {
       const res = await api.broadcastAlerts(actionId);
@@ -89,21 +87,21 @@ export function BroadcastModal({
     } finally {
       setBroadcasting(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionId, wardName, wardNo, aqi, onStatusUpdate]);
 
   // Run broadcast automatically on open if not already sent
   useEffect(() => {
     if (isOpen) {
       triggerBroadcast();
     } else {
-      // Clean up TTS
       if (typeof window !== "undefined") {
         window.speechSynthesis.cancel();
       }
       setIvrState("idle");
       setCallDuration(0);
     }
-  }, [isOpen, actionId]);
+  }, [isOpen, triggerBroadcast]);
 
   // IVR Call Duration Timer
   useEffect(() => {

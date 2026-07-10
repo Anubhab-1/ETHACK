@@ -5,7 +5,7 @@
  * providing one-click troubleshooting options (recalibrations & dispatch logs).
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
 interface SensorDiagnosticsProps {
@@ -29,7 +29,7 @@ export function SensorDiagnostics({ city }: SensorDiagnosticsProps) {
   const [recalibratingId, setRecalibratingId] = useState<number | null>(null);
   const [dispatchedId, setDispatchedId] = useState<number | null>(null);
 
-  const loadDiagnostics = async () => {
+  const loadDiagnostics = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.diagnostics(city);
@@ -40,11 +40,11 @@ export function SensorDiagnostics({ city }: SensorDiagnosticsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [city]);
 
   useEffect(() => {
     loadDiagnostics();
-  }, [city]);
+  }, [loadDiagnostics]);
 
   const handleRecalibrate = (stationId: number) => {
     setRecalibratingId(stationId);

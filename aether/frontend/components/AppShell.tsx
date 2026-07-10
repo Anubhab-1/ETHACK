@@ -1,6 +1,6 @@
 "use client";
 /**
- * AETHER — AppShell
+ * AETHER â€” AppShell
  * Persistent collapsible sidebar + topbar wrapper for all inner pages.
  * Replaces the one-off navigation each page currently builds independently.
  */
@@ -19,7 +19,6 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  Wind,
   Activity,
   Wifi,
   WifiOff,
@@ -79,7 +78,7 @@ function getAQIColor(aqi: number | null) {
 }
 
 function getAQILabel(aqi: number | null) {
-  if (aqi === null) return "—";
+  if (aqi === null) return "\u2014";
   if (aqi <= 50) return "Good";
   if (aqi <= 100) return "Satisfactory";
   if (aqi <= 200) return "Moderate";
@@ -90,48 +89,35 @@ function getAQILabel(aqi: number | null) {
 
 interface AppShellProps {
   children: React.ReactNode;
-  /** Override city shown in sidebar AQI indicator */
   city?: string;
-  /** Live AQI passed from page if available */
   liveAQI?: number | null;
 }
 
-export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps) {
-  const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [time, setTime] = useState(new Date());
-  const [online, setOnline] = useState(true);
+interface SidebarContentProps {
+  collapsed: boolean;
+  pathname: string;
+  city: string;
+  liveAQI?: number | null;
+  aqiColor: string;
+  aqiLabel: string;
+  timeStr: string;
+  dateStr: string;
+  online: boolean;
+}
 
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 60000);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    const onOnline = () => setOnline(true);
-    const onOffline = () => setOnline(false);
-    window.addEventListener("online", onOnline);
-    window.addEventListener("offline", onOffline);
-    return () => {
-      window.removeEventListener("online", onOnline);
-      window.removeEventListener("offline", onOffline);
-    };
-  }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
-  const aqiColor = getAQIColor(liveAQI ?? null);
-  const aqiLabel = getAQILabel(liveAQI ?? null);
-  const timeStr = time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const dateStr = time.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-
-  const SidebarContent = () => (
+function SidebarContent({
+  collapsed,
+  pathname,
+  city,
+  liveAQI,
+  aqiColor,
+  aqiLabel,
+  timeStr,
+  dateStr,
+  online,
+}: SidebarContentProps) {
+  return (
     <div className="flex flex-col h-full">
-      {/* Logo */}
       <div className={`flex items-center ${collapsed ? "justify-center px-2 py-4" : "gap-3 px-4 py-4"} border-b border-white/5`}>
         <div className="flex-none text-orange-500">
           <Hexagon size={collapsed ? 28 : 24} strokeWidth={1.5} fill="rgba(249,115,22,0.1)" />
@@ -144,7 +130,6 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
         )}
       </div>
 
-      {/* AQI Indicator */}
       {!collapsed && (
         <div className="mx-3 mt-3 mb-1 p-3 rounded-xl border border-white/6 bg-gradient-to-br from-slate-900/60 to-slate-900/30">
           <div className="flex items-center justify-between mb-1.5">
@@ -168,12 +153,11 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
       {collapsed && (
         <div className="flex flex-col items-center gap-1 py-2 border-b border-white/5">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black" style={{ background: `${aqiColor}22`, color: aqiColor }}>
-            {liveAQI ?? "—"}
+            {liveAQI ?? "\u2014"}
           </div>
         </div>
       )}
 
-      {/* Nav */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-4 hide-scrollbar">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
@@ -219,7 +203,6 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
         ))}
       </nav>
 
-      {/* Footer */}
       <div className={`border-t border-white/5 ${collapsed ? "p-2" : "p-3"}`}>
         {!collapsed ? (
           <div className="flex items-center justify-between text-[10px] text-slate-600">
@@ -231,27 +214,66 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
           </div>
         ) : (
           <div className="flex justify-center">
-            {online
-              ? <Wifi size={12} className="text-emerald-500" />
-              : <WifiOff size={12} className="text-red-500" />}
+            {online ? <Wifi size={12} className="text-emerald-500" /> : <WifiOff size={12} className="text-red-500" />}
           </div>
         )}
       </div>
     </div>
   );
+}
+
+export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps) {
+  const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [time, setTime] = useState(new Date());
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  const aqiColor = getAQIColor(liveAQI ?? null);
+  const aqiLabel = getAQILabel(liveAQI ?? null);
+  const timeStr = time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const dateStr = time.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 
   return (
     <div className="flex h-screen bg-gray-950 overflow-hidden">
-      {/* ── Desktop Sidebar ─────────────────────────────── */}
       <aside
         className={`hidden md:flex flex-col flex-none transition-all duration-300 ease-in-out app-sidebar ${
           collapsed ? "w-[56px]" : "w-[220px]"
         }`}
       >
-        <SidebarContent />
-        {/* Collapse toggle */}
+        <SidebarContent
+          collapsed={collapsed}
+          pathname={pathname}
+          city={city}
+          liveAQI={liveAQI}
+          aqiColor={aqiColor}
+          aqiLabel={aqiLabel}
+          timeStr={timeStr}
+          dateStr={dateStr}
+          online={online}
+        />
         <button
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => setCollapsed((current) => !current)}
           className="absolute top-1/2 -right-3 -translate-y-1/2 hidden md:flex w-6 h-6 rounded-full border border-white/10 bg-slate-900 items-center justify-center text-slate-500 hover:text-slate-200 hover:border-white/20 transition-all z-50 shadow-lg"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -259,12 +281,21 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
         </button>
       </aside>
 
-      {/* ── Mobile Sidebar Overlay ───────────────────────── */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 h-full w-[240px] app-sidebar flex flex-col">
-            <SidebarContent />
+            <SidebarContent
+              collapsed={false}
+              pathname={pathname}
+              city={city}
+              liveAQI={liveAQI}
+              aqiColor={aqiColor}
+              aqiLabel={aqiLabel}
+              timeStr={timeStr}
+              dateStr={dateStr}
+              online={online}
+            />
             <button onClick={() => setMobileOpen(false)} className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white">
               <X size={14} />
             </button>
@@ -272,9 +303,7 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
         </div>
       )}
 
-      {/* ── Main content area ────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile topbar */}
         <div className="flex md:hidden items-center gap-3 px-4 py-3 border-b border-white/6 bg-gray-950/80 backdrop-blur-md flex-none">
           <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-white">
             <Menu size={16} />
@@ -290,10 +319,7 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
           )}
         </div>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );

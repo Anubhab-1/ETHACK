@@ -306,7 +306,7 @@ export default function AdvisoryPage() {
   }, [liveData]);
 
   // Load Map Wards and Live Readings
-  const loadMapData = async () => {
+  const loadMapData = useCallback(async () => {
     setLoadingMap(true);
     setError(null);
     try {
@@ -322,11 +322,11 @@ export default function AdvisoryPage() {
     } finally {
       setLoadingMap(false);
     }
-  };
+  }, [city]);
 
   useEffect(() => {
     loadMapData();
-  }, [city]);
+  }, [loadMapData]);
 
   // Set default greeting and fetch initial browser geolocation
   useEffect(() => {

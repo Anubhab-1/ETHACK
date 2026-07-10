@@ -38,6 +38,40 @@ const AetherMap = dynamic(() => import("@/components/AetherMap").then((m) => m.A
 
 const CITIES = ["Kolkata", "Delhi", "Mumbai"];
 
+const DEMO_SCENARIOS = [
+  {
+    id: "school-protection",
+    title: "School Protection",
+    description: "Light traffic curbs plus construction stop near vulnerable receptors.",
+    trafficReduction: 30,
+    constructionHalt: true,
+    industrialRestriction: 0,
+  },
+  {
+    id: "traffic-crackdown",
+    title: "Traffic Crackdown",
+    description: "Aggressive transport controls for commuter-driven pollution spikes.",
+    trafficReduction: 70,
+    constructionHalt: false,
+    industrialRestriction: 20,
+  },
+  {
+    id: "full-emergency",
+    title: "Full Emergency",
+    description: "Citywide suppression package for severe AQI escalation.",
+    trafficReduction: 60,
+    constructionHalt: true,
+    industrialRestriction: 60,
+  },
+] as const;
+
+const JUDGE_MODE_STEPS = [
+  "Focus the worst-performing ward",
+  "Apply a guided intervention preset",
+  "Read the ROI and projected AQI change",
+  "Open the AI briefing or committee decree",
+] as const;
+
 export default function DashboardPage() {
   const [city, setCity] = useState("Kolkata");
   const [liveData, setLiveData] = useState<LiveAQIPoint[]>([]);
@@ -81,6 +115,7 @@ export default function DashboardPage() {
   const [simulating, setSimulating] = useState(false);
   const [showRoute, setShowRoute] = useState(false);
   const [calibrationOpen, setCalibrationOpen] = useState(false);
+  const [judgeModeOpen, setJudgeModeOpen] = useState(true);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -153,6 +188,15 @@ export default function DashboardPage() {
       console.error("Failed to upvote report:", e);
     }
   }, []);
+
+  const applyDemoScenario = useCallback(
+    (scenario: (typeof DEMO_SCENARIOS)[number]) => {
+      setTrafficReduction(scenario.trafficReduction);
+      setConstructionHalt(scenario.constructionHalt);
+      setIndustrialRestriction(scenario.industrialRestriction);
+    },
+    []
+  );
 
   // Satellite Swath Sweep Scan trigger
   useEffect(() => {
@@ -248,7 +292,7 @@ export default function DashboardPage() {
     // Debounce simulation calls slightly to avoid spamming slider changes
     const delay = setTimeout(runSimulation, 250);
     return () => clearTimeout(delay);
-  }, [selectedWard?.id, trafficReduction, constructionHalt, industrialRestriction, windSpeed, windDir, isWindOverridden]);
+  }, [selectedWard, trafficReduction, constructionHalt, industrialRestriction, windSpeed, windDir, isWindOverridden]);
 
   const simulatedHeatmapData = useMemo<HeatmapPoint[]>(() => {
     if (!simulatedWards) {
@@ -288,6 +332,23 @@ export default function DashboardPage() {
       console.error("Failed to load ward details:", e);
     }
   }, [city]);
+
+  const focusHotspotWard = useCallback(async () => {
+    if (heatmapData.length === 0) return;
+    const hotspot = [...heatmapData].sort((left, right) => right.aqi - left.aqi)[0];
+    if (!hotspot) return;
+    await handleWardClick(hotspot.ward_id);
+    setSidebarOpen(true);
+  }, [heatmapData, handleWardClick]);
+
+  const launchJudgeDemo = useCallback(async () => {
+    const emergencyScenario = DEMO_SCENARIOS.find((scenario) => scenario.id === "full-emergency");
+    await focusHotspotWard();
+    if (emergencyScenario) {
+      applyDemoScenario(emergencyScenario);
+    }
+    setSidebarOpen(true);
+  }, [applyDemoScenario, focusHotspotWard]);
 
   // Heuristic Cost-Benefit calculations for the sandbox
   const costBenefits = useMemo(() => {
@@ -338,6 +399,59 @@ export default function DashboardPage() {
     };
   }, [selectedWard, trafficReduction, constructionHalt, industrialRestriction, simulatedWards]);
 
+  const hasActiveSimulation = trafficReduction > 0 || constructionHalt || industrialRestriction > 0 || isWindOverridden;
+
+  const interventionSummary = useMemo(() => {
+    if (!selectedWard || !costBenefits) return null;
+
+    const actions: string[] = [];
+    if (trafficReduction > 0) actions.push(`${trafficReduction}% traffic controls`);
+    if (constructionHalt) actions.push("construction halt");
+    if (industrialRestriction > 0) actions.push(`${industrialRestriction}% industrial restriction`);
+    if (isWindOverridden) actions.push("wind-adjusted scenario");
+
+    const recommendedAction =
+      costBenefits.roi === "0.0x"
+        ? "No action modeled"
+        : costBenefits.aqiDrop >= 25
+          ? "Activate emergency intervention package"
+          : costBenefits.aqiDrop >= 10
+            ? "Deploy targeted mitigation package"
+            : "Use light-touch monitoring and enforcement";
+
+    const outcomeTone =
+      costBenefits.aqiDrop >= 25
+        ? "text-emerald-400"
+        : costBenefits.aqiDrop >= 10
+          ? "text-yellow-400"
+          : "text-gray-400";
+
+    return {
+      actions,
+      recommendedAction,
+      outcomeTone,
+      projectedAQI: simulatedWards?.[selectedWard.id] ?? selectedWard.aqi ?? null,
+    };
+  }, [
+    selectedWard,
+    costBenefits,
+    trafficReduction,
+    constructionHalt,
+    industrialRestriction,
+    isWindOverridden,
+    simulatedWards,
+  ]);
+
+  const activeScenarioId = useMemo(() => {
+    const match = DEMO_SCENARIOS.find(
+      (scenario) =>
+        scenario.trafficReduction === trafficReduction &&
+        scenario.constructionHalt === constructionHalt &&
+        scenario.industrialRestriction === industrialRestriction
+    );
+    return match?.id ?? null;
+  }, [trafficReduction, constructionHalt, industrialRestriction]);
+
   const cityLevel = getAQILevel(cityAvgAQI);
 
   return (
@@ -348,10 +462,7 @@ export default function DashboardPage() {
         {/* Logo and Mobile controls */}
         <div className="flex items-center justify-between w-full lg:w-auto">
           <div className="flex items-center gap-3">
-            <div className="text-orange-500 font-black text-xl tracking-tight cursor-pointer hover:text-orange-400 transition-colors" onClick={() => window.location.href = '/'}>
-              ⬡ AETHER
-            </div>
-            <span className="hidden sm:block text-gray-500 text-xs font-medium">Air Quality Intelligence</span>
+            <h1 className="font-bold text-sm text-gray-200 animate-fade-in">Situation Room</h1>
           </div>
           {/* Live indicator (mobile) */}
           <div className="flex lg:hidden items-center gap-1.5 text-xs text-gray-500 bg-gray-900/50 px-2.5 py-1 rounded-full border border-white/5">
@@ -448,6 +559,75 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {judgeModeOpen && (
+        <div className="flex-none px-4 py-3 border-b border-orange-500/10 bg-gradient-to-r from-orange-950/35 via-gray-950 to-slate-950">
+          <div className="rounded-2xl border border-orange-500/20 bg-gray-950/70 px-4 py-4 shadow-lg shadow-orange-950/20">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-400">Judge Mode</span>
+                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+                    Guided Demo
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-100">Run the strongest live demo in under two minutes</h2>
+                  <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-gray-400">
+                    Start with the worst AQI ward, apply a prebuilt intervention, then use the ROI panel, AI briefing, and committee decree to show signal-to-action decision support.
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {JUDGE_MODE_STEPS.map((step, index) => (
+                    <div key={step} className="rounded-xl border border-white/5 bg-gray-900/40 px-3 py-2 text-[11px] text-gray-300">
+                      <span className="mr-2 font-black text-orange-400">{index + 1}.</span>
+                      {step}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 lg:min-w-[260px]">
+                <button
+                  onClick={launchJudgeDemo}
+                  className="rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-orange-400"
+                >
+                  Launch Emergency Demo
+                </button>
+                <button
+                  onClick={focusHotspotWard}
+                  className="rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-xs font-semibold text-gray-200 transition-colors hover:border-orange-500/30 hover:text-orange-300"
+                >
+                  Focus Hotspot Ward
+                </button>
+                <button
+                  onClick={loadBriefing}
+                  className="rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-xs font-semibold text-gray-200 transition-colors hover:border-orange-500/30 hover:text-orange-300"
+                >
+                  Open AI Briefing
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedWard) return;
+                    setCommitteeOpen(true);
+                    setSidebarOpen(true);
+                  }}
+                  disabled={!selectedWard}
+                  className="rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-xs font-semibold text-gray-200 transition-colors hover:border-orange-500/30 hover:text-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Convene AI Committee
+                </button>
+                <button
+                  onClick={() => setJudgeModeOpen(false)}
+                  className="text-[10px] font-semibold text-gray-500 transition-colors hover:text-gray-300"
+                >
+                  Hide judge mode
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Main Content ──────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative">
 
@@ -537,6 +717,43 @@ export default function DashboardPage() {
             ) : (
               <>
                 <div className="space-y-2.5 text-xs">
+                  <div className="space-y-2 border-b border-white/5 pb-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Demo Playbook</span>
+                      {activeScenarioId && (
+                        <span className="text-[9px] text-emerald-400 font-semibold">Preset active</span>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      {DEMO_SCENARIOS.map((scenario) => {
+                        const isActive = activeScenarioId === scenario.id;
+                        return (
+                          <button
+                            key={scenario.id}
+                            onClick={() => applyDemoScenario(scenario)}
+                            className={`w-full rounded-lg border p-2 text-left transition-colors cursor-pointer ${
+                              isActive
+                                ? "border-orange-500/40 bg-orange-500/10"
+                                : "border-white/5 bg-gray-900/40 hover:border-orange-500/20 hover:bg-gray-900/70"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-[11px] font-semibold ${isActive ? "text-orange-300" : "text-gray-200"}`}>
+                                {scenario.title}
+                              </span>
+                              {isActive && (
+                                <span className="text-[9px] font-black text-orange-400">LIVE</span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-[9px] leading-relaxed text-gray-500">
+                              {scenario.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Traffic slider */}
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px] text-gray-300">
@@ -858,10 +1075,10 @@ export default function DashboardPage() {
           </div>
 
           {/* Left Side Info Column (Legend, Health Impact, Satellite HUD) */}
-          <div className="absolute bottom-16 left-3 z-[800] w-56 max-w-[calc(100vw-24px)] flex flex-col gap-3 pointer-events-auto">
+          <div className="absolute bottom-6 left-3 z-[800] max-w-[calc(100vw-24px)] flex flex-col sm:flex-row items-end gap-3 pointer-events-auto">
             {/* Sentinel-5P Downlink Telemetry HUD */}
             {showDownlinkHUD && (
-              <div className="glass-card p-3 border border-orange-500/25 shadow-2xl text-[10px] space-y-1.5 animate-slide-up bg-gray-950/95">
+              <div className="glass-card p-3 border border-orange-500/25 shadow-2xl text-[10px] space-y-1.5 animate-slide-up bg-gray-950/95 w-56 flex-none">
                 <div className="flex items-center justify-between border-b border-white/5 pb-1">
                   <span className="font-bold text-orange-400 uppercase tracking-wider text-[9px] flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-ping" />
@@ -886,14 +1103,16 @@ export default function DashboardPage() {
             )}
 
             {/* Health Impact Estimate Panel */}
-            <HealthImpactCounter
-              cityAvgAQI={cityAvgAQI}
-              cityName={city}
-              stationCount={liveData.length}
-            />
+            <div className="w-56 flex-none">
+              <HealthImpactCounter
+                cityAvgAQI={cityAvgAQI}
+                cityName={city}
+                stationCount={liveData.length}
+              />
+            </div>
 
             {/* AQI Legend overlay */}
-            <div className="glass-card p-3 text-xs space-y-1 bg-gray-950/90">
+            <div className="glass-card p-3 text-xs space-y-1 bg-gray-950/90 w-56 flex-none">
               <p className="text-gray-400 font-semibold mb-2 text-[10px] uppercase tracking-wider">AQI Scale</p>
               {[
                 ["Good", "#00e400", "0–50"],
@@ -915,7 +1134,7 @@ export default function DashboardPage() {
 
         {/* ── Intelligence Side Panel ────────────────────────────────── */}
         <div
-          className={`absolute md:relative right-0 top-0 bottom-0 transition-all duration-300 ease-in-out glass-panel overflow-y-auto ${
+          className={`absolute md:relative right-0 top-0 bottom-0 transition-all duration-300 ease-in-out glass-panel overflow-y-auto h-full ${
             sidebarOpen ? "w-full md:w-80 xl:w-96 opacity-100 z-[990]" : "w-0 opacity-0 pointer-events-none z-[-1]"
           }`}
           style={{ borderLeft: sidebarOpen ? "1px solid rgba(255,255,255,0.08)" : "none" }}
@@ -1034,6 +1253,67 @@ export default function DashboardPage() {
                       <div className="flex items-center gap-2 text-gray-500 text-sm">
                         <div className="w-4 h-4 border border-orange-500 border-t-transparent rounded-full animate-spin" />
                         Generating forecast...
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-white/8" />
+
+                  {/* Intervention ROI */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                      Intervention ROI
+                    </h4>
+                    {!hasActiveSimulation ? (
+                      <div className="rounded-xl border border-dashed border-white/10 bg-gray-900/30 p-3 text-[11px] text-gray-500">
+                        Adjust the Digital Twin controls to generate a commissioner-ready impact estimate for this ward.
+                      </div>
+                    ) : costBenefits && interventionSummary ? (
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-orange-500/20 bg-orange-950/15 p-3">
+                          <p className="text-[10px] uppercase tracking-wider text-orange-400 font-bold mb-1">
+                            Recommended Action
+                          </p>
+                          <p className={`text-sm font-semibold ${interventionSummary.outcomeTone}`}>
+                            {interventionSummary.recommendedAction}
+                          </p>
+                          <p className="mt-2 text-[10px] text-gray-400">
+                            Scenario: {interventionSummary.actions.join(" + ")}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-lg border border-white/5 bg-gray-900/60 p-2">
+                            <p className="text-[9px] uppercase tracking-wider text-gray-500">Projected AQI</p>
+                            <p className="text-lg font-black" style={{ color: getAQILevel(interventionSummary.projectedAQI).color }}>
+                              {interventionSummary.projectedAQI !== null ? Math.round(interventionSummary.projectedAQI) : "\u2014"}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-white/5 bg-gray-900/60 p-2">
+                            <p className="text-[9px] uppercase tracking-wider text-gray-500">AQI Reduction</p>
+                            <p className={`text-lg font-black ${costBenefits.aqiDrop > 0 ? "text-emerald-400" : "text-gray-400"}`}>
+                              -{costBenefits.aqiDrop.toFixed(1)}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-white/5 bg-gray-900/60 p-2">
+                            <p className="text-[9px] uppercase tracking-wider text-gray-500">Health Savings</p>
+                            <p className="text-lg font-black text-emerald-400">{"\u20B9"} {costBenefits.healthSavings}L</p>
+                          </div>
+                          <div className="rounded-lg border border-white/5 bg-gray-900/60 p-2">
+                            <p className="text-[9px] uppercase tracking-wider text-gray-500">ROI Index</p>
+                            <p className={`text-lg font-black ${costBenefits.roiColor}`}>{costBenefits.roi}</p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-white/5 bg-gray-900/50 p-3 text-[11px] text-gray-400">
+                          Estimated avoided hospital burden:{" "}
+                          <span className="font-bold text-gray-200">{costBenefits.hospitalAvoided} patients/day</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-gray-500 text-sm">
+                        <div className="w-4 h-4 border border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        Evaluating intervention impact...
                       </div>
                     )}
                   </div>
