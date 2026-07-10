@@ -13,6 +13,7 @@
 import { useState, useEffect } from "react";
 import { api, HeatmapPoint } from "@/lib/api";
 import Link from "next/link";
+import { AppShell } from "@/components/AppShell";
 
 const LANGUAGES = [
   { code: "en", label: "English", native: "English" },
@@ -115,6 +116,7 @@ export default function CitizenPage() {
   const [question, setQuestion] = useState("");
   const [reportForm, setReportForm] = useState({ type: "industrial_smoke", description: "", severity: "medium" });
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [reportId, setReportId] = useState("");
   const [activeTab, setActiveTab] = useState<"home" | "advisory" | "report" | "alerts">("home");
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLon, setUserLon] = useState<number | null>(null);
@@ -182,6 +184,7 @@ export default function CitizenPage() {
   const handleReport = async () => {
     // Simulate report submission
     await new Promise(r => setTimeout(r, 800));
+    setReportId(`RPT-${Math.floor(100000 + Math.random() * 900000)}`);
     setReportSubmitted(true);
   };
 
@@ -194,7 +197,8 @@ export default function CitizenPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/10 text-white">
+    <AppShell liveAQI={aqi}>
+    <div className="min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/10 text-white">
       <div className="max-w-md mx-auto px-4 py-6 space-y-4">
 
         {/* Header */}
@@ -404,7 +408,7 @@ export default function CitizenPage() {
                 <div className="text-4xl">✅</div>
                 <h3 className="text-white font-bold">Report Submitted!</h3>
                 <p className="text-slate-400 text-sm">Your report will be reviewed and forwarded to the nearest enforcement team.</p>
-                <p className="text-slate-500 text-xs">Reference ID: RPT-{Date.now().toString().slice(-6)}</p>
+                <p className="text-slate-500 text-xs">Reference ID: {reportId}</p>
                 <button
                   onClick={() => { setReportSubmitted(false); setReportForm({ type: "industrial_smoke", description: "", severity: "medium" }); }}
                   className="bg-indigo-600 text-white text-sm px-4 py-2 rounded-xl"
@@ -508,5 +512,6 @@ export default function CitizenPage() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }

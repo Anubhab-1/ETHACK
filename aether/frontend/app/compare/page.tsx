@@ -10,6 +10,7 @@ import Link from "next/link";
 import { api, LiveAQIPoint, HeatmapPoint, AttributionResponse } from "@/lib/api";
 import { AQIBadge } from "@/components/AQIBadge";
 import { getAQILevel, SOURCE_COLORS, SOURCE_ICONS, SOURCE_LABELS } from "@/lib/aqi-colors";
+import { AppShell } from "@/components/AppShell";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, RadarChart, Radar, PolarGrid,
@@ -214,7 +215,8 @@ export default function ComparePage() {
   }));
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+    <AppShell>
+    <div className="min-h-full bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
       <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100] sticky top-0 shadow-md">
         <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
@@ -224,14 +226,7 @@ export default function ComparePage() {
             <h1 className="font-bold text-sm text-gray-200">Multi-City Intelligence</h1>
           </div>
         </div>
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
-          <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
-          <Link href="/forecast" className="nav-link">📈 Forecast</Link>
-          <Link href="/enforcement" className="nav-link">⚡ Enforcement</Link>
-          <Link href="/compare" className="nav-link active">🏙️ Compare</Link>
-          <Link href="/reports" className="nav-link">📢 Citizen Hub</Link>
-          <Link href="/advisory" className="nav-link">💬 Advisory</Link>
-        </nav>
+
         <button
           onClick={loadCityData}
           disabled={loading}
@@ -530,5 +525,6 @@ export default function ComparePage() {
         )}
       </div>
     </div>
+    </AppShell>
   );
 }

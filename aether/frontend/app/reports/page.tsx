@@ -8,6 +8,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { api, CitizenReport, WardDetail } from "@/lib/api";
+import { AppShell } from "@/components/AppShell";
+import { SkeletonCard } from "@/components/SkeletonLoaders";
 
 const CITIES = ["Kolkata", "Delhi", "Mumbai"];
 
@@ -153,7 +155,8 @@ export default function CitizenReportsPage() {
     .slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+    <AppShell city={city}>
+    <div className="min-h-full bg-gray-950 text-gray-100 flex flex-col">
       {/* Header Nav */}
       <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md sticky top-0 z-[1100] shadow-md flex-none">
         <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
@@ -163,14 +166,7 @@ export default function CitizenReportsPage() {
             <h1 className="font-bold text-sm text-gray-200">Citizen Reports</h1>
           </div>
         </div>
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
-          <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
-          <Link href="/forecast" className="nav-link">📈 Forecast</Link>
-          <Link href="/enforcement" className="nav-link">⚡ Enforcement</Link>
-          <Link href="/compare" className="nav-link">🏙️ Compare</Link>
-          <Link href="/reports" className="nav-link active">📢 Citizen Hub</Link>
-          <Link href="/advisory" className="nav-link">💬 Advisory</Link>
-        </nav>
+
         <div className="flex items-center justify-end w-full sm:w-auto mt-1 sm:mt-0">
           <select
             value={city}
@@ -250,9 +246,10 @@ export default function CitizenReportsPage() {
           {/* Incident Feed List */}
           <div className="flex-1 space-y-4">
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-10 h-10 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-xs text-gray-500">Loading citizen complaint records...</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <SkeletonCard key={i} rows={3} />
+                ))}
               </div>
             ) : filteredReports.length === 0 ? (
               <div className="glass-card p-12 text-center text-gray-500 text-xs">
@@ -557,5 +554,6 @@ export default function CitizenReportsPage() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }

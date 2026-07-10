@@ -16,7 +16,7 @@ export interface AQILevel {
 export const AQI_LEVELS: AQILevel[] = [
   {
     label: "Good",
-    color: "#00e400",
+    color: "#22c55e",
     bgColor: "bg-emerald-500",
     textColor: "text-emerald-400",
     borderColor: "border-emerald-500",
@@ -25,7 +25,7 @@ export const AQI_LEVELS: AQILevel[] = [
   },
   {
     label: "Satisfactory",
-    color: "#92d050",
+    color: "#84cc16",
     bgColor: "bg-lime-500",
     textColor: "text-lime-400",
     borderColor: "border-lime-500",
@@ -34,7 +34,7 @@ export const AQI_LEVELS: AQILevel[] = [
   },
   {
     label: "Moderate",
-    color: "#ffff00",
+    color: "#eab308",
     bgColor: "bg-yellow-500",
     textColor: "text-yellow-400",
     borderColor: "border-yellow-500",
@@ -43,7 +43,7 @@ export const AQI_LEVELS: AQILevel[] = [
   },
   {
     label: "Poor",
-    color: "#ff7e00",
+    color: "#f97316",
     bgColor: "bg-orange-500",
     textColor: "text-orange-400",
     borderColor: "border-orange-500",
@@ -52,19 +52,19 @@ export const AQI_LEVELS: AQILevel[] = [
   },
   {
     label: "Very Poor",
-    color: "#ff0000",
-    bgColor: "bg-red-600",
+    color: "#ef4444",
+    bgColor: "bg-red-500",
     textColor: "text-red-400",
-    borderColor: "border-red-600",
+    borderColor: "border-red-500",
     range: [301, 400],
     emoji: "🔴",
   },
   {
     label: "Severe",
-    color: "#7e0023",
-    bgColor: "bg-rose-900",
-    textColor: "text-rose-300",
-    borderColor: "border-rose-800",
+    color: "#991b1b",
+    bgColor: "bg-red-900",
+    textColor: "text-red-300",
+    borderColor: "border-red-900",
     range: [401, 500],
     emoji: "🟣",
   },

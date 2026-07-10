@@ -12,6 +12,7 @@ import { AQIBadge } from "@/components/AQIBadge";
 import { ForecastChart } from "@/components/ForecastChart";
 import { getAQILevel } from "@/lib/aqi-colors";
 import { format, parseISO } from "date-fns";
+import { AppShell } from "@/components/AppShell";
 
 const CITIES = ["Kolkata", "Delhi", "Mumbai"];
 
@@ -173,7 +174,8 @@ export default function ForecastPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+    <AppShell city={city}>
+    <div className="min-h-full bg-gray-950 text-gray-100 flex flex-col">
       {/* Header */}
       <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100] sticky top-0 shadow-md">
         <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
@@ -183,14 +185,7 @@ export default function ForecastPage() {
             <h1 className="font-bold text-sm text-gray-200">Predictive Intelligence</h1>
           </div>
         </div>
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
-          <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
-          <Link href="/forecast" className="nav-link active">📈 Forecast</Link>
-          <Link href="/enforcement" className="nav-link">⚡ Enforcement</Link>
-          <Link href="/compare" className="nav-link">🏙️ Compare</Link>
-          <Link href="/reports" className="nav-link">📢 Citizen Hub</Link>
-          <Link href="/advisory" className="nav-link">💬 Advisory</Link>
-        </nav>
+
         <div className="flex items-center gap-3">
           <Link href="/dashboard" className="text-xs text-orange-400 hover:underline hidden sm:block">
             ← Situation Room
@@ -491,5 +486,6 @@ export default function ForecastPage() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }

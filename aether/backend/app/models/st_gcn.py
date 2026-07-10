@@ -15,8 +15,9 @@ try:
     import torch.nn as nn
     from torch_geometric.nn import GCNConv
     TORCH_AVAILABLE = True
-except ImportError:
+except Exception:
     TORCH_AVAILABLE = False
+    torch = None
     class nn:
         class Module: pass
     logger.warning("torch or torch-geometric not available. STGCN models will stub out.")

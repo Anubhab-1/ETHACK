@@ -130,7 +130,7 @@ export function BroadcastModal({
       { text: "🚚 [Resident - Main Road]: Spraying truck spotted active. Visibility improving." }
     ];
 
-    let timerIds: NodeJS.Timeout[] = [];
+    const timerIds: NodeJS.Timeout[] = [];
 
     feedbackPresets.forEach((preset, index) => {
       const id = setTimeout(() => {
@@ -209,7 +209,7 @@ export function BroadcastModal({
 
     const utterance = new SpeechSynthesisUtterance(currentMessage);
     const voices = window.speechSynthesis.getVoices();
-    let voiceLang = language === "bn" ? "bn" : language === "hi" ? "hi" : "en";
+    const voiceLang = language === "bn" ? "bn" : language === "hi" ? "hi" : "en";
     const selectedVoice = voices.find((v) => v.lang.startsWith(voiceLang));
     if (selectedVoice) utterance.voice = selectedVoice;
 

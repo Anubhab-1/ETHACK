@@ -11,6 +11,8 @@ import { api, EnforcementAction, EnforcementStats } from "@/lib/api";
 import { AQIBadge } from "@/components/AQIBadge";
 import { SOURCE_COLORS, SOURCE_ICONS, SOURCE_LABELS } from "@/lib/aqi-colors";
 import { BroadcastModal } from "@/components/BroadcastModal";
+import { AppShell } from "@/components/AppShell";
+import { SkeletonTable } from "@/components/SkeletonLoaders";
 
 const STATUS_COLORS: Record<string, string> = {
   open: "text-orange-400 bg-orange-900/30 border-orange-800/60",
@@ -99,7 +101,8 @@ export default function EnforcementPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
+    <AppShell city={city}>
+    <div className="min-h-full bg-gray-950 text-gray-100">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md sticky top-0 z-[1100] shadow-md">
         <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
@@ -109,14 +112,7 @@ export default function EnforcementPage() {
             <h1 className="font-bold text-sm text-gray-200">Enforcement Command</h1>
           </div>
         </div>
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
-          <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
-          <Link href="/forecast" className="nav-link">📈 Forecast</Link>
-          <Link href="/enforcement" className="nav-link active">⚡ Enforcement</Link>
-          <Link href="/compare" className="nav-link">🏙️ Compare</Link>
-          <Link href="/reports" className="nav-link">📢 Citizen Hub</Link>
-          <Link href="/advisory" className="nav-link">💬 Advisory</Link>
-        </nav>
+
         <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
           {lastSync && (
             <span className="text-[10px] text-gray-600 hidden sm:block">
@@ -273,9 +269,8 @@ export default function EnforcementPage() {
             </button>
           </div>
         ) : loading ? (
-          <div className="text-center py-20">
-            <div className="w-10 h-10 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-500 text-sm">Loading enforcement queue for {city}...</p>
+          <div className="space-y-4">
+            <SkeletonTable rows={5} cols={4} />
           </div>
         ) : actions.length === 0 ? (
           <div className="text-center py-20 glass-card">
@@ -433,5 +428,6 @@ export default function EnforcementPage() {
         />
       )}
     </div>
+    </AppShell>
   );
 }

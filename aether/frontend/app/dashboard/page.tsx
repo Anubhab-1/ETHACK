@@ -7,6 +7,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Cpu, Satellite, Activity, Sliders, Users, RefreshCw, Route, Brain } from "lucide-react";
 import { api, LiveAQIPoint, HeatmapPoint, WardDetail, ForecastPoint, AttributionResponse } from "@/lib/api";
 import { AQIBadge } from "@/components/AQIBadge";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
@@ -17,6 +20,7 @@ import { SensorDiagnostics } from "@/components/SensorDiagnostics";
 import { SatelliteCalibration } from "@/components/SatelliteCalibration";
 import { HealthImpactCounter } from "@/components/HealthImpactCounter";
 import { AlertNotificationSystem } from "@/components/AlertNotificationSystem";
+import { AppShell } from "@/components/AppShell";
 
 
 // Dynamic import for map (client-side only — Leaflet has no SSR)
@@ -55,6 +59,7 @@ export default function DashboardPage() {
   const [windSpeed, setWindSpeed] = useState(6.5);
   const [windDir, setWindDir] = useState(180);
   const [isWindOverridden, setIsWindOverridden] = useState(false);
+  const [weatherData, setWeatherData] = useState<{ temp_c: number; humidity_pct: number; wind_speed: number; wind_dir: number } | null>(null);
   const [showSatellite, setShowSatellite] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [showDownlinkHUD, setShowDownlinkHUD] = useState(false);
@@ -92,9 +97,12 @@ export default function DashboardPage() {
       setCitizenReports(reports);
       setLastUpdated(new Date());
 
-      if (weather && !isWindOverridden) {
-        setWindSpeed(weather.wind_speed || 6.5);
-        setWindDir(weather.wind_dir || 180);
+      if (weather) {
+        setWeatherData(weather);
+        if (!isWindOverridden) {
+          setWindSpeed(weather.wind_speed || 6.5);
+          setWindDir(weather.wind_dir || 180);
+        }
       }
 
       // Compute city average AQI
@@ -333,7 +341,8 @@ export default function DashboardPage() {
   const cityLevel = getAQILevel(cityAvgAQI);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 overflow-hidden">
+    <AppShell city={city} liveAQI={cityAvgAQI}>
+    <div className="flex flex-col h-full bg-gray-950 overflow-hidden">
       {/* ── Top Navigation Bar ────────────────────────────────────────── */}
       <header className="flex-none z-[1100] flex flex-col lg:flex-row items-center justify-between px-4 py-3 gap-3 lg:gap-0 bg-gray-950/95 backdrop-blur-md border-b border-white/8 shadow-md">
         {/* Logo and Mobile controls */}
@@ -351,27 +360,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Navigation scrollbar */}
-        <nav className="flex items-center gap-1 overflow-x-auto w-full lg:w-auto whitespace-nowrap scrollbar-none py-1 lg:py-0 border-y border-white/5 lg:border-none">
-          <Link href="/dashboard" className="nav-link active">
-            <span>🗺️</span> Dashboard
-          </Link>
-          <Link href="/forecast" className="nav-link">
-            <span>📈</span> Forecast
-          </Link>
-          <Link href="/enforcement" className="nav-link">
-            <span>⚡</span> Enforcement
-          </Link>
-          <Link href="/compare" className="nav-link">
-            <span>🏙️</span> Compare
-          </Link>
-          <Link href="/reports" className="nav-link">
-            <span>📢</span> Citizen Hub
-          </Link>
-          <Link href="/advisory" className="nav-link">
-            <span>💬</span> Advisory
-          </Link>
-        </nav>
+        {/* Weather context strip */}
+        {weatherData && (
+          <div className="flex items-center gap-3 text-[11px] bg-slate-900/60 border border-white/5 px-3 py-1 rounded-full text-slate-400 font-mono text-data">
+            <span className="flex items-center gap-1 text-slate-300">🌡️ {weatherData.temp_c}°C</span>
+            <span className="h-2.5 w-px bg-slate-800" />
+            <span className="flex items-center gap-1 text-slate-300">💧 {weatherData.humidity_pct}% RH</span>
+            <span className="h-2.5 w-px bg-slate-800" />
+            <span className="flex items-center gap-1 text-slate-300">💨 {weatherData.wind_speed} km/h ({weatherData.wind_dir}°)</span>
+          </div>
+        )}
 
         {/* Selector + API keys / actions */}
         <div className="flex items-center justify-between lg:justify-end gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap">
@@ -654,8 +652,15 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="text-xs text-gray-300 leading-relaxed space-y-2 whitespace-pre-wrap font-sans">
-                    {briefingText}
+                  <div className="text-xs text-gray-300 leading-relaxed prose prose-invert prose-xs max-w-none
+                    [&_h1]:text-orange-400 [&_h1]:text-xs [&_h1]:font-bold [&_h1]:uppercase [&_h1]:tracking-wider [&_h1]:mb-1
+                    [&_h2]:text-orange-300 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:mb-1
+                    [&_h3]:text-slate-300 [&_h3]:text-xs [&_h3]:font-semibold
+                    [&_strong]:text-white [&_strong]:font-bold
+                    [&_ul]:space-y-0.5 [&_li]:text-gray-400 [&_li]:text-xs
+                    [&_p]:text-gray-300 [&_p]:text-xs [&_p]:leading-relaxed
+                    [&_code]:bg-slate-800 [&_code]:px-1 [&_code]:rounded [&_code]:text-orange-300 [&_code]:font-mono [&_code]:text-[10px]">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{briefingText}</ReactMarkdown>
                   </div>
                   <div className="flex gap-2 pt-2 border-t border-white/5">
                     <button
@@ -1100,5 +1105,6 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+    </AppShell>
   );
 }

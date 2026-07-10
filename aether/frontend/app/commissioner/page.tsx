@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { AgentCommitteeModal } from "@/components/AgentCommitteeModal";
 import Link from "next/link";
+import { AppShell } from "@/components/AppShell";
 
 const CITIES = ["Kolkata", "Delhi", "Mumbai"];
 
@@ -116,7 +117,8 @@ export default function CommissionerPage() {
     : "from-slate-950 via-indigo-950/20 to-slate-950";
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${bgTheme} text-white`}>
+    <AppShell city={selectedCity}>
+    <div className={`min-h-full bg-gradient-to-br ${bgTheme} text-white`}>
       {/* Crisis banner */}
       {crisisMode && (
         <div className="bg-red-600 text-white text-center py-2 text-sm font-bold animate-pulse">
@@ -352,5 +354,6 @@ export default function CommissionerPage() {
         />
       )}
     </div>
+    </AppShell>
   );
 }

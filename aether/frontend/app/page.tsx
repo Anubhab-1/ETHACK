@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { LayoutDashboard, TrendingUp, BarChart2, Building2, MessageSquare, Hexagon } from "lucide-react";
 import { api, LiveAQIPoint } from "@/lib/api";
 
 const CITIES = ["Kolkata", "Delhi", "Mumbai"];
@@ -208,41 +209,63 @@ export default function LandingPage() {
   const activeStations = liveData[activeCity] || [];
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 overflow-x-hidden">
-      {/* ── Animated Background Grid ─────────────────────────────── */}
+    <div className="min-h-screen bg-gray-950 text-gray-100 overflow-x-clip">
+      {/* ── Animated Background ───────────────────────────────────── */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        {/* Subtle grid */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 opacity-40"
           style={{
-            backgroundImage: `
-              linear-gradient(rgba(249,115,22,0.03) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(249,115,22,0.03) 1px, transparent 1px)
-            `,
-            backgroundSize: "60px 60px",
+            backgroundImage: `linear-gradient(rgba(249,115,22,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(249,115,22,0.04) 1px, transparent 1px)`,
+            backgroundSize: "80px 80px",
           }}
         />
-        {/* Radial glow */}
-        <div
-          className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{
-            width: 800,
-            height: 800,
-            background: "radial-gradient(circle, rgba(249,115,22,0.06) 0%, transparent 70%)",
-          }}
-        />
+        {/* Primary glow — top center */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full animate-glow"
+          style={{ width: 1000, height: 600, background: "radial-gradient(ellipse, rgba(249,115,22,0.09) 0%, transparent 60%)" }} />
+        {/* Secondary glow — bottom right */}
+        <div className="absolute bottom-0 right-0 rounded-full animate-glow" style={{ animationDelay: "1.5s",
+          width: 600, height: 400, background: "radial-gradient(ellipse, rgba(59,130,246,0.05) 0%, transparent 70%)" }} />
+        {/* Floating particles (CSS-only) */}
+        {[...Array(20)].map((_, i) => (
+          <div key={i}
+            className="absolute rounded-full"
+            style={{
+              width: 2 + (i % 3),
+              height: 2 + (i % 3),
+              left: `${(i * 37 + 5) % 95}%`,
+              top: `${(i * 53 + 10) % 90}%`,
+              background: i % 3 === 0 ? "#f97316" : i % 3 === 1 ? "#3b82f6" : "#22c55e",
+              opacity: 0.15 + (i % 4) * 0.1,
+              animation: `float-up ${4 + (i % 3)}s ease-in-out infinite`,
+              animationDelay: `${(i * 0.4) % 3}s`,
+            }}
+          />
+        ))}
       </div>
 
       {/* ── Navigation ──────────────────────────────────────────── */}
       <nav className="relative z-50 flex items-center justify-between px-6 py-4 border-b border-white/6 bg-gray-950/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="text-orange-500 font-black text-2xl tracking-tight">⬡ AETHER</div>
-          <span className="text-gray-600 text-xs hidden sm:block">Urban Air Quality Intelligence</span>
+          <Hexagon size={28} className="text-orange-500" strokeWidth={1.5} fill="rgba(249,115,22,0.1)" />
+          <div>
+            <div className="text-orange-500 font-black text-xl tracking-tight leading-none">AETHER</div>
+            <div className="text-gray-600 text-[10px] hidden sm:block">Urban Air Quality Intelligence</div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/dashboard" className="hidden sm:flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">🗺️ Dashboard</Link>
-          <Link href="/forecast" className="hidden sm:flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">📈 Forecast</Link>
-          <Link href="/compare" className="hidden sm:flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">🏙️ Compare</Link>
-          <Link href="/commissioner" className="hidden sm:flex items-center gap-2 text-xs text-indigo-400 hover:text-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-900/20 border border-indigo-800/30 transition-all">🏛️ Commissioner</Link>
+        <div className="flex items-center gap-1">
+          <Link href="/dashboard" className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">
+            <LayoutDashboard size={12} /> Dashboard
+          </Link>
+          <Link href="/forecast" className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">
+            <TrendingUp size={12} /> Forecast
+          </Link>
+          <Link href="/compare" className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all">
+            <BarChart2 size={12} /> Compare
+          </Link>
+          <Link href="/commissioner" className="hidden sm:flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-200 px-3 py-1.5 rounded-lg hover:bg-indigo-900/20 border border-indigo-800/30 transition-all">
+            <Building2 size={12} /> Commissioner
+          </Link>
           <Link
             href="/dashboard"
             className="ml-2 px-4 py-2 bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold rounded-lg shadow-lg shadow-orange-500/25 transition-all"

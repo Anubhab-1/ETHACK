@@ -11,6 +11,7 @@ import dynamic from "next/dynamic";
 import { api, LiveAQIPoint, HeatmapPoint, WardDetail } from "@/lib/api";
 import { AQIBadge } from "@/components/AQIBadge";
 import { getAQILevel } from "@/lib/aqi-colors";
+import { AppShell } from "@/components/AppShell";
 
 // Dynamic import for map to avoid Next.js SSR leaflet errors
 const AetherMap = dynamic(() => import("@/components/AetherMap").then((m) => m.AetherMap), {
@@ -420,7 +421,8 @@ export default function AdvisoryPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col h-screen overflow-hidden">
+    <AppShell city={city} liveAQI={cityAvgAQI}>
+    <div className="min-h-full bg-gray-950 text-gray-100 flex flex-col h-screen overflow-hidden">
       {/* ── Header ── */}
       <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100]">
         <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
@@ -430,14 +432,7 @@ export default function AdvisoryPage() {
             <h1 className="font-bold text-sm text-gray-200">Citizen Advisory</h1>
           </div>
         </div>
-        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-1 sm:py-0 w-full sm:w-auto">
-          <Link href="/dashboard" className="nav-link">🗺️ Dashboard</Link>
-          <Link href="/forecast" className="nav-link">📈 Forecast</Link>
-          <Link href="/enforcement" className="nav-link">⚡ Enforcement</Link>
-          <Link href="/compare" className="nav-link">🏙️ Compare</Link>
-          <Link href="/reports" className="nav-link">📢 Citizen Hub</Link>
-          <Link href="/advisory" className="nav-link active">💬 Advisory</Link>
-        </nav>
+
 
         <div className="flex items-center gap-3">
           {/* City selector */}
@@ -744,5 +739,6 @@ export default function AdvisoryPage() {
 
       </div>
     </div>
+    </AppShell>
   );
 }
