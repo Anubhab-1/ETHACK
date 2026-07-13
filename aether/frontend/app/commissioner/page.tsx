@@ -44,11 +44,11 @@ const HISTORICAL_CAUSAL: CausalRecord[] = [
 ];
 
 const ROI_INTERVENTIONS = [
-  { action: "Heavy Vehicle Ban", cost_lakhs: 2.5, aqi_reduction: 89, health_savings: 14.2, roi: 5.7, time_hrs: 2 },
-  { action: "Construction Halt", cost_lakhs: 1.2, aqi_reduction: 67, health_savings: 10.8, roi: 9.0, time_hrs: 6 },
-  { action: "Industrial Curtailment", cost_lakhs: 8.0, aqi_reduction: 123, health_savings: 19.7, roi: 2.5, time_hrs: 8 },
-  { action: "Combined Emergency", cost_lakhs: 12.0, aqi_reduction: 173, health_savings: 27.7, roi: 2.3, time_hrs: 4 },
-  { action: "Show-Cause Notice", cost_lakhs: 0.3, aqi_reduction: 60, health_savings: 9.6, roi: 32.0, time_hrs: 48 },
+  { action: "Heavy Vehicle Ban", cost_lakhs: 2.5, aqi_reduction: 89, health_savings: 14.2, co2_avoided_tons: 24.5, roi: 5.7, time_hrs: 2 },
+  { action: "Construction Halt", cost_lakhs: 1.2, aqi_reduction: 67, health_savings: 10.8, co2_avoided_tons: 8.2, roi: 9.0, time_hrs: 6 },
+  { action: "Industrial Curtailment", cost_lakhs: 8.0, aqi_reduction: 123, health_savings: 19.7, co2_avoided_tons: 42.0, roi: 2.5, time_hrs: 8 },
+  { action: "Combined Emergency", cost_lakhs: 12.0, aqi_reduction: 173, health_savings: 27.7, co2_avoided_tons: 68.5, roi: 2.3, time_hrs: 4 },
+  { action: "Show-Cause Notice", cost_lakhs: 0.3, aqi_reduction: 60, health_savings: 9.6, co2_avoided_tons: 2.1, roi: 32.0, time_hrs: 48 },
 ];
 
 function AQIBadge({ value }: { value: number }) {
@@ -158,15 +158,23 @@ export default function CommissionerPage() {
     return ROI_INTERVENTIONS.map((row) => {
       const scaledReduction = Math.round(row.aqi_reduction * scale);
       const scaledSavings = parseFloat((row.health_savings * scale).toFixed(1));
+      const scaledCo2 = parseFloat((row.co2_avoided_tons * scale).toFixed(1));
       const calculatedROI = parseFloat((scaledSavings / row.cost_lakhs).toFixed(1));
       return {
         ...row,
         aqi_reduction: scaledReduction,
         health_savings: scaledSavings,
+        co2_avoided_tons: scaledCo2,
         roi: calculatedROI,
       };
     });
   }, [avgAQI]);
+
+  const totalCo2Avoided = useMemo(() => {
+    const scale = avgAQI ? avgAQI / 200 : 1.0;
+    const baseTons = activeInterventions * 8.5 * scale;
+    return baseTons.toFixed(1);
+  }, [activeInterventions, avgAQI]);
 
   const bgTheme = crisisMode
     ? "from-red-950/50 via-slate-950 to-slate-950"
@@ -212,12 +220,13 @@ export default function CommissionerPage() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {[
             { label: "City-wide AQI", value: avgAQI ? `${avgAQI}` : "—", sub: avgAQI > 200 ? "⚠️ Action Required" : "✅ Monitoring", color: avgAQI > 300 ? "text-red-400" : avgAQI > 200 ? "text-orange-400" : "text-emerald-400" },
             { label: "Active Interventions", value: `${activeInterventions}`, sub: "Open & Deployed tasks", color: "text-cyan-400" },
             { label: "Signal → Response SLA", value: avgResponseTime, sub: "Detection to dispatch", color: "text-violet-400" },
             { label: "Health Savings (Est.)", value: healthSavings, sub: "WHO dose-response model", color: "text-emerald-400" },
+            { label: "Carbon Offset (Est.)", value: `${totalCo2Avoided} t`, sub: "CO₂ emissions prevented", color: "text-emerald-400 font-mono" },
           ].map((kpi, i) => (
             <div key={i} className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
               <div className="text-slate-400 text-xs mb-1">{kpi.label}</div>
@@ -311,7 +320,7 @@ export default function CommissionerPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-700/50">
-                      {["Intervention", "Cost (Rs Lakh)", "AQI Reduction", "Health Savings", "ROI", "Effect Time"].map(h => (
+                      {["Intervention", "Cost (Rs Lakh)", "AQI Reduction", "Health Savings", "CO₂ Offset", "ROI", "Effect Time"].map(h => (
                         <th key={h} className="text-left pb-2 text-slate-400 text-xs font-medium pr-4">{h}</th>
                       ))}
                     </tr>
@@ -326,6 +335,9 @@ export default function CommissionerPage() {
                           <span className="text-slate-500 text-xs ml-1">μg/m³</span>
                         </td>
                         <td className="py-2.5 pr-4 text-emerald-400">₹{row.health_savings.toFixed(1)}L</td>
+                        <td className="py-2.5 pr-4 text-emerald-400 font-mono text-xs">
+                          🌱 {row.co2_avoided_tons.toFixed(1)} <span className="text-slate-500 text-[10px]">t/day</span>
+                        </td>
                         <td className="py-2.5 pr-4">
                           <span className={`font-bold ${row.roi > 10 ? "text-emerald-300" : row.roi > 5 ? "text-yellow-300" : "text-orange-300"}`}>
                             {row.roi.toFixed(1)}×
