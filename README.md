@@ -190,21 +190,6 @@ The hackathon evaluation explicitly asks for "demonstrated reduction in response
 
 ---
 
-## 🎬 Recommended Demo Flow (for judges)
-
-1. **Landing page** → shows live AQI orbs for 3 cities
-2. **Dashboard** → select worst-AQI ward; emergency banner fires
-3. **Digital Twin** → apply "Emergency Preset" → show AQI drop + ROI panel
-4. **AI Briefing** → stream executive brief
-5. **Agent Committee** → convene 5-agent deliberation; show decree
-6. **Commissioner** → show response-time metric + causal proof of past intervention
-7. **Enforcement** → show P1 action, deploy, broadcast alert
-8. **Field Officer** → show task acknowledged from field
-
-**Story arc:** *Detect → Diagnose → Simulate → Justify → Decide → Act → Prove.*
-
----
-
 ## 👥 Team
 
 Built for the **ET AI Hackathon 2026** — Problem Statement 5: Urban Air Quality Management.
