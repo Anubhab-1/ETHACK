@@ -69,6 +69,31 @@ export default function FieldOfficerPage() {
   const [evidenceNotes, setEvidenceNotes] = useState("");
   const [evidenceSeverity, setEvidenceSeverity] = useState("high");
   const [gpsStamp, setGpsStamp] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [evidenceSubmitted, setEvidenceSubmitted] = useState(false);
+  const [submittingEvidence, setSubmittingEvidence] = useState(false);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPhotoUrl(url);
+    }
+  };
+
+  const submitEvidence = () => {
+    setSubmittingEvidence(true);
+    setTimeout(() => {
+      setSubmittingEvidence(false);
+      setEvidenceSubmitted(true);
+      setTimeout(() => {
+        setEvidenceSubmitted(false);
+        setPhotoUrl(null);
+        setEvidenceNotes("");
+        setActiveTab("tasks");
+      }, 1500);
+    }, 1000);
+  };
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -424,14 +449,31 @@ export default function FieldOfficerPage() {
               </div>
               <span className="ml-auto w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
             </div>
-            <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center space-y-2">
-              <Camera size={28} className="mx-auto text-slate-600" />
-              <div className="text-slate-300 text-sm font-medium">Camera Evidence Capture</div>
-              <div className="text-slate-500 text-xs">Photo auto-stamped with GPS, timestamp, officer ID</div>
-              <label className="mt-2 inline-block bg-indigo-600/60 hover:bg-indigo-600 text-white text-xs px-4 py-2 rounded-lg border border-indigo-500/40 cursor-pointer transition-colors">
-                📷 Capture / Upload
-                <input type="file" accept="image/*" capture="environment" className="hidden" />
-              </label>
+            <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/50 min-h-[160px] flex items-center justify-center relative">
+              {photoUrl ? (
+                <div className="relative w-full h-[220px] flex items-center justify-center bg-black">
+                  <img src={photoUrl} className="w-full h-full object-cover" alt="Evidence" />
+                  <div className="absolute bottom-2 left-2 bg-slate-950/80 border border-emerald-500/40 text-[9px] font-mono text-emerald-400 p-2 rounded space-y-0.5">
+                    <div>📍 {gpsStamp || "22.5428°N 88.3273°E"}</div>
+                    <div>📅 {new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC</div>
+                    <div>🆔 KMC-INSPECT-7049</div>
+                    <div>🟢 VERIFIED EVIDENCE DATA</div>
+                  </div>
+                  <button onClick={() => setPhotoUrl(null)} className="absolute top-2 right-2 bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded">
+                    Retake
+                  </button>
+                </div>
+              ) : (
+                <div className="p-6 text-center space-y-2 w-full">
+                  <Camera size={28} className="mx-auto text-slate-600 animate-pulse" />
+                  <div className="text-slate-300 text-sm font-medium">Camera Evidence Capture</div>
+                  <div className="text-slate-500 text-[11px]">Photo auto-stamped with GPS, timestamp, officer ID</div>
+                  <label className="mt-2 inline-block bg-indigo-600/60 hover:bg-indigo-600 text-white text-xs px-4 py-2 rounded-lg border border-indigo-500/40 cursor-pointer transition-colors">
+                    📷 Capture / Upload
+                    <input type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
+                  </label>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Written Observation</label>
@@ -456,8 +498,23 @@ export default function FieldOfficerPage() {
                 ))}
               </div>
             </div>
-            <button className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
-              📤 Submit Evidence Package
+            <button
+              onClick={submitEvidence}
+              disabled={submittingEvidence || evidenceSubmitted}
+              className={`w-full font-semibold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 ${
+                evidenceSubmitted ? "bg-emerald-600 text-white" : "bg-indigo-600 hover:bg-indigo-500 text-white"
+              }`}
+            >
+              {submittingEvidence ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Uploading Evidence Package...
+                </>
+              ) : evidenceSubmitted ? (
+                <>✓ Evidence Package Submitted & Synced</>
+              ) : (
+                <>📤 Submit Evidence Package</>
+              )}
             </button>
           </div>
         )}
