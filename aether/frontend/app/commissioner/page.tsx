@@ -11,7 +11,7 @@
  * - Agent deliberation quick launch
  * - Multi-city comparison table
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { api } from "@/lib/api";
 import { AgentCommitteeModal } from "@/components/AgentCommitteeModal";
 import Link from "next/link";
@@ -152,6 +152,21 @@ export default function CommissionerPage() {
 
   const stats = cityStats[selectedCity];
   const avgAQI = stats?.avg_aqi || 0;
+
+  const dynamicROI = useMemo(() => {
+    const scale = avgAQI ? avgAQI / 200 : 1.0;
+    return ROI_INTERVENTIONS.map((row) => {
+      const scaledReduction = Math.round(row.aqi_reduction * scale);
+      const scaledSavings = parseFloat((row.health_savings * scale).toFixed(1));
+      const calculatedROI = parseFloat((scaledSavings / row.cost_lakhs).toFixed(1));
+      return {
+        ...row,
+        aqi_reduction: scaledReduction,
+        health_savings: scaledSavings,
+        roi: calculatedROI,
+      };
+    });
+  }, [avgAQI]);
 
   const bgTheme = crisisMode
     ? "from-red-950/50 via-slate-950 to-slate-950"
@@ -302,7 +317,7 @@ export default function CommissionerPage() {
                     </tr>
                   </thead>
                   <tbody className="space-y-1">
-                    {ROI_INTERVENTIONS.sort((a, b) => b.roi - a.roi).map((row, i) => (
+                    {dynamicROI.sort((a, b) => b.roi - a.roi).map((row, i) => (
                       <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-700/20 transition-colors">
                         <td className="py-2.5 pr-4 text-slate-200 font-medium">{row.action}</td>
                         <td className="py-2.5 pr-4 text-slate-300">₹{row.cost_lakhs.toFixed(1)}L</td>

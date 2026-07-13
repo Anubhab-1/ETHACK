@@ -139,11 +139,26 @@ async def lifespan(app: FastAPI):
                     db.commit()
                     logger.info(f"Successfully seeded {len(reports)} mock citizen reports.")
 
-            # Fetch fresh AQI data
-            from app.scripts.refresh_data import refresh_all
-            refresh_all(db)
+            # Fetch fresh AQI data in background so uvicorn binds and listens immediately
+            import asyncio
+            async def run_initial_data_fetch():
+                # Let the server fully bind first
+                await asyncio.sleep(0.5)
+                logger.info("📡 Starting initial database CPCB/weather refresh in background...")
+                from app.database import SessionLocal
+                bg_db = SessionLocal()
+                try:
+                    from app.scripts.refresh_data import refresh_all
+                    refresh_all(bg_db)
+                    logger.info("📡 Initial database refresh complete.")
+                except Exception as e:
+                    logger.error(f"Background startup data error: {e}")
+                finally:
+                    bg_db.close()
+            
+            asyncio.create_task(run_initial_data_fetch())
         except Exception as e:
-            logger.error(f"Startup data error: {e}")
+            logger.error(f"Startup database/seeding error: {e}")
         finally:
             db.close()
 
