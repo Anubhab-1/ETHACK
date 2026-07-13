@@ -3,22 +3,35 @@
  * Typed client for all backend endpoints.
  */
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "")
-).replace(/\/$/, "");
+let API_BASE = "";
 
 if (typeof window !== "undefined") {
+  const hostname = window.location.hostname;
+  const isLocalIp = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(hostname) || hostname.startsWith("127.0.0.");
+  
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    API_BASE = process.env.NEXT_PUBLIC_API_URL;
+  } else if (isLocalIp) {
+    // Dynamically query the laptop's backend server when testing on a mobile device on same local network
+    API_BASE = `http://${hostname}:8000`;
+  } else {
+    API_BASE = process.env.NODE_ENV === "development" ? "http://localhost:8000" : "";
+  }
+
   if (process.env.NODE_ENV === "production") {
-    if (!process.env.NEXT_PUBLIC_API_URL) {
+    if (!process.env.NEXT_PUBLIC_API_URL && !isLocalIp) {
       console.warn(
-        "⚠️ WARNING: AETHER Frontend is running in PRODUCTION mode, but NEXT_PUBLIC_API_URL is undefined. API_BASE is falling back to http://localhost:8000."
+        "⚠️ WARNING: AETHER Frontend is running in PRODUCTION mode, but NEXT_PUBLIC_API_URL is undefined. API_BASE is falling back to relative paths (will fail on Vercel unless proxy is configured)."
       );
     }
   } else if (process.env.NODE_ENV === "development") {
     console.log(`[AETHER Debug] API_BASE resolved to: ${API_BASE}`);
   }
+} else {
+  API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 }
+
+API_BASE = API_BASE.replace(/\/$/, "");
 
 export interface LiveAQIPoint {
   station_id: number;
