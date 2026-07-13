@@ -25,6 +25,7 @@ interface AetherMapProps {
   windSpeed?: number;
   windDir?: number;
   showSatellite?: boolean;
+  satelliteGrid?: { lat: number; lon: number; value: number }[];
   showRoute?: boolean;
   wardDetail?: WardDetail | null;
   citizenReports?: import("@/lib/api").CitizenReport[];
@@ -73,6 +74,7 @@ export function AetherMap({
   windSpeed = 0,
   windDir = 0,
   showSatellite = false,
+  satelliteGrid = [],
   showRoute = false,
   wardDetail = null,
   citizenReports = [],
@@ -229,17 +231,16 @@ export function AetherMap({
       )}
 
       {/* Sentinel-5P NO2 Satellite Layer (Tropospheric Column Density) */}
-      {showSatellite && heatmapData.map((ward) => {
-        const densityFactor = (ward.aqi * 0.35 + (ward.lat * 1000 % 100)) * 0.05;
-        const scaleVal = Math.min(100, Math.max(10, densityFactor));
+      {showSatellite && (satelliteGrid || []).map((gridPoint, idx) => {
+        const scaleVal = Math.min(100, Math.max(10, gridPoint.value * 8.5));
         return (
           <CircleMarker
-            key={`sat-${ward.ward_id}`}
-            center={[ward.lat, ward.lon]}
-            radius={28}
+            key={`sat-${idx}`}
+            center={[gridPoint.lat, gridPoint.lon]}
+            radius={32}
             pathOptions={{
-              fillColor: "#f97316", // glowing orange-red
-              fillOpacity: 0.15 * (scaleVal / 100),
+              fillColor: "#ef4444", // glowing NO2 red-orange
+              fillOpacity: 0.25 * (scaleVal / 100),
               color: "transparent",
               weight: 0,
             }}

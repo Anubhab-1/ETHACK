@@ -439,4 +439,12 @@ export const api = {
   /** Get city-wide causal history */
   getCityCausalHistory: (city = "Kolkata") =>
     apiFetch<any[]>(`/api/causal-impact/city-history?city=${encodeURIComponent(city)}`),
+
+  /** Get Sentinel-5P satellite grid */
+  satelliteGrid: (city = "Kolkata") =>
+    apiFetch<{
+      city: string;
+      bounds: [[number, number], [number, number]];
+      grid: { lat: number; lon: number; value: number; unit: string }[];
+    }>(`/api/aqi/satellite?city=${encodeURIComponent(city)}`),
 };

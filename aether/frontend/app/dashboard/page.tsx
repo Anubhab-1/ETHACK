@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [showDownlinkHUD, setShowDownlinkHUD] = useState(false);
   const [committeeOpen, setCommitteeOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [satelliteGrid, setSatelliteGrid] = useState<{ lat: number; lon: number; value: number }[]>([]);
 
 
   // AI Strategic Executive Briefing
@@ -216,6 +217,19 @@ export default function DashboardPage() {
       setShowDownlinkHUD(false);
     }
   }, [showSatellite]);
+
+  // Load Sentinel-5P satellite grid from backend
+  useEffect(() => {
+    if (showSatellite && city) {
+      api.satelliteGrid(city)
+        .then((res) => {
+          if (res && res.grid) {
+            setSatelliteGrid(res.grid);
+          }
+        })
+        .catch((err) => console.error("Failed to load satellite grid:", err));
+    }
+  }, [showSatellite, city]);
 
   // Text to Speech logic
   const handleSpeak = (text: string) => {
@@ -596,6 +610,7 @@ export default function DashboardPage() {
               windSpeed={windSpeed}
               windDir={windDir}
               showSatellite={showSatellite}
+              satelliteGrid={satelliteGrid}
               showRoute={showRoute}
               wardDetail={selectedWard}
               citizenReports={citizenReports}
