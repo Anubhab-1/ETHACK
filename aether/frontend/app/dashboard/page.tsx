@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [attribution, setAttribution] = useState<AttributionResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [wardLoading, setWardLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -337,6 +338,7 @@ export default function DashboardPage() {
     setSelectedWard(null);
     setForecast([]);
     setAttribution(null);
+    setWardLoading(true);
 
     try {
       const [wardDetail, attr] = await Promise.all([
@@ -351,6 +353,8 @@ export default function DashboardPage() {
       setForecast(fcResponse.forecasts);
     } catch (e) {
       console.error("Failed to load ward details:", e);
+    } finally {
+      setWardLoading(false);
     }
   }, [city]);
 
@@ -1111,7 +1115,19 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              {selectedWard ? (
+              {wardLoading ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-8 skeleton rounded-lg w-3/4" />
+                  <div className="h-4 skeleton rounded w-1/2" />
+                  <div className="flex gap-2">
+                    <div className="h-6 skeleton rounded-full w-20" />
+                    <div className="h-6 skeleton rounded-full w-16" />
+                  </div>
+                  <div className="h-24 skeleton rounded-xl" />
+                  <div className="h-32 skeleton rounded-xl" />
+                  <div className="h-20 skeleton rounded-xl" />
+                </div>
+              ) : selectedWard ? (
                 <>
                   {/* Ward Header */}
                   <div className="space-y-2">

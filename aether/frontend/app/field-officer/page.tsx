@@ -392,11 +392,50 @@ export default function FieldOfficerPage() {
         {/* ── ROUTE TAB ───────────────────────────────────────────────── */}
         {activeTab === "route" && (
           <div className="space-y-4">
+            {/* Animated SVG Route Map */}
+            <div className="relative border border-white/5 rounded-xl bg-gray-950 overflow-hidden p-4 flex items-center justify-center h-48 shadow-inner">
+              <svg className="w-full h-full max-w-sm" viewBox="0 0 200 120">
+                <defs>
+                  <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 2 L 10 5 L 0 8 z" fill="#818cf8" />
+                  </marker>
+                </defs>
+                {/* Connecting Paths with ant-path dasharray animation */}
+                <path d="M 100 60 Q 70 30 50 30" fill="none" stroke="#818cf8" strokeWidth="1.5" strokeDasharray="4 4" className="leaflet-ant-path" />
+                <path d="M 50 30 L 40 85" fill="none" stroke="#818cf8" strokeWidth="1.5" strokeDasharray="4 4" className="leaflet-ant-path" />
+                <path d="M 40 85 Q 100 100 150 90" fill="none" stroke="#818cf8" strokeWidth="1.5" strokeDasharray="4 4" className="leaflet-ant-path" />
+                <path d="M 150 90 L 160 40" fill="none" stroke="#818cf8" strokeWidth="1.5" strokeDasharray="4 4" className="leaflet-ant-path" />
+                <path d="M 160 40 Q 130 50 100 60" fill="none" stroke="#818cf8" strokeWidth="1.5" strokeDasharray="4 4" className="leaflet-ant-path" />
+                
+                {/* Base Station (Center) */}
+                <circle cx="100" cy="60" r="8" fill="#4f46e5" className="animate-pulse" />
+                <text x="100" y="50" textAnchor="middle" fill="#a5b4fc" fontSize="7" fontWeight="bold">HQ BASE</text>
+
+                {/* Route stops */}
+                {[
+                  { cx: 50, cy: 30, num: 1, name: route[0]?.ward_name || "Stop 1" },
+                  { cx: 40, cy: 85, num: 2, name: route[1]?.ward_name || "Stop 2" },
+                  { cx: 150, cy: 90, num: 3, name: route[2]?.ward_name || "Stop 3" },
+                  { cx: 160, cy: 40, num: 4, name: route[3]?.ward_name || "Stop 4" },
+                ].map((stop, i) => (
+                  <g key={i}>
+                    <circle cx={stop.cx} cy={stop.cy} r="6" fill="#f97316" />
+                    <text x={stop.cx} textAnchor="middle" y={stop.cy + 2.5} fill="#fff" fontSize="7" fontWeight="bold">{stop.num}</text>
+                    <text x={stop.cx} textAnchor="middle" y={stop.cy + 10} fill="#94a3b8" fontSize="5">{stop.name.slice(0, 8)}</text>
+                  </g>
+                ))}
+              </svg>
+              <div className="absolute bottom-2 right-2 bg-slate-950/80 border border-indigo-500/20 px-2 py-0.5 rounded text-[8px] font-mono text-indigo-400">
+                OR-TOOLS SOLVER ACTIVE
+              </div>
+            </div>
+
             <div className="glass-card p-4">
               <h3 className="text-white font-semibold mb-1 flex items-center gap-2"><Map size={14} className="text-indigo-400" /> OR-Tools Optimized Route</h3>
               <p className="text-slate-400 text-xs mb-4">
                 Priority-weighted vehicle routing. Top {Math.min(route.length, 5)} open actions.
               </p>
+
               <div className="space-y-3">
                 {[{ ward: "Base Station", action: "Depart 09:00", icon: "🏢", isBase: true },
                   ...route.slice(0, 5).map((a, i) => ({

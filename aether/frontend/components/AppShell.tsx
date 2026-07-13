@@ -247,6 +247,12 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
 
   useEffect(() => {
     setMobileOpen(false);
+    if (typeof window !== "undefined") {
+      const path = pathname.split("/").filter(Boolean)[0] || "Home";
+      const formatted = path.charAt(0).toUpperCase() + path.slice(1);
+      const titleName = formatted === "Home" ? "Urban Environmental Intelligence" : formatted;
+      document.title = `${titleName} | AETHER`;
+    }
   }, [pathname]);
 
   useEffect(() => {

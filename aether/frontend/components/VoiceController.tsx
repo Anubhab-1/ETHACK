@@ -257,7 +257,10 @@ export function VoiceController({
   }, [parseCommand]);
 
   const toggleListening = () => {
-    if (!recognitionRef.current) return;
+    if (!recognitionRef.current) {
+      setErrorMessage("Speech recognition requires Chrome/Edge on Windows.");
+      return;
+    }
 
     if (isListening) {
       recognitionRef.current.stop();

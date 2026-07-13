@@ -332,13 +332,17 @@ export default function CitizenReportsPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               
               {/* Wizard Steps indicator */}
-              <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 border-b border-white/5 pb-2">
-                <span className={wizardStep >= 1 ? "text-orange-400" : ""}>1. Category</span>
-                <span>➔</span>
-                <span className={wizardStep >= 2 ? "text-orange-400" : ""}>2. Ward/Location</span>
-                <span>➔</span>
-                <span className={wizardStep >= 3 ? "text-orange-400" : ""}>3. Review</span>
+              <div className="space-y-2 pb-2 border-b border-white/5">
+                <div className="flex items-center justify-between text-[10px] font-bold text-gray-500">
+                  <span className={wizardStep >= 1 ? "text-orange-400" : ""}>1. CATEGORY</span>
+                  <span className={wizardStep >= 2 ? "text-orange-400" : ""}>2. LOCATION</span>
+                  <span className={wizardStep >= 3 ? "text-orange-400" : ""}>3. CONFIRM</span>
+                </div>
+                <div className="h-1 bg-gray-900 rounded-full overflow-hidden">
+                  <div className={`h-full bg-orange-500 transition-all duration-300 ${wizardStep === 1 ? "w-1/3" : wizardStep === 2 ? "w-2/3" : "w-full bg-emerald-500"}`} />
+                </div>
               </div>
+
 
               {/* STEP 1: Category & Severity */}
               {wizardStep === 1 && (

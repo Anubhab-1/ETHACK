@@ -28,7 +28,7 @@ const AetherMap = dynamic(() => import("@/components/AetherMap").then((m) => m.A
 
 const LANGUAGES = [
   { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "bn", label: "বাংলা", flag: "🇧🇩" },
+  { code: "bn", label: "বাংলা", flag: "🇮🇳" },
   { code: "hi", label: "हिन्दी", flag: "🇮🇳" },
 ];
 

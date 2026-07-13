@@ -46,6 +46,9 @@ export default function EnforcementPage() {
   const [deployingId, setDeployingId] = useState<number | null>(null);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [recomputeToast, setRecomputeToast] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -85,6 +88,8 @@ export default function EnforcementPage() {
     await api.recomputeEnforcement(city);
     await loadData();
     setRecomputing(false);
+    setRecomputeToast(true);
+    setTimeout(() => setRecomputeToast(false), 3000);
   };
 
   // Compute resolution rate
@@ -283,7 +288,7 @@ export default function EnforcementPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {actions.map((action, idx) => {
+            {actions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((action, idx) => {
               const priority = PRIORITY_LABEL(action.priority_score);
               const isDeploying = deployingId === action.id;
               const isResolving = resolvingId === action.id;
@@ -293,93 +298,70 @@ export default function EnforcementPage() {
                   className="glass-card p-5 hover:border-orange-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-orange-500/5 animate-slide-up group"
                   style={{ animationDelay: `${idx * 40}ms` }}
                 >
-                  <div className="flex items-start gap-4">
-                    {/* Rank */}
-                    <div className="flex-none text-center w-10 pt-1">
-                      <p className="text-2xl font-black text-gray-700 group-hover:text-gray-500 transition-colors">
-                        {idx + 1}
-                      </p>
-                    </div>
-
-                    {/* Main content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap mb-2">
-                        <h3 className="font-bold text-gray-100">{action.ward_name}</h3>
-                        <span className="text-xs text-gray-600">Ward #{action.ward_no}</span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border uppercase tracking-wide ${priority.color}`}>
-                          {priority.text}
-                        </span>
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border"
-                          style={{
-                            color: SOURCE_COLORS[action.target_type] || "#9ca3af",
-                            backgroundColor: (SOURCE_COLORS[action.target_type] || "#9ca3af") + "22",
-                            borderColor: (SOURCE_COLORS[action.target_type] || "#9ca3af") + "44",
-                          }}
-                        >
-                          {SOURCE_ICONS[action.target_type]} {SOURCE_LABELS[action.target_type] || action.target_type}
-                        </span>
-                      </div>
-
-                      <p className="text-sm text-gray-400 leading-relaxed mb-3">{action.action_text}</p>
-
-                      {/* Priority score bar */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-1000"
-                            style={{
-                              width: `${action.priority_score}%`,
-                              backgroundColor:
-                                action.priority_score > 80 ? "#ef4444" :
-                                action.priority_score > 60 ? "#f97316" :
-                                action.priority_score > 40 ? "#eab308" : "#22c55e",
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs font-bold text-gray-500 flex-none">
-                          Score: {Math.round(action.priority_score)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Status & Actions */}
-                    <div className="flex-none flex flex-col gap-2 items-end min-w-[140px]">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border tracking-wide ${STATUS_COLORS[action.status]}`}>
-                        {STATUS_ICONS[action.status]} {action.status}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    {/* Source Type Indicator */}
+                    <div className="flex items-start gap-3.5">
+                      <span className="text-2xl p-2 bg-gray-900/60 rounded-xl border border-white/5 flex-none select-none">
+                        {SOURCE_ICONS[action.target_type] || "📍"}
                       </span>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${priority.color}`}>
+                            {priority.text}
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border capitalize ${STATUS_COLORS[action.status]}`}>
+                            {STATUS_ICONS[action.status]} {action.status}
+                          </span>
+                        </div>
+                        <h2 className="font-bold text-gray-200 text-sm">
+                          {SOURCE_LABELS[action.target_type] || "Target Enforcement Source"}
+                        </h2>
+                        <p className="text-xs text-gray-500">
+                          {action.ward_name} (Ward #{action.ward_no}) · {action.city}
+                        </p>
+                        <p className="text-xs text-gray-400 leading-relaxed mt-1">
+                          {action.action_text}
+                        </p>
+                      </div>
+                    </div>
 
+                    {/* Metadata & Actions */}
+                    <div className="flex flex-col md:items-end gap-1.5 md:min-w-[200px]">
+                      <div className="text-right font-mono text-[10px] text-gray-500">
+                        Priority Index: <span className="text-orange-400 font-bold text-xs">{action.priority_score.toFixed(1)}</span>
+                      </div>
+                      
                       {action.status === "open" && (
                         <button
                           onClick={() => handleStatusUpdate(action.id, "deployed")}
                           disabled={isDeploying}
-                          className="w-full px-3 py-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all shadow-md hover:shadow-blue-500/30 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                          className="w-full px-3 py-1.5 text-xs rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold transition-all cursor-pointer text-center disabled:opacity-60 flex items-center justify-center gap-1.5"
                         >
                           {isDeploying ? (
                             <><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> Deploying...</>
-                          ) : "🚔 Deploy Unit →"}
+                          ) : "⚡ Deploy Inspector"}
                         </button>
                       )}
 
                       {action.status === "deployed" && (
-                        <div className="flex flex-col gap-1.5 w-full">
+                        <div className="flex gap-2 w-full">
                           <button
                             onClick={() => {
                               setSelectedAction(action);
                               setBroadcastOpen(true);
                             }}
-                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold transition-all shadow-md hover:shadow-orange-500/30 cursor-pointer text-center"
+                            className="flex-1 px-2 py-1.5 text-xs rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-all font-semibold cursor-pointer text-center"
                           >
-                            📢 Broadcast Alert
+                            📢 Broadcast
                           </button>
                           <button
                             onClick={() => handleStatusUpdate(action.id, "resolved")}
                             disabled={isResolving}
-                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition-all cursor-pointer text-center disabled:opacity-60 flex items-center justify-center gap-1.5"
+                            className="flex-1 px-2 py-1.5 text-xs rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition-all cursor-pointer text-center disabled:opacity-60 flex items-center justify-center gap-1.5"
                           >
                             {isResolving ? (
                               <><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> Resolving...</>
-                            ) : "✓ Mark Resolved"}
+                            ) : "✓ Resolve"}
                           </button>
                         </div>
                       )}
@@ -394,6 +376,31 @@ export default function EnforcementPage() {
                 </div>
               );
             })}
+
+            {/* Pagination Controls */}
+            {!loading && actions.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between py-4 border-t border-white/5 mt-4">
+                <span className="text-xs text-gray-500">
+                  Showing {Math.min(actions.length, (currentPage - 1) * PAGE_SIZE + 1)} - {Math.min(actions.length, currentPage * PAGE_SIZE)} of {actions.length} actions
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-gray-900 border border-gray-800 text-gray-400 hover:text-white disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={currentPage * PAGE_SIZE >= actions.length}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="px-3 py-1.5 text-xs rounded-lg bg-gray-900 border border-gray-800 text-gray-400 hover:text-white disabled:opacity-50 transition-colors cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -197,23 +197,41 @@ export default function CommissionerPage() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "City-wide AQI", value: avgAQI ? `${avgAQI}` : "—", sub: avgAQI > 200 ? "⚠️ Action Required" : "✅ Monitoring", color: avgAQI > 300 ? "text-red-400" : avgAQI > 200 ? "text-orange-400" : "text-emerald-400" },
             { label: "Active Interventions", value: `${activeInterventions}`, sub: "Open & Deployed tasks", color: "text-cyan-400" },
-            { label: "Signal → Intervention Time", value: avgResponseTime, sub: "Detection to dispatch SLA", color: "text-violet-400" },
+            { label: "Signal → Response SLA", value: avgResponseTime, sub: "Detection to dispatch", color: "text-violet-400" },
             { label: "Health Savings (Est.)", value: healthSavings, sub: "WHO dose-response model", color: "text-emerald-400" },
           ].map((kpi, i) => (
             <div key={i} className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
               <div className="text-slate-400 text-xs mb-1">{kpi.label}</div>
-              <div className={`text-3xl font-black ${kpi.color}`}>{kpi.value}</div>
+              <div className={`text-2xl sm:text-3xl font-black ${kpi.color}`}>{kpi.value}</div>
               <div className="text-slate-500 text-xs mt-1">{kpi.sub}</div>
             </div>
           ))}
         </div>
 
+        {/* GRAP Stage Banner */}
+        {avgAQI > 0 && (() => {
+          const s = avgAQI <= 200 ? { stage: "Stage 0 — Normal Operations", color: "#22c55e", bg: "bg-emerald-950/40 border-emerald-800/40", actions: "No mandatory GRAP restrictions in effect." }
+            : avgAQI <= 300 ? { stage: "Stage I — GRAP Active", color: "#facc15", bg: "bg-yellow-950/40 border-yellow-800/40", actions: "Hot-mix plants & stone crushers off. Mechanised road sweeping mandatory." }
+            : avgAQI <= 400 ? { stage: "Stage II — GRAP Active", color: "#f97316", bg: "bg-orange-950/40 border-orange-800/40", actions: "+ Diesel generator ban. Strict dust suppression. Biomass burning prohibited." }
+            : avgAQI <= 450 ? { stage: "Stage III — GRAP Active", color: "#ef4444", bg: "bg-red-950/40 border-red-800/40", actions: "+ BS-III petrol / BS-IV diesel vehicles banned. WFH advisory for offices." }
+            : { stage: "Stage IV — GRAP EMERGENCY", color: "#dc2626", bg: "bg-red-950/60 border-red-700/60", actions: "+ Truck entry ban. Schools closed. All construction halted city-wide." };
+          return (
+            <div className={`border rounded-xl px-5 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 ${s.bg}`}>
+              <div>
+                <span className="text-xs font-black tracking-wider" style={{ color: s.color }}>⚖️ GRAP: {s.stage}</span>
+                <p className="text-slate-400 text-xs mt-0.5">{s.actions}</p>
+              </div>
+              <span className="text-[10px] text-slate-500 flex-none">Based on {selectedCity} avg AQI {avgAQI}</span>
+            </div>
+          );
+        })()}
+
         {/* Main grid */}
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Top worst wards + agent launch */}
           <div className="col-span-1 space-y-4">
@@ -346,7 +364,8 @@ export default function CommissionerPage() {
         {/* Multi-city comparison */}
         <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-5">
           <h3 className="text-white font-semibold mb-4">🏙️ Multi-City Intelligence Summary</h3>
-          <div className="grid grid-cols-3 gap-6">
+          {/* Multi-city comparison */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {CITIES.map(c => {
               const cs = cityStats[c];
               return (
