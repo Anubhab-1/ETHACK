@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Ward, Weather, Reading, Station
 from app.services.attributor import get_current_aqi_for_ward, attribute_sources
+from app.services.pinn_dispersion import simulate_dispersion
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -173,16 +174,16 @@ def evaluate_simulation(
         sim_aqi = current_aqis[w.id]
         
         if is_downwind and aqi_drop > 0:
-            # Gaussian-like dispersion decay factor along centerline and downwind distance
-            # Closer to centerline = higher impact; closer to source = higher impact
-            centerline_decay = math.cos(angle_diff * 1.5)  # spreads out slightly
-            distance_decay = math.exp(-distance_km / 6.0)  # half-life distance scale of ~4.1 km
-            
-            # Wind speed effect: higher wind stretches the dispersion, spreading the cleaner air further
-            wind_stretch = min(2.0, max(0.5, wind_speed / 8.0))
-            
-            propagation_factor = centerline_decay * distance_decay * wind_stretch * 0.40 # max 40% of target drop affects downwind
-            downwind_drop = aqi_drop * propagation_factor
+            downwind_drop = simulate_dispersion(
+                source_lat=target_ward.lat,
+                source_lon=target_ward.lon,
+                strength=aqi_drop,
+                wind_speed=wind_speed,
+                wind_dir=wind_dir,
+                target_lat=w.lat,
+                target_lon=w.lon,
+                hours=1.0
+            )
             
             # Apply reduction to downwind ward
             sim_aqi = max(10.0, sim_aqi - downwind_drop)

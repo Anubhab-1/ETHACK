@@ -49,6 +49,20 @@ function FlyToCity({ city }: { city: string }) {
   return null;
 }
 
+function ResizeMap() {
+  const map = useMap();
+  useEffect(() => {
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener("resize", handleResize);
+    // Initial trigger
+    map.invalidateSize();
+    return () => window.removeEventListener("resize", handleResize);
+  }, [map]);
+  return null;
+}
+
 export function AetherMap({
   liveData,
   heatmapData,
@@ -84,6 +98,7 @@ export function AetherMap({
       />
 
       <FlyToCity city={city} />
+      <ResizeMap />
 
       {/* Ward Choropleth Layer */}
       {heatmapData.map((ward) => (

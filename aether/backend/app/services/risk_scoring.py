@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 try:
     import xgboost as xgb
     XGB_AVAILABLE = True
-except ImportError:
+except Exception:
     XGB_AVAILABLE = False
-    logger.info("xgboost not installed. PredictiveRiskScorer will use heuristic fallback.")
+    logger.info("xgboost not installed or failed to import. PredictiveRiskScorer will use heuristic fallback.")
 
 class PredictiveRiskScorer:
     """

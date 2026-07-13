@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import json
 from datetime import datetime
-from typing import TypedDict, List, Dict, Any, Optional
+from typing import TypedDict, List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +18,12 @@ import math
 
 # Fallbacks for langchain/langgraph
 try:
-    from langchain.agents import Tool
-    from langgraph.graph import StateGraph, END
+    from langchain.agents import Tool  # type: ignore
+    from langgraph.graph import StateGraph, END  # type: ignore
     LANGCHAIN_AVAILABLE = True
-except ImportError:
+except Exception:
     LANGCHAIN_AVAILABLE = False
-    logger.info("langchain or langgraph not installed. Using local ReAct and state transitions fallback.")
+    logger.info("langchain or langgraph not installed or failed to import. Using local ReAct and state transitions fallback.")
 
 class AgentState(TypedDict):
     ward_id: str

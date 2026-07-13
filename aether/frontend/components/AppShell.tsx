@@ -249,6 +249,18 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
     setMobileOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    // Trigger window resize event repeatedly during transition to ensure Leaflet maps and charts scale smoothly
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      window.dispatchEvent(new Event("resize"));
+      if (Date.now() - startTime > 400) {
+        clearInterval(interval);
+      }
+    }, 16); // ~60fps
+    return () => clearInterval(interval);
+  }, [collapsed]);
+
   const aqiColor = getAQIColor(liveAQI ?? null);
   const aqiLabel = getAQILabel(liveAQI ?? null);
   const timeStr = time.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -257,7 +269,7 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
   return (
     <div className="flex h-screen bg-gray-950 overflow-hidden">
       <aside
-        className={`hidden md:flex flex-col flex-none transition-all duration-300 ease-in-out app-sidebar ${
+        className={`relative hidden md:flex flex-col flex-none transition-all duration-300 ease-in-out app-sidebar ${
           collapsed ? "w-[56px]" : "w-[220px]"
         }`}
       >
@@ -274,10 +286,10 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
         />
         <button
           onClick={() => setCollapsed((current) => !current)}
-          className="absolute top-1/2 -right-3 -translate-y-1/2 hidden md:flex w-6 h-6 rounded-full border border-white/10 bg-slate-900 items-center justify-center text-slate-500 hover:text-slate-200 hover:border-white/20 transition-all z-50 shadow-lg"
+          className="absolute top-1/2 -right-3.5 -translate-y-1/2 hidden md:flex w-7 h-7 rounded-full border border-orange-500/40 bg-gray-900 hover:bg-orange-500 text-orange-400 hover:text-white items-center justify-center transition-all z-50 shadow-lg shadow-orange-500/10 cursor-pointer"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+          {collapsed ? <ChevronRight size={14} strokeWidth={2.5} /> : <ChevronLeft size={14} strokeWidth={2.5} />}
         </button>
       </aside>
 

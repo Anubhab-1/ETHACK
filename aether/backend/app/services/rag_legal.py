@@ -79,7 +79,8 @@ def seed_documents_if_empty(db: Session):
             logger.info(f"Successfully seeded {len(SEED_DOCUMENTS)} regulatory documents.")
     except Exception as e:
         logger.error(f"Error seeding documents: {e}")
-        db.rollback()
+        if db is not None:
+            db.rollback()
 
 def query_legal(question: str, db: Session, limit: int = 3) -> List[Dict[str, Any]]:
     """

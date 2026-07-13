@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
+import { InteractiveKnowledgeGraph } from "./InteractiveKnowledgeGraph";
 
 interface AgentCommitteeModalProps {
   isOpen: boolean;
@@ -103,7 +104,7 @@ export function AgentCommitteeModal({
   const [visibleTurns, setVisibleTurns] = useState<(AgentTurn | DialogueTurn)[]>([]);
   const [typingIndex, setTypingIndex] = useState(-1);
   const [typingAgent, setTypingAgent] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"deliberation" | "constitutional" | "causal" | "decree">("deliberation");
+  const [activeTab, setActiveTab] = useState<"deliberation" | "constitutional" | "causal" | "decree" | "graph">("deliberation");
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -269,6 +270,7 @@ export function AgentCommitteeModal({
               { id: "constitutional", label: "⚖️ Constitution" },
               { id: "causal", label: "📊 Causal Proof" },
               { id: "decree", label: "📜 Decree" },
+              { id: "graph", label: "🕸️ Knowledge Graph" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -543,7 +545,7 @@ export function AgentCommitteeModal({
                   </div>
 
                   <div className="bg-amber-950/20 border border-amber-800/30 rounded-xl p-4 text-xs text-amber-300">
-                    <strong>Judge Note:</strong> This is not correlation — it is causal inference.
+                    <strong>Methodology Note:</strong> This is not correlation — it is causal inference.
                     We use unaffected "donor" wards as a synthetic counterfactual, then measure the
                     actual minus counterfactual AQI in the post-intervention period.
                     A p-value &lt; 0.05 means the probability of observing this effect by chance alone is less than 5%.
@@ -573,6 +575,13 @@ export function AgentCommitteeModal({
               >
                 🖨️ Print Official Dispatch Order
               </button>
+            </div>
+          )}
+
+          {/* Knowledge Graph Tab */}
+          {!loading && response && activeTab === "graph" && (
+            <div className="p-4">
+              <InteractiveKnowledgeGraph wardId={wardId} />
             </div>
           )}
         </div>

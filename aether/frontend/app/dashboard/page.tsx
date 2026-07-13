@@ -65,12 +65,7 @@ const DEMO_SCENARIOS = [
   },
 ] as const;
 
-const JUDGE_MODE_STEPS = [
-  "Focus the worst-performing ward",
-  "Apply a guided intervention preset",
-  "Read the ROI and projected AQI change",
-  "Open the AI briefing or committee decree",
-] as const;
+
 
 export default function DashboardPage() {
   const [city, setCity] = useState("Kolkata");
@@ -115,7 +110,8 @@ export default function DashboardPage() {
   const [simulating, setSimulating] = useState(false);
   const [showRoute, setShowRoute] = useState(false);
   const [calibrationOpen, setCalibrationOpen] = useState(false);
-  const [judgeModeOpen, setJudgeModeOpen] = useState(true);
+  const [twinSimMinimized, setTwinSimMinimized] = useState(false);
+  const [controlsMinimized, setControlsMinimized] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -165,6 +161,13 @@ export default function DashboardPage() {
     const interval = setInterval(loadData, 5 * 60 * 1000); // refresh every 5 min
     return () => clearInterval(interval);
   }, [loadData]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setTwinSimMinimized(true);
+      setControlsMinimized(true);
+    }
+  }, []);
 
   // Reset wind override logic
   const handleResetWind = useCallback(() => {
@@ -333,22 +336,7 @@ export default function DashboardPage() {
     }
   }, [city]);
 
-  const focusHotspotWard = useCallback(async () => {
-    if (heatmapData.length === 0) return;
-    const hotspot = [...heatmapData].sort((left, right) => right.aqi - left.aqi)[0];
-    if (!hotspot) return;
-    await handleWardClick(hotspot.ward_id);
-    setSidebarOpen(true);
-  }, [heatmapData, handleWardClick]);
 
-  const launchJudgeDemo = useCallback(async () => {
-    const emergencyScenario = DEMO_SCENARIOS.find((scenario) => scenario.id === "full-emergency");
-    await focusHotspotWard();
-    if (emergencyScenario) {
-      applyDemoScenario(emergencyScenario);
-    }
-    setSidebarOpen(true);
-  }, [applyDemoScenario, focusHotspotWard]);
 
   // Heuristic Cost-Benefit calculations for the sandbox
   const costBenefits = useMemo(() => {
@@ -559,74 +547,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {judgeModeOpen && (
-        <div className="flex-none px-4 py-3 border-b border-orange-500/10 bg-gradient-to-r from-orange-950/35 via-gray-950 to-slate-950">
-          <div className="rounded-2xl border border-orange-500/20 bg-gray-950/70 px-4 py-4 shadow-lg shadow-orange-950/20">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.24em] text-orange-400">Judge Mode</span>
-                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
-                    Guided Demo
-                  </span>
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-gray-100">Run the strongest live demo in under two minutes</h2>
-                  <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-gray-400">
-                    Start with the worst AQI ward, apply a prebuilt intervention, then use the ROI panel, AI briefing, and committee decree to show signal-to-action decision support.
-                  </p>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  {JUDGE_MODE_STEPS.map((step, index) => (
-                    <div key={step} className="rounded-xl border border-white/5 bg-gray-900/40 px-3 py-2 text-[11px] text-gray-300">
-                      <span className="mr-2 font-black text-orange-400">{index + 1}.</span>
-                      {step}
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              <div className="flex flex-col gap-2 lg:min-w-[260px]">
-                <button
-                  onClick={launchJudgeDemo}
-                  className="rounded-xl bg-orange-500 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-orange-400"
-                >
-                  Launch Emergency Demo
-                </button>
-                <button
-                  onClick={focusHotspotWard}
-                  className="rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-xs font-semibold text-gray-200 transition-colors hover:border-orange-500/30 hover:text-orange-300"
-                >
-                  Focus Hotspot Ward
-                </button>
-                <button
-                  onClick={loadBriefing}
-                  className="rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-xs font-semibold text-gray-200 transition-colors hover:border-orange-500/30 hover:text-orange-300"
-                >
-                  Open AI Briefing
-                </button>
-                <button
-                  onClick={() => {
-                    if (!selectedWard) return;
-                    setCommitteeOpen(true);
-                    setSidebarOpen(true);
-                  }}
-                  disabled={!selectedWard}
-                  className="rounded-xl border border-white/10 bg-gray-900/50 px-4 py-2.5 text-xs font-semibold text-gray-200 transition-colors hover:border-orange-500/30 hover:text-orange-300 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Convene AI Committee
-                </button>
-                <button
-                  onClick={() => setJudgeModeOpen(false)}
-                  className="text-[10px] font-semibold text-gray-500 transition-colors hover:text-gray-300"
-                >
-                  Hide judge mode
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Main Content ──────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative">
@@ -700,22 +621,28 @@ export default function DashboardPage() {
           )}
 
           {/* Floating Digital Twin Policy Panel */}
-          <div className="absolute top-14 right-3 z-[800] glass-card p-4 w-72 max-w-[calc(100vw-24px)] space-y-3.5 border border-white/5 shadow-2xl bg-gray-950/90">
+          <div className="absolute top-14 right-3 z-[800] glass-card p-3 md:p-4 w-72 max-w-[calc(100vw-24px)] space-y-3 border border-white/5 shadow-2xl bg-gray-950/90">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-xs text-orange-400 uppercase tracking-wider">Digital Twin Sim</h3>
-              {simulating ? (
-                <span className="text-[9px] bg-orange-500/10 border border-orange-500/30 text-orange-400 px-1.5 py-0.5 rounded font-black animate-pulse">EVALUATING...</span>
-              ) : (
-                <span className="text-[9px] bg-orange-500/10 border border-orange-500/30 text-orange-400 px-1.5 py-0.5 rounded font-black">ACTIVE</span>
-              )}
+              <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => setTwinSimMinimized(!twinSimMinimized)}>
+                <span className="text-[10px] text-gray-400">{twinSimMinimized ? "➕" : "➖"}</span>
+                <h3 className="font-bold text-xs text-orange-400 uppercase tracking-wider font-semibold">Digital Twin Sim</h3>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {simulating ? (
+                  <span className="text-[9px] bg-orange-500/10 border border-orange-500/30 text-orange-400 px-1.5 py-0.5 rounded font-black animate-pulse">EVALUATING...</span>
+                ) : (
+                  <span className="text-[9px] bg-orange-500/10 border border-orange-500/30 text-orange-400 px-1.5 py-0.5 rounded font-black">ACTIVE</span>
+                )}
+              </div>
             </div>
             
-            {!selectedWard ? (
-              <div className="text-center py-2 text-[10px] text-gray-500">
-                ⚠️ Select a ward on the map to run localized policy simulations.
-              </div>
-            ) : (
-              <>
+            {!twinSimMinimized && (
+              !selectedWard ? (
+                <div className="text-center py-2 text-[10px] text-gray-500">
+                  ⚠️ Select a ward on the map to run localized policy simulations.
+                </div>
+              ) : (
+                <>
                 <div className="space-y-2.5 text-xs">
                   <div className="space-y-2 border-b border-white/5 pb-3">
                     <div className="flex items-center justify-between">
@@ -838,6 +765,7 @@ export default function DashboardPage() {
                   </button>
                 )}
               </>
+            )
             )}
           </div>
 
@@ -939,10 +867,15 @@ export default function DashboardPage() {
 
 
           {/* Floating Weather Layer Control Panel */}
-          <div className="absolute bottom-16 right-3 z-[800] glass-card p-4 w-56 max-w-[calc(100vw-24px)] text-xs space-y-3 border border-white/5 shadow-lg bg-gray-950/90">
-            <p className="text-gray-400 font-bold text-[9px] uppercase tracking-wider text-orange-500">Map Layers & Controls</p>
+          <div className="absolute bottom-16 right-3 z-[800] glass-card p-3 md:p-4 w-56 max-w-[calc(100vw-24px)] text-xs space-y-3 border border-white/5 shadow-lg bg-gray-950/90">
+            <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setControlsMinimized(!controlsMinimized)}>
+              <p className="text-gray-400 font-bold text-[9px] uppercase tracking-wider text-orange-500">Map Layers & Controls</p>
+              <span className="text-[10px] text-gray-400">{controlsMinimized ? "➕" : "➖"}</span>
+            </div>
             
-            <div className="space-y-2">
+            {!controlsMinimized && (
+              <>
+                <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-gray-300 text-[11px] font-medium">Wind Flow Layer</span>
                 <input
@@ -1072,6 +1005,8 @@ export default function DashboardPage() {
                 📊 Calibration Curve
               </button>
             </div>
+              </>
+            )}
           </div>
 
           {/* Left Side Info Column (Legend, Health Impact, Satellite HUD) */}
@@ -1111,24 +1046,7 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* AQI Legend overlay */}
-            <div className="glass-card p-3 text-xs space-y-1 bg-gray-950/90 w-56 flex-none">
-              <p className="text-gray-400 font-semibold mb-2 text-[10px] uppercase tracking-wider">AQI Scale</p>
-              {[
-                ["Good", "#00e400", "0–50"],
-                ["Satisfactory", "#92d050", "51–100"],
-                ["Moderate", "#ffff00", "101–200"],
-                ["Poor", "#ff7e00", "201–300"],
-                ["Very Poor", "#ff0000", "301–400"],
-                ["Severe", "#7e0023", "401–500"],
-              ].map(([label, color, range]) => (
-                <div key={label} className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full flex-none" style={{ backgroundColor: color }} />
-                  <span className="text-gray-300">{label}</span>
-                  <span className="text-gray-600 ml-auto">{range}</span>
-                </div>
-              ))}
-            </div>
+
           </div>
         </div>
 

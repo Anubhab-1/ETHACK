@@ -18,6 +18,7 @@ import logging
 import random
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
+import pandas as pd
 from sqlalchemy.orm import Session
 from app.models import Ward, Reading, Station, EnforcementAction
 
@@ -65,7 +66,7 @@ def _get_ward_aqi_series(ward: Ward, days: int, db: Session) -> List[float]:
             day_key = r.measured_at.strftime("%Y-%m-%d")
             daily.setdefault(day_key, []).append(r.aqi)
 
-    series = [round(sum(v) / len(v), 1) for v in sorted(daily.values(), key=lambda _: _)]
+    series = [round(sum(daily[k]) / len(daily[k]), 1) for k in sorted(daily.keys())]
     # Pad to requested length if needed
     while len(series) < days:
         series.insert(0, series[0] if series else 150.0)
@@ -406,7 +407,7 @@ class CausalImpactAnalyzer:
                 
         # Generate target and control series
         total_days = pre_period_days + post_period_days
-        rng = random.Random(sum(ord(c) for c in ward_id) + total_days)
+        rng = random.Random(sum(ord(c) for c in str(ward_id)) + total_days)
         
         target_series = [max(20.0, 150.0 + rng.gauss(0, 20)) for _ in range(total_days)]
         control_series_list = []

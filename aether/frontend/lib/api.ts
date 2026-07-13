@@ -421,4 +421,15 @@ export const api = {
       }[];
       graph_stats: Record<string, unknown>;
     }>(`/api/agents/pagerank-polluters?city=${encodeURIComponent(city)}`),
+
+  /** Parse voice command using LLM */
+  voiceCommand: (command: string, city: string, wards: string[]) =>
+    apiFetch<{
+      action: string;
+      parameters: Record<string, any>;
+      speech_response: string;
+    }>(`/api/agents/voice-command`, {
+      method: "POST",
+      body: JSON.stringify({ command, city, wards }),
+    }),
 };

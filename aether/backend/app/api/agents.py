@@ -40,12 +40,13 @@ settings = get_settings()
 router = APIRouter()
 
 
-from app.schemas import AgentSimulationResponse
+from app.schemas import AgentSimulationResponse, AgentTurn, CausalEvidence
 from app.services.agent_committee import (
     run_agent_react_loop,
     run_constitutional_checks,
     synthesize_decree,
-    AGENT_CONFIGS
+    AGENT_CONFIGS,
+    _get_recommended_action
 )
 
 
@@ -249,3 +250,137 @@ def invoke_agent_tool(
         raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}. Available: {list(TOOL_REGISTRY.keys())}")
 
     return invoke_tool(tool_name, params, db)
+
+
+class VoiceCommandRequest(BaseModel):
+    command: str
+    city: str
+    wards: List[str]
+
+
+@router.post("/agents/voice-command")
+def process_voice_command(
+    req: VoiceCommandRequest,
+    db: Session = Depends(get_db),
+):
+    """Parse natural language command using LLM or rule fallback."""
+    settings = get_settings()
+    command_text = req.command
+    city_context = req.city
+    wards_list = req.wards
+    
+    # ─── Fallback Local Rules Parser ───
+    def local_fallback():
+        text = command_text.lower()
+        res = {
+            "action": "unrecognized",
+            "parameters": {},
+            "speech_response": "Command not understood."
+        }
+        
+        # City switch
+        for c in ["delhi", "mumbai", "kolkata"]:
+            if c in text:
+                res["action"] = "change_city"
+                res["parameters"]["city"] = c.capitalize()
+                res["speech_response"] = f"Switching view to {c.capitalize()}."
+                return res
+                
+        # Toggle layers
+        if "wind" in text:
+            res["action"] = "toggle_layer"
+            res["parameters"]["layer"] = "wind"
+            res["parameters"]["layer_state"] = None
+            res["speech_response"] = "Toggling wind flow layer."
+            return res
+        if "satellite" in text or "no2" in text:
+            res["action"] = "toggle_layer"
+            res["parameters"]["layer"] = "satellite"
+            res["parameters"]["layer_state"] = None
+            res["speech_response"] = "Toggling Sentinel-5P NO2 overlay."
+            return res
+        if "report" in text:
+            res["action"] = "toggle_layer"
+            res["parameters"]["layer"] = "citizen_reports"
+            res["parameters"]["layer_state"] = None
+            res["speech_response"] = "Toggling citizen incident feed."
+            return res
+            
+        # Action triggers
+        if "committee" in text or "simulation" in text or "run" in text or "convene" in text:
+            res["action"] = "run_simulation"
+            res["speech_response"] = "Convening constitutional chamber deliberation."
+            return res
+        if "briefing" in text:
+            res["action"] = "change_simulation_parameter"
+            res["parameters"]["briefing"] = True
+            res["speech_response"] = "Synthesizing executive briefing."
+            return res
+            
+        # Focus ward
+        for w in wards_list:
+            if w.lower() in text:
+                res["action"] = "focus_ward"
+                res["parameters"]["ward_name"] = w
+                res["speech_response"] = f"Centering map on {w} ward."
+                return res
+                
+        return res
+
+    # Check for LLM key
+    if not settings.openai_api_key:
+        logger.info("No LLM key — using local rules fallback for voice routing")
+        return local_fallback()
+        
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_api_base or None,
+            timeout=5.0,
+            max_retries=0
+        )
+        
+        system_prompt = f"""You are AETHER Jarvis, a smart city voice interface router.
+Given a spoken command, the current city, and a list of available wards in that city, map the user's intent to one of the structured actions.
+
+Available Wards in {city_context}: {", ".join(wards_list)}
+Current City Context: {city_context}
+
+You MUST return a JSON object with the following schema:
+{{
+  "action": "change_city" | "toggle_layer" | "focus_ward" | "run_simulation" | "change_simulation_parameter" | "unrecognized",
+  "parameters": {{
+    "city": "Kolkata" | "Delhi" | "Mumbai" (if user wants to change city),
+    "ward_name": string (exact match from available wards list if user wants to select/focus a ward),
+    "layer": "wind" | "satellite" | "citizen_reports" (if action is toggle_layer),
+    "layer_state": true | false (true to enable/show, false to disable/hide, or null if toggling),
+    "traffic_reduction": int 0-100 (if user says reduce traffic by X percent),
+    "construction_halt": bool (if user says halt/stop construction),
+    "industrial_restriction": int 0-100 (if user says restrict industrial emissions by X percent),
+    "briefing": bool (if user requested reading/playing briefing)
+  }},
+  "speech_response": "A short verbal confirmation to speak back to the user in a professional, helpful computer tone."
+}}
+
+Response must contain ONLY the valid JSON, no markdown code block tags, no comments.
+"""
+
+        resp = client.chat.completions.create(
+            model=settings.llm_model or "meta/llama-3.1-70b-instruct",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Spoken command: '{command_text}'"}
+            ],
+            temperature=0.0,
+            response_format={"type": "json_object"}
+        )
+        
+        content = resp.choices[0].message.content.strip()
+        parsed = json.loads(content)
+        logger.info(f"Jarvis LLM match: {parsed}")
+        return parsed
+        
+    except Exception as e:
+        logger.warning(f"Voice LLM match failed: {e}. Falling back to local rules.")
+        return local_fallback()

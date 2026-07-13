@@ -136,7 +136,7 @@ def _get_station_history(city: str, hours: int, db: Session) -> pd.DataFrame:
     df = pd.DataFrame(data)
     df["measured_at"] = pd.to_datetime(df["measured_at"])
     df = df.set_index("measured_at").resample("1h").mean().reset_index()
-    df = df.fillna(method="ffill").fillna(method="bfill")
+    df = df.ffill().bfill()
     return df
 
 
@@ -195,7 +195,7 @@ def _engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         df["wind_dir_sin"] = np.sin(np.radians(df["wind_dir"].fillna(0)))
         df["wind_dir_cos"] = np.cos(np.radians(df["wind_dir"].fillna(0)))
 
-    df = df.fillna(method="ffill").fillna(0)
+    df = df.ffill().fillna(0)
     return df
 
 

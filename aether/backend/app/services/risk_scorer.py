@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 try:
     import xgboost as xgb
     XGB_AVAILABLE = True
-except ImportError:
+except Exception:
     XGB_AVAILABLE = False
-    logger.info("xgboost not installed. Risk scorer will use statistical fallback.")
+    logger.info("xgboost not installed or failed to import. Risk scorer will use statistical fallback.")
 
 try:
-    import shap
+    import shap  # type: ignore
     SHAP_AVAILABLE = True
-except ImportError:
+except Exception:
     SHAP_AVAILABLE = False
-    logger.info("shap not installed. Risk scorer will use XGBoost built-in feature importances.")
+    logger.info("shap not installed or failed to import. Risk scorer will use XGBoost built-in feature importances.")
 
 def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
     """
@@ -160,7 +160,10 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
         shap_contribs = {}
         if shap_values is not None and len(shap_values.shape) > 1:
             for f_idx, f_name in enumerate(feature_names):
-                shap_contribs[f_name] = float(shap_values[i, f_idx])
+                if len(shap_values.shape) == 3:
+                    shap_contribs[f_name] = float(shap_values[i, f_idx, 1])
+                else:
+                    shap_contribs[f_name] = float(shap_values[i, f_idx])
         else:
             # Heuristic feature attribution fallback
             shap_contribs = {
