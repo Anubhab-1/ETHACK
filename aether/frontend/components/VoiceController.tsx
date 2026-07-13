@@ -29,6 +29,7 @@ interface VoiceControllerProps {
   setTrafficReduction: (val: number) => void;
   setConstructionHalt: (val: boolean) => void;
   setIndustrialRestriction: (val: number) => void;
+  inline?: boolean;
 }
 
 export function VoiceController({
@@ -47,6 +48,7 @@ export function VoiceController({
   setTrafficReduction,
   setConstructionHalt,
   setIndustrialRestriction,
+  inline = false,
 }: VoiceControllerProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -274,24 +276,31 @@ export function VoiceController({
   };
 
   return (
-    <div className="absolute top-14 left-3 z-[800] flex flex-col items-start gap-2 pointer-events-auto select-none">
+    <div className={inline ? "relative z-[950] flex flex-col items-end pointer-events-auto select-none" : "absolute top-14 left-3 z-[800] flex flex-col items-start gap-2 pointer-events-auto select-none"}>
       
       {/* Mic Trigger Button */}
       <button
         onClick={toggleListening}
-        className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-lg ${
-          isListening
-            ? "bg-red-600 border-red-500 text-white animate-pulse shadow-red-600/20"
-            : "bg-gray-950/90 border-white/10 text-orange-400 hover:text-orange-300 hover:bg-gray-900 cursor-pointer"
-        }`}
+        className={inline 
+          ? `w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${
+              isListening
+                ? "bg-red-600 border-red-500 text-white animate-pulse shadow-red-600/20"
+                : "bg-gray-800 border-gray-700 text-orange-400 hover:text-orange-300 hover:bg-gray-900 cursor-pointer"
+            }`
+          : `w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-lg ${
+              isListening
+                ? "bg-red-600 border-red-500 text-white animate-pulse shadow-red-600/20"
+                : "bg-gray-950/90 border-white/10 text-orange-400 hover:text-orange-300 hover:bg-gray-900 cursor-pointer"
+            }`
+        }
         title={isListening ? "Listening... Click to stop" : "Activate voice assistant (Jarvis)"}
       >
-        {isListening ? <Mic size={18} strokeWidth={2.5} /> : <MicOff size={18} />}
+        {isListening ? <Mic size={15} strokeWidth={2.5} /> : <MicOff size={15} />}
       </button>
 
       {/* Floating HUD transcript panel (only when text exists or listening) */}
       {(isListening || transcript || hudMessage || errorMessage) && (
-        <div className="glass-card p-3 w-64 text-xs space-y-2 border border-white/5 shadow-2xl bg-slate-950/95 animate-slide-up rounded-xl">
+        <div className={`glass-card p-3 w-64 text-xs space-y-2 border border-white/5 shadow-2xl bg-slate-950/95 animate-slide-up rounded-xl ${inline ? "absolute top-10 right-0" : ""}`}>
           <div className="flex items-center justify-between border-b border-white/5 pb-1">
             <span className="text-[9px] font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5 animate-pulse">
               <Volume2 size={10} /> JARVIS PILOT ACTIVE

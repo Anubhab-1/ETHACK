@@ -575,6 +575,7 @@ export default function DashboardPage() {
               setTrafficReduction={setTrafficReduction}
               setConstructionHalt={setConstructionHalt}
               setIndustrialRestriction={setIndustrialRestriction}
+              inline={true}
             />
 
             {/* Refresh button */}
@@ -911,187 +912,188 @@ export default function DashboardPage() {
           )}
 
 
-          {/* Floating Weather Layer Control Panel */}
-          <div className="absolute bottom-16 right-3 z-[800] glass-card p-3 md:p-4 w-56 max-w-[calc(100vw-24px)] text-xs space-y-3 border border-white/5 shadow-lg bg-gray-950/90">
-            <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setControlsMinimized(!controlsMinimized)}>
-              <p className="text-gray-400 font-bold text-[9px] uppercase tracking-wider text-orange-500">Map Layers & Controls</p>
-              <span className="text-[10px] text-gray-400">{controlsMinimized ? "➕" : "➖"}</span>
-            </div>
+          {/* Left Side Info Column (Legend, Map Controls, Health Impact, Satellite HUD) */}
+          <div className="absolute bottom-6 left-3 z-[800] max-w-[calc(100vw-24px)] flex flex-col items-start gap-3 pointer-events-auto">
             
-            {!controlsMinimized && (
-              <>
-                <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-300 text-[11px] font-medium">Wind Flow Layer</span>
-                <input
-                  type="checkbox"
-                  checked={showWind}
-                  onChange={(e) => setShowWind(e.target.checked)}
-                  className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
-                />
+            {/* Floating Weather/Map Layer Control Panel (Shifted Over Health Risk Estimate) */}
+            <div className="glass-card p-3 md:p-4 w-56 text-xs space-y-3 border border-white/5 shadow-lg bg-gray-950/90">
+              <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setControlsMinimized(!controlsMinimized)}>
+                <p className="text-gray-400 font-bold text-[9px] uppercase tracking-wider text-orange-500">Map Layers & Controls</p>
+                <span className="text-[10px] text-gray-400">{controlsMinimized ? "➕" : "➖"}</span>
               </div>
-
-              {showWind && (
-                <div className="space-y-2 pl-2 border-l border-white/5 pt-1">
-                  {/* Wind Direction Slider */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-gray-400 font-mono">
-                      <span>Wind Dir</span>
-                      <span className="text-orange-400 font-bold">{Math.round(windDir)}°</span>
+              
+              {!controlsMinimized && (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-[11px] font-medium">Wind Flow Layer</span>
+                      <input
+                        type="checkbox"
+                        checked={showWind}
+                        onChange={(e) => setShowWind(e.target.checked)}
+                        className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
+                      />
                     </div>
+
+                    {showWind && (
+                      <div className="space-y-2 pl-2 border-l border-white/5 pt-1">
+                        {/* Wind Direction Slider */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] text-gray-400 font-mono">
+                            <span>Wind Dir</span>
+                            <span className="text-orange-400 font-bold">{Math.round(windDir)}°</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="360"
+                            step="5"
+                            value={windDir}
+                            onChange={(e) => {
+                              setWindDir(Number(e.target.value));
+                              setIsWindOverridden(true);
+                            }}
+                            className="w-full h-1 bg-gray-800 rounded appearance-none cursor-pointer accent-orange-500"
+                          />
+                        </div>
+
+                        {/* Wind Speed Slider */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[10px] text-gray-400 font-mono">
+                            <span>Wind Speed</span>
+                            <span className="text-orange-400 font-bold">{windSpeed.toFixed(1)} km/h</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="40"
+                            step="0.5"
+                            value={windSpeed}
+                            onChange={(e) => {
+                              setWindSpeed(Number(e.target.value));
+                              setIsWindOverridden(true);
+                            }}
+                            className="w-full h-1 bg-gray-800 rounded appearance-none cursor-pointer accent-orange-500"
+                          />
+                        </div>
+
+                        {isWindOverridden && (
+                          <button
+                            onClick={handleResetWind}
+                            className="text-[9px] text-red-400 hover:text-red-300 hover:underline block text-right w-full font-semibold"
+                          >
+                            Reset to Live Weather
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-white/5 pt-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-[11px] font-medium">Citizen Reports</span>
+                      <input
+                        type="checkbox"
+                        checked={showCitizenReports}
+                        onChange={(e) => setShowCitizenReports(e.target.checked)}
+                        className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300 text-[11px] font-medium">Sentinel-5P NO₂</span>
+                      <input
+                        type="checkbox"
+                        checked={showSatellite}
+                        onChange={(e) => setShowSatellite(e.target.checked)}
+                        className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {showSatellite && (
+                      <button
+                        onClick={() => {
+                          setScanning(true);
+                          setShowDownlinkHUD(false);
+                          setTimeout(() => {
+                            setScanning(false);
+                            setShowDownlinkHUD(true);
+                          }, 2500);
+                        }}
+                        disabled={scanning}
+                        className="w-full py-1 text-[9px] bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded font-semibold transition-all cursor-pointer text-center disabled:opacity-50"
+                      >
+                        {scanning ? "📡 DOWNLINK SWEEP ACTIVE..." : "📡 RUN TELEMETRY SCAN"}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="border-t border-white/5 pt-2 flex items-center justify-between">
+                    <span className="text-gray-300 text-[11px] font-medium">Mitigation Route</span>
                     <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      step="5"
-                      value={windDir}
-                      onChange={(e) => {
-                        setWindDir(Number(e.target.value));
-                        setIsWindOverridden(true);
-                      }}
-                      className="w-full h-1 bg-gray-800 rounded appearance-none cursor-pointer accent-orange-500"
+                      type="checkbox"
+                      checked={showRoute}
+                      onChange={(e) => setShowRoute(e.target.checked)}
+                      className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
+                      disabled={!selectedWard}
+                      title={!selectedWard ? "Select a ward to enable routing" : ""}
                     />
                   </div>
 
-                  {/* Wind Speed Slider */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-gray-400 font-mono">
-                      <span>Wind Speed</span>
-                      <span className="text-orange-400 font-bold">{windSpeed.toFixed(1)} km/h</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="40"
-                      step="0.5"
-                      value={windSpeed}
-                      onChange={(e) => {
-                        setWindSpeed(Number(e.target.value));
-                        setIsWindOverridden(true);
-                      }}
-                      className="w-full h-1 bg-gray-800 rounded appearance-none cursor-pointer accent-orange-500"
-                    />
-                  </div>
-
-                  {isWindOverridden && (
+                  <div className="pt-2 border-t border-white/5 flex gap-2">
                     <button
-                      onClick={handleResetWind}
-                      className="text-[9px] text-red-400 hover:text-red-300 hover:underline block text-right w-full font-semibold"
+                      onClick={() => {
+                        setCalibrationOpen(!calibrationOpen);
+                        setBriefingOpen(false);
+                        setDiagnosticsOpen(false);
+                      }}
+                      className="flex-1 py-1 text-[9px] bg-gray-900 border border-gray-800 text-orange-400 hover:text-orange-300 rounded font-bold transition-colors cursor-pointer text-center"
                     >
-                      Reset to Live Weather
+                      📊 Calibration Curve
                     </button>
-                  )}
-                </div>
+                  </div>
+                </>
               )}
             </div>
 
-            <div className="border-t border-white/5 pt-2 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-300 text-[11px] font-medium">Citizen Reports</span>
-                <input
-                  type="checkbox"
-                  checked={showCitizenReports}
-                  onChange={(e) => setShowCitizenReports(e.target.checked)}
-                  className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div className="border-t border-white/5 pt-2 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-300 text-[11px] font-medium">Sentinel-5P NO₂</span>
-                <input
-                  type="checkbox"
-                  checked={showSatellite}
-                  onChange={(e) => setShowSatellite(e.target.checked)}
-                  className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
-                />
-              </div>
-
-              {showSatellite && (
-                <button
-                  onClick={() => {
-                    setScanning(true);
-                    setShowDownlinkHUD(false);
-                    setTimeout(() => {
-                      setScanning(false);
-                      setShowDownlinkHUD(true);
-                    }, 2500);
-                  }}
-                  disabled={scanning}
-                  className="w-full py-1 text-[9px] bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border border-orange-500/30 rounded font-semibold transition-all cursor-pointer text-center disabled:opacity-50"
-                >
-                  {scanning ? "📡 DOWNLINK SWEEP ACTIVE..." : "📡 RUN TELEMETRY SCAN"}
-                </button>
+            <div className="flex flex-col sm:flex-row items-end gap-3">
+              {/* Sentinel-5P Downlink Telemetry HUD */}
+              {showDownlinkHUD && (
+                <div className="glass-card p-3 border border-orange-500/25 shadow-2xl text-[10px] space-y-1.5 animate-slide-up bg-gray-950/95 w-56 flex-none">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-1">
+                    <span className="font-bold text-orange-400 uppercase tracking-wider text-[9px] flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-ping" />
+                      Satellite Downlink Connected
+                    </span>
+                    <button
+                      onClick={() => setShowDownlinkHUD(false)}
+                      className="text-gray-500 hover:text-gray-300 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="font-mono text-gray-400 space-y-0.5 text-[9px] leading-tight">
+                    <p><span className="text-gray-500">ORBIT ID :</span> Sentinel-5P / S5P_TROPOMI_L3</p>
+                    <p><span className="text-gray-500">SPECTRA  :</span> Tropospheric Column NO2 Density</p>
+                    <p><span className="text-gray-500">ALTITUDE :</span> 824 km (Sun-Synchronous Polar)</p>
+                    <p><span className="text-gray-500">GRID RES :</span> 5.5km x 3.5km spatial grid</p>
+                    <p><span className="text-gray-500">FIDELITY :</span> Ground Monitor R² = 0.84</p>
+                    <p className="text-emerald-400 font-semibold mt-1">✓ Virtual sensor grids generated for unsurveyed zones.</p>
+                  </div>
+                </div>
               )}
-            </div>
 
-            <div className="border-t border-white/5 pt-2 flex items-center justify-between">
-              <span className="text-gray-300 text-[11px] font-medium">Mitigation Route</span>
-              <input
-                type="checkbox"
-                checked={showRoute}
-                onChange={(e) => setShowRoute(e.target.checked)}
-                className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
-                disabled={!selectedWard}
-                title={!selectedWard ? "Select a ward to enable routing" : ""}
-              />
-            </div>
-
-            <div className="pt-2 border-t border-white/5 flex gap-2">
-              <button
-                onClick={() => {
-                  setCalibrationOpen(!calibrationOpen);
-                  setBriefingOpen(false);
-                  setDiagnosticsOpen(false);
-                }}
-                className="flex-1 py-1 text-[9px] bg-gray-900 border border-gray-800 text-orange-400 hover:text-orange-300 rounded font-bold transition-colors cursor-pointer text-center"
-              >
-                📊 Calibration Curve
-              </button>
-            </div>
-              </>
-            )}
-          </div>
-
-          {/* Left Side Info Column (Legend, Health Impact, Satellite HUD) */}
-          <div className="absolute bottom-6 left-3 z-[800] max-w-[calc(100vw-24px)] flex flex-col sm:flex-row items-end gap-3 pointer-events-auto">
-            {/* Sentinel-5P Downlink Telemetry HUD */}
-            {showDownlinkHUD && (
-              <div className="glass-card p-3 border border-orange-500/25 shadow-2xl text-[10px] space-y-1.5 animate-slide-up bg-gray-950/95 w-56 flex-none">
-                <div className="flex items-center justify-between border-b border-white/5 pb-1">
-                  <span className="font-bold text-orange-400 uppercase tracking-wider text-[9px] flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-ping" />
-                    Satellite Downlink Connected
-                  </span>
-                  <button
-                    onClick={() => setShowDownlinkHUD(false)}
-                    className="text-gray-500 hover:text-gray-300 text-xs font-bold"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="font-mono text-gray-400 space-y-0.5 text-[9px] leading-tight">
-                  <p><span className="text-gray-500">ORBIT ID :</span> Sentinel-5P / S5P_TROPOMI_L3</p>
-                  <p><span className="text-gray-500">SPECTRA  :</span> Tropospheric Column NO2 Density</p>
-                  <p><span className="text-gray-500">ALTITUDE :</span> 824 km (Sun-Synchronous Polar)</p>
-                  <p><span className="text-gray-500">GRID RES :</span> 5.5km x 3.5km spatial grid</p>
-                  <p><span className="text-gray-500">FIDELITY :</span> Ground Monitor R² = 0.84</p>
-                  <p className="text-emerald-400 font-semibold mt-1">✓ Virtual sensor grids generated for unsurveyed zones.</p>
-                </div>
+              {/* Health Impact Estimate Panel */}
+              <div className="w-56 flex-none">
+                <HealthImpactCounter
+                  cityAvgAQI={cityAvgAQI}
+                  cityName={city}
+                  stationCount={liveData.length}
+                />
               </div>
-            )}
-
-            {/* Health Impact Estimate Panel */}
-            <div className="w-56 flex-none">
-              <HealthImpactCounter
-                cityAvgAQI={cityAvgAQI}
-                cityName={city}
-                stationCount={liveData.length}
-              />
             </div>
-
-
           </div>
         </div>
 
