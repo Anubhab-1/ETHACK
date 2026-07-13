@@ -1,4 +1,0 @@
-- [x] Identify source of verbose logs (SQLAlchemy `echo=True` in `app/database.py`)
-- [x] Disable SQLAlchemy SQL echo by default / via env
-- [x] Reduce SQLAlchemy logger level to WARNING/ERROR in `app/main.py`
-- [x] Verify backend logs are quiet during API calls

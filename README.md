@@ -1,101 +1,31 @@
 # 🌫️ AETHER — Urban Air Quality Intelligence Platform
 
 > **ET AI Hackathon 2026 · Problem Statement 5**
-> *From measurement to intervention — intelligence that cleans the air.*
-
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
-[![Python](https://img.shields.io/badge/Python-3.8+-blue)](https://python.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+> *"AI-Powered Urban Air Quality Intelligence for Smart City Intervention"*
+> From measurement to intervention — intelligence that cleans the air.
 
 ---
 
-## 🚀 What is AETHER?
+## 🚀 Quick Start (Local Dev)
 
-AETHER is a **real-time, AI-driven urban air quality intelligence platform** designed for city commissioners and environmental agencies. It transforms raw CPCB sensor data into actionable intelligence — from identifying pollution hotspots to auto-deploying enforcement teams and broadcasting multilingual health alerts to citizens.
-
-### Core Features
-
-| Module | Description |
-|--------|-------------|
-| 🗺️ **Live AQI Situation Room** | Leaflet heatmap across 144 Kolkata wards + 2 cities, powered by IDW interpolation |
-| 🤖 **Multi-Agent AI Committee** | 4 specialist AI agents debate and issue policy decrees for each ward |
-| 🧪 **Digital Twin Simulator** | Gaussian plume dispersion model — simulate traffic bans, construction halts before enacting |
-| 📡 **72h LSTM Forecast** | XGBoost-based predictions with seasonal + temporal features |
-| 🚨 **Enforcement Command Center** | Auto-priority scoring → deploy → broadcast SMS/WhatsApp/IVR alerts |
-| 🛰️ **Satellite Calibration** | Sentinel-5P NO₂ ground-truth correlation curves |
-| 💬 **Multilingual Advisory** | Citizen health chatbot in English, Bengali (বাংলা) and Hindi (हिन्दी) |
-| 📊 **Sensor Diagnostics** | Real-time station health monitoring with anomaly detection |
-
----
-
-## 🏗️ Architecture
-
-```
-AETHER Platform
-├── Frontend  (Next.js 16 + Tailwind CSS v4)
-│   ├── /              — Cinematic landing page with live AQI orbs
-│   ├── /dashboard     — Full Situation Room (Map + Digital Twin + AI)
-│   ├── /forecast      — 72h ward-level predictions
-│   ├── /enforcement   — Command Center (Prioritize → Deploy → Broadcast)
-│   ├── /compare       — 3-city analytics dashboard
-│   ├── /advisory      — Multilingual citizen health advisor
-│   └── /reports       — Citizen pollution reports
-│
-├── Backend   (FastAPI + SQLAlchemy + SQLite/PostgreSQL)
-│   ├── /api/health         — System diagnostics
-│   ├── /api/aqi            — Live CPCB station data + heatmap
-│   ├── /api/forecast       — XGBoost 72h predictions
-│   ├── /api/attribution    — Source breakdown (traffic/industrial/etc.)
-│   ├── /api/advisory       — NLP advisory + executive briefing
-│   ├── /api/agents         — Multi-agent committee simulation
-│   ├── /api/simulation     — Gaussian plume digital twin
-│   ├── /api/enforcement    — Priority scoring + dispatch + broadcast
-│   └── /api/diagnostics    — Sensor health + anomaly detection
-│
-└── Data Layer (SQLite dev / PostgreSQL prod)
-    ├── stations, wards, readings tables
-    ├── enforcement_actions table
-    └── Spatial indexing for ward lookup
-```
-
----
-
-## ⚡ Quick Start
-
-### Prerequisites
-- Python 3.8+
-- Node.js 18+
-
-### 1. Backend
-
+### Backend
 ```bash
 cd aether/backend
 pip install -r requirements.txt
-
-# (Optional) Add API keys for live data
-cp .env.example .env
-# Edit .env → set CPCB_API_KEY and OPENAI_API_KEY
-# App works perfectly WITHOUT keys using intelligent mock data
-
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+cp .env.example .env   # Set CPCB_API_KEY + OPENAI_API_KEY (optional — works with mock data)
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# → http://localhost:8000   Docs: http://localhost:8000/docs
 ```
 
-Backend starts at **http://localhost:8000**  
-Interactive API docs: **http://localhost:8000/docs**
-
-### 2. Frontend
-
+### Frontend
 ```bash
 cd aether/frontend
 npm install
 npm run dev
+# → http://localhost:3000
 ```
 
-Frontend starts at **http://localhost:3000**
-
-### 3. Docker (single command)
-
+### Docker (one command)
 ```bash
 cd aether
 docker-compose up --build
@@ -103,73 +33,180 @@ docker-compose up --build
 
 ---
 
-## 🔑 API Keys (Optional)
+## 🏗️ Tech Stack
 
-The platform works **fully offline with realistic mock data**. To enable live production feeds:
-
-| Key | Source | Feature Unlocked |
-|-----|--------|-----------------|
-| `CPCB_API_KEY` | [data.gov.in](https://data.gov.in) → Sign up → CPCB AQI | Live sensor readings from 800+ stations |
-| `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) | GPT-4o-mini powered briefings & multilingual advisory |
-
-Set these in `aether/backend/.env`.
-
----
-
-## ✅ Verified API Endpoints (27/27 passing)
-
-Run the full audit:
-```bash
-cd aether
-python audit.py
-```
+| Layer | Technology |
+|---|---|
+| **Frontend** | Next.js 16 · React 19 · Vanilla CSS (globals.css) · TypeScript · Recharts · Leaflet |
+| **Backend** | FastAPI · SQLAlchemy · SQLite (dev) / PostgreSQL (prod) · APScheduler |
+| **AI/ML** | XGBoost · NumPy · Pandas · SciPy · scikit-learn · NetworkX · OR-Tools |
+| **LLM** | OpenAI SDK (gpt-4o-mini) — falls back to template engine without key |
+| **Infra** | Docker · Docker Compose · Uvicorn |
 
 ---
 
-## 📁 Project Structure
+## 🗺️ Project Structure
 
 ```
 ETHACK/
-├── .gitignore
-├── .gitattributes
-├── docker-compose.yml              # Root-level orchestration
-├── AETHER_Status_And_Future_Scope.md
+├── README.md                        ← THIS FILE — single source of truth
 ├── aether/
-│   ├── audit.py                    # Full API test suite (27 endpoints)
-│   ├── verify_final.py             # Quick sanity check
-│   ├── docker-compose.yml          # App-level orchestration
+│   ├── audit.py                     # Full 27-endpoint API test suite
+│   ├── docker-compose.yml
 │   ├── backend/
 │   │   ├── app/
-│   │   │   ├── api/                # FastAPI route handlers
-│   │   │   ├── services/           # Business logic (forecast, attribution…)
-│   │   │   ├── scripts/            # Seed & refresh scripts
-│   │   │   ├── models.py           # SQLAlchemy ORM models
-│   │   │   └── main.py             # FastAPI entrypoint
+│   │   │   ├── main.py              # FastAPI entrypoint + scheduler
+│   │   │   ├── config.py            # Settings (env vars)
+│   │   │   ├── database.py          # SQLAlchemy setup
+│   │   │   ├── schemas.py           # Pydantic request/response models
+│   │   │   ├── models/              # SQLAlchemy ORM models
+│   │   │   ├── api/                 # Route handlers (15 routers)
+│   │   │   ├── services/            # Business logic (18 modules)
+│   │   │   └── scripts/             # Seed & data refresh scripts
 │   │   ├── requirements.txt
 │   │   └── Dockerfile
 │   └── frontend/
-│       ├── app/                    # Next.js App Router pages
-│       ├── components/             # React components
-│       ├── lib/                    # API client + utilities
+│       ├── app/                     # Next.js App Router pages
+│       │   ├── page.tsx             # Cinematic landing
+│       │   ├── dashboard/           # Main situation room
+│       │   ├── forecast/            # 72h AQI forecast
+│       │   ├── enforcement/         # Enforcement command center
+│       │   ├── compare/             # 3-city analytics
+│       │   ├── advisory/            # Multilingual citizen chat
+│       │   ├── reports/             # Citizen incident reports
+│       │   ├── commissioner/        # Policy maker dashboard
+│       │   ├── field-officer/       # Field officer mobile UI
+│       │   └── citizen/             # Citizen health portal
+│       ├── components/              # Shared React components
+│       ├── lib/                     # API client (lib/api.ts) + utilities
 │       └── package.json
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## ✅ Current Build Status (as of 2026-07-13)
 
-**Backend:** FastAPI · SQLAlchemy · SQLite/PostgreSQL · XGBoost · NumPy · Pandas · SciPy · APScheduler · OpenAI SDK
+### What Works End-to-End
+| Feature | Status | Notes |
+|---|---|---|
+| Live AQI heatmap (Leaflet + IDW) | ✅ Live | CPCB feed with mock fallback |
+| Ward-level drill-down sidebar | ✅ Live | 144 Kolkata + Delhi + Mumbai wards |
+| Source attribution (NMF/PMF) | ✅ Live | 95% CI, 6-pollutant speciation |
+| 72h forecast (ST-GCN → XGBoost) | ✅ Live | PyTorch fallback to XGBoost |
+| Digital twin simulator | ✅ Live | Gaussian plume + PINN dispersion |
+| Causal impact engine | ✅ Live | Synthetic control + permutation test |
+| Multi-agent AI committee (5 agents) | ✅ Live | ReAct + constitutional coordinator |
+| Enforcement priority queue | ✅ Live | OR-Tools VRP inspector routing |
+| Multilingual advisory (EN/HI/BN) | ✅ Live | Chatbot UI; translation is template-based |
+| RAG legal advisory | ✅ Live | TF-IDF over Air Act 1981, CPCB norms |
+| Citizen incident reporting | ✅ Live | Upvotes, admin validation, ward mapping |
+| Knowledge graph (NetworkX) | ✅ Live | Ward → Industry → Violation edges |
+| Commissioner dashboard | ⚠️ Partial | HISTORICAL_CAUSAL & ROI data hardcoded (not from API) |
+| Field officer mobile UI | ⚠️ Partial | GPS/camera tabs are UI-only, not wired to browser APIs |
+| Sentinel-5P satellite layer | ⚠️ Fake | Animation only — no real NO₂ data fetched |
+| Multilingual real translation | ⚠️ Fake | Text is hardcoded templates, not LLM-translated |
+| VoiceController | ⚠️ Orphan | Component exists but not integrated in any page |
+| Backend tests | ✅ 53 passing | `pytest aether/backend/tests/` |
+| Frontend build | ✅ Passing | `npm run build` |
+| API endpoints | ✅ 27/27 | `python audit.py` |
 
-**Frontend:** Next.js 16 · React 19 · Tailwind CSS v4 · Recharts · Leaflet + React-Leaflet · TypeScript
+---
 
-**Infrastructure:** Docker · Docker Compose · Uvicorn
+## 🔑 API Keys (Optional — App Works Without Them)
+
+| Key | Source | What It Unlocks |
+|---|---|---|
+| `CPCB_API_KEY` | [data.gov.in](https://data.gov.in) | Live CPCB station readings (800+ stations) |
+| `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) | GPT-4o-mini briefings + advisory translation |
+
+Set in `aether/backend/.env`.
+
+---
+
+## 🎯 Hackathon Judging Criteria
+
+| Criteria | Weight | Current Score | Gap |
+|---|---|---|---|
+| **Innovation** | 25% | 7/10 | Real satellite data; trained (not synthetic) models |
+| **Business Impact** | 25% | 6/10 | Response-time metric; connect Commissioner to real API |
+| **Technical Excellence** | 20% | 7/10 | RMSE vs. baseline benchmark; real CPCB training data |
+| **Scalability** | 15% | 8/10 | Add caching; async forecast queue |
+| **User Experience** | 15% | 7/10 | Wire camera/GPS; real translation; remove orphan components |
+
+---
+
+## ⚠️ Critical Known Issues (Must Fix Before Demo)
+
+### 1. XGBoost Risk Scorer is Trained on Fake Data
+**File:** `backend/app/services/risk_scorer.py` — Line 122–125
+The model is fit on 100 rows of `np.random.randn()`. Not a real trained model.
+**Fix:** Train on real CPCB historical CSV (India AQI dataset, Kaggle). Report RMSE vs. persistence baseline in the UI.
+
+### 2. Commissioner Dashboard Uses Hardcoded Constants
+**File:** `frontend/app/commissioner/page.tsx` — `HISTORICAL_CAUSAL` and `ROI_INTERVENTIONS` arrays.
+These are static hardcoded data, not fetched from the causal impact / simulation API.
+**Fix:** Call `/api/causal-impact/{ward_id}` and `/api/simulation/{ward_id}` instead.
+
+### 3. No Signal-to-Intervention Time Measurement
+The hackathon evaluation explicitly asks for "demonstrated reduction in response time from signal to intervention." This is never measured or displayed.
+**Fix:** Add `detected_at`, `ticket_created_at`, `acknowledged_at` timestamps to EnforcementAction. Display response time on Commissioner dashboard.
+
+### 4. Satellite Layer is a UI-Only Animation
+**File:** `frontend/app/dashboard/page.tsx` — Sentinel-5P scan is a CSS animation. No real NO₂ data.
+**Fix:** Fetch cached Sentinel-5P NO₂ GeoTIFF from Copernicus (free) or NASA OMI and overlay as a real map layer.
+
+### 5. Advisory Translation is Hardcoded
+**File:** `frontend/app/advisory/page.tsx` — Bengali/Hindi text is in `QUICK_QUESTIONS` constants.
+**Fix:** Wrap advisory LLM response with Google Translate API or LibreTranslate for real dynamic translation.
+
+---
+
+## 🛣️ Work Plan (Prioritized)
+
+### 🔴 Do First — Critical (3–4 hours)
+- [ ] Fix Commissioner: connect `HISTORICAL_CAUSAL` to `/api/causal-impact/{ward_id}`
+- [ ] Add `detected_at` → `ticket_created_at` → `acknowledged_at` to EnforcementAction model + API
+- [ ] Show "Signal → Intervention Time" metric card on Commissioner dashboard
+- [ ] Add anomaly spike detection in APScheduler job → auto-create enforcement action
+
+### 🟡 Do Next — High Impact (8–10 hours)
+- [ ] Train XGBoost risk scorer on real CPCB CSV data (80/20 split, report RMSE vs. persistence)
+- [ ] Integrate real Sentinel-5P archived NO₂ data as actual map layer (Copernicus free tier)
+- [ ] Add real translation: wrap advisory LLM response with LibreTranslate (free, self-hostable)
+- [ ] Wire `getUserMedia` (camera) + `geolocation` GPS to Field Officer evidence tab
+
+### 🟢 Polish for Demo Day (2–4 hours)
+- [ ] Remove or integrate `VoiceController.tsx` (currently an orphan component)
+- [ ] Add forecast confidence interval ±1σ band to forecast chart
+- [ ] Verify `docker compose up` works fully end-to-end with seeded data
+- [ ] Add forecast RMSE vs. persistence table to Forecast page
+- [ ] Add real GRAP stage checker (given city AQI → display mandatory GRAP actions)
+
+### 🔵 Nice-to-Have (if time allows)
+- [ ] WebSocket (`/ws/live`) to replace 5-minute polling for real-time AQI push
+- [ ] Export enforcement notice as PDF (evidence_generator already builds text)
+- [ ] Add Chennai, Bangalore as 4th and 5th cities
+- [ ] CO₂ avoided calculator on Commissioner ROI panel
+
+---
+
+## 🎬 Recommended Demo Flow (for judges)
+
+1. **Landing page** → shows live AQI orbs for 3 cities
+2. **Dashboard** → select worst-AQI ward; emergency banner fires
+3. **Digital Twin** → apply "Emergency Preset" → show AQI drop + ROI panel
+4. **AI Briefing** → stream executive brief
+5. **Agent Committee** → convene 5-agent deliberation; show decree
+6. **Commissioner** → show response-time metric + causal proof of past intervention
+7. **Enforcement** → show P1 action, deploy, broadcast alert
+8. **Field Officer** → show task acknowledged from field
+
+**Story arc:** *Detect → Diagnose → Simulate → Justify → Decide → Act → Prove.*
 
 ---
 
 ## 👥 Team
 
 Built for the **ET AI Hackathon 2026** — Problem Statement 5: Urban Air Quality Management.
-
----
 
 *AETHER — Because clean air is a right, not a privilege.*
