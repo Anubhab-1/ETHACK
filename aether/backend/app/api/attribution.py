@@ -158,6 +158,9 @@ def get_enforcement_queue(
             "alerts_sent": a.alerts_sent or 0,
             "alerts_confirmed": a.alerts_confirmed or 0,
             "created_at": a.created_at.isoformat(),
+            "detected_at": a.detected_at.isoformat() if a.detected_at else None,
+            "acknowledged_at": a.acknowledged_at.isoformat() if a.acknowledged_at else None,
+            "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
         })
 
     return result
@@ -179,8 +182,12 @@ def update_enforcement_status(
         raise HTTPException(status_code=400, detail=f"Status must be one of {valid_statuses}")
     
     action.status = update.status
-    if update.status == "resolved":
+    if update.status == "deployed":
+        action.acknowledged_at = datetime.utcnow()
+    elif update.status == "resolved":
         action.resolved_at = datetime.utcnow()
+        if not action.acknowledged_at:
+            action.acknowledged_at = datetime.utcnow() # safe fallback
     
     db.commit()
     db.refresh(action)

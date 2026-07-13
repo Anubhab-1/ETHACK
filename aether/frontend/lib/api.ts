@@ -106,6 +106,9 @@ export interface EnforcementAction {
   target_type: string;
   status: string;
   created_at: string;
+  detected_at?: string;
+  acknowledged_at?: string;
+  resolved_at?: string;
 }
 
 export interface EnforcementStats {
@@ -432,4 +435,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ command, city, wards }),
     }),
+
+  /** Get city-wide causal history */
+  getCityCausalHistory: (city = "Kolkata") =>
+    apiFetch<any[]>(`/api/causal-impact/city-history?city=${encodeURIComponent(city)}`),
 };

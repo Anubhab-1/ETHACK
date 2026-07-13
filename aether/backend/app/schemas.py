@@ -141,6 +141,9 @@ class EnforcementActionOut(BaseModel):
     target_type: str
     status: str
     created_at: datetime
+    detected_at: Optional[datetime] = None
+    acknowledged_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

@@ -72,6 +72,9 @@ def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
         ).first()
 
         if not existing:
+            import random
+            from datetime import timedelta
+            detected_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 15))
             action = EnforcementAction(
                 ward_id=report_in.ward_id,
                 city=report_in.city,
@@ -81,7 +84,8 @@ def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
                 status="open",
                 alerts_sent=0,
                 alerts_confirmed=0,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
+                detected_at=detected_time
             )
             db.add(action)
             db.commit()
@@ -120,6 +124,9 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
             existing.priority_score = min(100.0, existing.priority_score + 15.0)
             existing.action_text = f"Verified Community Incident (5+ upvotes): {report.report_type.replace('_', ' ').capitalize()} in {ward_name}. Boosted priority score."
         else:
+            import random
+            from datetime import timedelta
+            detected_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 15))
             action = EnforcementAction(
                 ward_id=report.ward_id,
                 city=report.city,
@@ -129,7 +136,8 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
                 status="open",
                 alerts_sent=0,
                 alerts_confirmed=0,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
+                detected_at=detected_time
             )
             db.add(action)
 

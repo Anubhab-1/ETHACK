@@ -32,6 +32,12 @@ def refresh_all(db: Session):
             weather_records = fetch_weather(city=city, db=db)
             upsert_weather(weather_records, city, db)
 
+            # Trigger automated anomaly detection
+            from app.services.enforcement_scorer import detect_spikes_and_auto_escalate
+            anomalies_created = detect_spikes_and_auto_escalate(db, city)
+            if anomalies_created > 0:
+                logger.info(f"🚨 Automated spike detection: created {anomalies_created} enforcement actions for {city}")
+
             logger.info(f"✅ Refreshed data for {city}")
         except Exception as e:
             logger.error(f"Error refreshing {city}: {e}")

@@ -141,6 +141,8 @@ class EnforcementAction(Base):
     alerts_confirmed: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    detected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Compound index: accelerates city+status filter (most common query pattern)
     __table_args__ = (
