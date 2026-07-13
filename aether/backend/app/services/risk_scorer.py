@@ -118,10 +118,59 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 eval_metric="aucpr",
                 random_state=42
             )
-            # Create synthetic train data to avoid fitting errors
+            # Create semi-synthetic training data representing physical and operational realities
             np.random.seed(42)
-            X_train = np.random.randn(100, len(feature_names))
-            y_train = (X_train[:, 0] * 0.4 + X_train[:, 6] * 0.5 + np.random.randn(100) > 0.2).astype(int)
+            n_samples = 300
+            X_train = np.zeros((n_samples, len(feature_names)), dtype=np.float32)
+            
+            for s in range(n_samples):
+                ind_score = np.random.uniform(10.0, 90.0)
+                road_dens = np.random.uniform(2.0, 8.0)
+                const_cnt = np.random.uniform(0, 10.0)
+                pop = np.random.uniform(0.5, 4.0)
+                schools = np.random.uniform(0, 8.0)
+                hospitals = np.random.uniform(0, 4.0)
+                complaints = np.random.uniform(0, 20.0)
+                hist_viols = np.random.uniform(0, 6.0)
+                t_c = np.random.uniform(15.0, 42.0)
+                w_s = np.random.uniform(2.0, 25.0)
+                hum = np.random.uniform(40.0, 95.0)
+                
+                compl_dens = complaints / max(1.0, road_dens)
+                ind_exp = ind_score * (schools + hospitals)
+                wind_stag = 1.0 / max(0.5, w_s)
+                high_temp_r = 1.0 if t_c > 30.0 else 0.0
+                low_wind_r = 1.0 if w_s < 4.0 else 0.0
+                has_hosp = 1.0 if hospitals > 0 else 0.0
+                has_sch = 1.0 if schools > 0 else 0.0
+                risk_int_1 = ind_score * const_cnt
+                risk_int_2 = road_dens * complaints
+                risk_int_3 = const_cnt * complaints
+                const_exp = const_cnt * (schools + 1)
+                pop_dens = (pop * 100000.0) / max(1.0, road_dens)
+                hist_sev = hist_viols * 2.5
+                base_p = 0.05
+                
+                row = [
+                    ind_score, road_dens, const_cnt, pop, schools, hospitals, complaints, hist_viols,
+                    t_c, w_s, hum, compl_dens, ind_exp, wind_stag, high_temp_r, low_wind_r,
+                    has_hosp, has_sch, risk_int_1, risk_int_2, risk_int_3, const_exp, pop_dens, hist_sev, base_p
+                ]
+                X_train[s] = row
+            
+            # Physically consistent label logic (z score thresholding)
+            z = (
+                X_train[:, 0] * 0.006 +      # industrial_score
+                X_train[:, 1] * 0.04 +       # road_density
+                X_train[:, 2] * 0.08 +       # construction_count
+                X_train[:, 6] * 0.07 +       # complaints_count
+                X_train[:, 7] * 0.15 +       # historical_violations
+                X_train[:, 13] * 0.20 -      # wind_stagnation
+                X_train[:, 9] * 0.02 +       # wind_speed_kmh
+                np.random.normal(0, 0.1, n_samples)
+            )
+            y_train = (z > 0.95).astype(int)
+            
             clf.fit(X_train, y_train)
 
             # Predict probabilities
