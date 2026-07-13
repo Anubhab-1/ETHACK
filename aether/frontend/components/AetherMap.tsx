@@ -232,15 +232,17 @@ export function AetherMap({
 
       {/* Sentinel-5P NO2 Satellite Layer (Tropospheric Column Density) */}
       {showSatellite && (satelliteGrid || []).map((gridPoint, idx) => {
-        const scaleVal = Math.min(100, Math.max(10, gridPoint.value * 8.5));
+        const opacity = Math.min(0.65, Math.max(0.08, gridPoint.value / 4.0));
+        // High-pollution centers get deep red, mid gets bright orange, low gets soft yellow
+        const color = gridPoint.value > 2.5 ? "#ef4444" : gridPoint.value > 1.4 ? "#f97316" : "#eab308";
         return (
           <CircleMarker
             key={`sat-${idx}`}
             center={[gridPoint.lat, gridPoint.lon]}
-            radius={32}
+            radius={28}
             pathOptions={{
-              fillColor: "#ef4444", // glowing NO2 red-orange
-              fillOpacity: 0.25 * (scaleVal / 100),
+              fillColor: color, 
+              fillOpacity: opacity,
               color: "transparent",
               weight: 0,
             }}
