@@ -50,6 +50,7 @@ docker-compose up --build
 ```
 ETHACK/
 ├── README.md                        ← THIS FILE — single source of truth
+├── ARCHITECTURE.md                  ← System context & Mermaid data flow diagrams
 ├── aether/
 │   ├── audit.py                     # Full 27-endpoint API test suite
 │   ├── docker-compose.yml
