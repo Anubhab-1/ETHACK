@@ -10,7 +10,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Cpu, Satellite, Activity, Sliders, Users, RefreshCw, Route, Brain } from "lucide-react";
-import { api, LiveAQIPoint, HeatmapPoint, WardDetail, ForecastPoint, AttributionResponse } from "@/lib/api";
+import { api, API_BASE, LiveAQIPoint, HeatmapPoint, WardDetail, ForecastPoint, AttributionResponse } from "@/lib/api";
 import { AQIBadge } from "@/components/AQIBadge";
 import { SourceBreakdown } from "@/components/SourceBreakdown";
 import { ForecastChart } from "@/components/ForecastChart";
@@ -167,6 +167,65 @@ export default function DashboardPage() {
     const interval = setInterval(loadData, 5 * 60 * 1000); // refresh every 5 min
     return () => clearInterval(interval);
   }, [loadData]);
+
+  // Real-time WebSocket synchronization
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Convert API_BASE HTTP protocol to WS protocol
+    const wsBase = API_BASE.startsWith("http")
+      ? API_BASE.replace(/^http/, "ws")
+      : `${window.location.protocol.replace(/^http/, "ws")}//${window.location.host}${API_BASE}`;
+    
+    const wsUrl = `${wsBase}/api/ws/live?city=${encodeURIComponent(city)}`;
+    console.log(`[AETHER WS] Connecting to: ${wsUrl}`);
+    
+    let socket: WebSocket;
+    let reconnectTimeout: NodeJS.Timeout;
+    
+    const connect = () => {
+      socket = new WebSocket(wsUrl);
+      
+      socket.onopen = () => {
+        console.log(`[AETHER WS] Subscribed to live telemetry for ${city}`);
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "telemetry_update" && data.readings) {
+            console.log(`[AETHER WS] Received live telemetry tick: ${data.readings.length} stations`);
+            setLiveData(data.readings);
+            
+            // Recompute average AQI
+            const aqis = data.readings.filter((s: any) => s.aqi !== null).map((s: any) => s.aqi as number);
+            if (aqis.length > 0) {
+              setCityAvgAQI(Math.round(aqis.reduce((a: number, b: number) => a + b, 0) / aqis.length));
+            }
+          }
+        } catch (err) {
+          console.error("[AETHER WS] Error parsing message:", err);
+        }
+      };
+      
+      socket.onclose = (event) => {
+        console.log(`[AETHER WS] Connection closed (code: ${event.code}). Retrying in 10s...`);
+        reconnectTimeout = setTimeout(connect, 10000);
+      };
+      
+      socket.onerror = (err) => {
+        console.warn("[AETHER WS] Connection error:", err);
+        socket.close();
+      };
+    };
+    
+    connect();
+    
+    return () => {
+      if (socket) socket.close();
+      clearTimeout(reconnectTimeout);
+    };
+  }, [city]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {

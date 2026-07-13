@@ -3,7 +3,7 @@
  * Typed client for all backend endpoints.
  */
 
-let API_BASE = "";
+export let API_BASE = "";
 
 if (typeof window !== "undefined") {
   const hostname = window.location.hostname;

@@ -222,7 +222,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Request-ID", "Accept"],
 )
 
-from app.api import health, aqi, forecast, attribution, advisory, agents, diagnostics, simulation, reports
+from app.api import health, aqi, forecast, attribution, advisory, agents, diagnostics, simulation, reports, ws
 from app.api import forecast_advanced, attribution_advanced, causal_impact, enforcement_advanced, agents_advanced
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
@@ -234,6 +234,7 @@ app.include_router(agents.router, prefix="/api", tags=["Agents"])
 app.include_router(diagnostics.router, prefix="/api", tags=["Diagnostics"])
 app.include_router(simulation.router, prefix="/api", tags=["Simulation"])
 app.include_router(reports.router, prefix="/api", tags=["Citizen Reports"])
+app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
 
 # Advanced National Upgrade Routers
 app.include_router(forecast_advanced.router, tags=["Forecast Advanced"])
