@@ -21,6 +21,7 @@ import { SatelliteCalibration } from "@/components/SatelliteCalibration";
 import { HealthImpactCounter } from "@/components/HealthImpactCounter";
 import { AlertNotificationSystem } from "@/components/AlertNotificationSystem";
 import { AppShell } from "@/components/AppShell";
+import { VoiceController } from "@/components/VoiceController";
 
 
 // Dynamic import for map (client-side only — Leaflet has no SSR)
@@ -72,6 +73,7 @@ export default function DashboardPage() {
   const [liveData, setLiveData] = useState<LiveAQIPoint[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   const [selectedWard, setSelectedWard] = useState<WardDetail | null>(null);
+  const [wards, setWards] = useState<{ id: number; name: string }[]>([]);
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [attribution, setAttribution] = useState<AttributionResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +130,8 @@ export default function DashboardPage() {
       setHeatmapData(heatmap);
       setCitizenReports(reports);
       setLastUpdated(new Date());
+      // Populate wards for VoiceController ward navigation
+      setWards(heatmap.map((w) => ({ id: w.ward_id, name: w.ward_name })));
 
       if (weather) {
         setWeatherData(weather);
@@ -546,6 +550,28 @@ export default function DashboardPage() {
           <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
             {/* Alert Notification Bell */}
             <AlertNotificationSystem liveAQI={liveData} city={city} />
+
+            {/* Voice Controller — Jarvis mode */}
+            <VoiceController
+              city={city}
+              setCity={setCity}
+              setSelectedWard={(w) => {
+                if (w) handleWardClick(w.id);
+                else setSelectedWard(null);
+              }}
+              wards={wards}
+              showWind={showWind}
+              setShowWind={setShowWind}
+              showSatellite={showSatellite}
+              setShowSatellite={setShowSatellite}
+              showCitizenReports={showCitizenReports}
+              setShowCitizenReports={setShowCitizenReports}
+              onConveneCommittee={() => setCommitteeOpen(true)}
+              onTriggerVoiceBriefing={loadBriefing}
+              setTrafficReduction={setTrafficReduction}
+              setConstructionHalt={setConstructionHalt}
+              setIndustrialRestriction={setIndustrialRestriction}
+            />
 
             {/* Refresh button */}
             <button
