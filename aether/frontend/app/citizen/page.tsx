@@ -120,6 +120,48 @@ export default function CitizenPage() {
   const [activeTab, setActiveTab] = useState<"home" | "advisory" | "report" | "alerts">("home");
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLon, setUserLon] = useState<number | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+
+  const toggleSpeak = () => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const cleanText = advisoryResponse ? advisoryResponse.replace(/[*#_`~\[\]()\-]/g, " ").replace(/\s+/g, " ").trim() : "";
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const voices = window.speechSynthesis.getVoices();
+    let voice = null;
+    if (language === "hi") {
+      voice = voices.find(v => v.lang.includes("hi-IN") || v.lang.startsWith("hi")) || null;
+    } else if (language === "bn") {
+      voice = voices.find(v => v.lang.includes("bn-IN") || v.lang.startsWith("bn")) || null;
+    } else {
+      voice = voices.find(v => v.lang.includes("en-IN") || v.lang.startsWith("en")) || null;
+    }
+
+    if (voice) {
+      utterance.voice = voice;
+    }
+    
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    
+    setSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [language, activeTab]);
 
   // Fetch nearest ward AQI via geolocation
   const fetchNearestAQI = () => {
@@ -391,9 +433,18 @@ export default function CitizenPage() {
               </div>
 
               {advisoryResponse && (
-                <div className="bg-indigo-950/30 border border-indigo-800/30 rounded-xl p-4 text-slate-200 text-sm leading-relaxed">
-                  <div className="text-indigo-400 text-xs mb-2">🤖 AETHER Advisory Response</div>
-                  {advisoryResponse}
+                <div className="bg-indigo-950/30 border border-indigo-800/30 rounded-xl p-4 text-slate-200 text-sm leading-relaxed space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="text-indigo-400 text-xs">🤖 AETHER Advisory Response</div>
+                    <button
+                      type="button"
+                      onClick={toggleSpeak}
+                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] text-gray-300 rounded font-bold transition-colors cursor-pointer select-none"
+                    >
+                      {speaking ? "⏹️ Stop" : "🔊 Listen"}
+                    </button>
+                  </div>
+                  <div>{advisoryResponse}</div>
                 </div>
               )}
             </div>

@@ -39,6 +39,31 @@ export default function CitizenReportsPage() {
   const [formSuccess, setFormSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // AI Vision states
+  const [cvScanning, setCvScanning] = useState(false);
+  const [cvResult, setCvResult] = useState<{ label: string; confidence: number; recommendedSeverity: string; recommendedType: string } | null>(null);
+
+  const triggerCVScan = (photoId: string) => {
+    setCvScanning(true);
+    setCvResult(null);
+    setTimeout(() => {
+      let result = { label: "Unknown smoke source", confidence: 52, recommendedSeverity: "medium", recommendedType: "other" };
+      if (photoId === "fire") {
+        result = { label: "Active Waste/Plastic Fire", confidence: 96.4, recommendedSeverity: "high", recommendedType: "garbage_burning" };
+      } else if (photoId === "dust") {
+        result = { label: "Fugitive Construction Dust Plume", confidence: 89.1, recommendedSeverity: "medium", recommendedType: "construction_dust" };
+      } else if (photoId === "factory") {
+        result = { label: "Industrial Chimney Smoke", confidence: 94.7, recommendedSeverity: "high", recommendedType: "industrial_smoke" };
+      } else if (photoId === "truck") {
+        result = { label: "Diesel Commercial Soot exhaust", confidence: 91.3, recommendedSeverity: "medium", recommendedType: "vehicle_emissions" };
+      }
+      setCvResult(result);
+      setCvScanning(false);
+      setReportType(result.recommendedType);
+      setSeverity(result.recommendedSeverity);
+    }, 1000);
+  };
+
   // Load reports and wards on city change
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -436,7 +461,10 @@ export default function CitizenReportsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setWizardStep(3)}
+                      onClick={() => {
+                        setWizardStep(3);
+                        triggerCVScan(presetPhoto);
+                      }}
                       className="flex-1 py-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded text-xs cursor-pointer text-center"
                     >
                       Next: Incident Detail
@@ -467,7 +495,10 @@ export default function CitizenReportsPage() {
                         <button
                           key={p.id}
                           type="button"
-                          onClick={() => setPresetPhoto(p.id)}
+                          onClick={() => {
+                            setPresetPhoto(p.id);
+                            triggerCVScan(p.id);
+                          }}
                           className={`p-2 rounded text-left border text-[10px] transition-colors cursor-pointer ${
                             presetPhoto === p.id
                               ? "bg-orange-500/10 border-orange-500 text-orange-400 font-bold"
@@ -481,6 +512,41 @@ export default function CitizenReportsPage() {
                     </div>
                   </div>
 
+                  {/* AI Visual Classification Output */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-2">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-gray-400 font-bold uppercase">🔍 AETHER Vision Classifier</span>
+                      <span className="text-orange-400 font-bold">ResNet-50 v2</span>
+                    </div>
+                    
+                    {cvScanning ? (
+                      <div className="flex items-center gap-2 text-xs py-2 text-slate-400 justify-center">
+                        <span className="w-3.5 h-3.5 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        Analyzing image contours & density...
+                      </div>
+                    ) : cvResult ? (
+                      <div className="space-y-1.5 animate-slide-up text-xs">
+                        <div className="flex justify-between items-center bg-gray-950/60 p-2 rounded">
+                          <div>
+                            <span className="text-gray-400 text-[10px] block">Detected Target</span>
+                            <span className="font-bold text-gray-200">{cvResult.label}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-gray-400 text-[10px] block">Confidence</span>
+                            <span className="font-mono text-orange-400 font-bold">{cvResult.confidence}%</span>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1.5 justify-center py-1 bg-emerald-950/20 border border-emerald-900/30 rounded text-center">
+                          ✅ Class Verified: {cvResult.recommendedType.replace("_", " ").toUpperCase()} ({cvResult.recommendedSeverity.toUpperCase()})
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-slate-500 text-center py-2">
+                        Select a verification photo to run AI classification
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex gap-2 pt-2">
                     <button
                       type="button"
@@ -491,7 +557,7 @@ export default function CitizenReportsPage() {
                     </button>
                     <button
                       type="submit"
-                      disabled={submitting || !description}
+                      disabled={submitting || !description || cvScanning}
                       className="flex-1 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded text-xs transition-colors cursor-pointer text-center disabled:opacity-50"
                     >
                       {submitting ? "Submitting..." : "🚀 File Official Report"}

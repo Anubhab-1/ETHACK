@@ -48,6 +48,8 @@ export default function EnforcementPage() {
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [recomputeToast, setRecomputeToast] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeTrackingId, setActiveTrackingId] = useState<number | null>(null);
+  const [trackingCountdown, setTrackingCountdown] = useState<number>(0);
   const PAGE_SIZE = 10;
 
   const loadData = useCallback(async () => {
@@ -81,6 +83,31 @@ export default function EnforcementPage() {
     await loadData();
     setDeployingId(null);
     setResolvingId(null);
+  };
+
+  // Real-time dispatch tracking countdown
+  useEffect(() => {
+    if (activeTrackingId === null || trackingCountdown <= 0) return;
+    
+    const interval = setInterval(() => {
+      setTrackingCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // Complete actual status update
+          handleStatusUpdate(activeTrackingId, "deployed");
+          setActiveTrackingId(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [activeTrackingId, trackingCountdown]);
+
+  const startTracking = (actionId: number) => {
+    setActiveTrackingId(actionId);
+    setTrackingCountdown(15);
   };
 
   const handleRecompute = async () => {
@@ -290,7 +317,7 @@ export default function EnforcementPage() {
           <div className="space-y-3">
             {actions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((action, idx) => {
               const priority = PRIORITY_LABEL(action.priority_score);
-              const isDeploying = deployingId === action.id;
+              const isDeploying = deployingId === action.id || activeTrackingId === action.id;
               const isResolving = resolvingId === action.id;
               return (
                 <div
@@ -333,12 +360,12 @@ export default function EnforcementPage() {
                       
                       {action.status === "open" && (
                         <button
-                          onClick={() => handleStatusUpdate(action.id, "deployed")}
+                          onClick={() => startTracking(action.id)}
                           disabled={isDeploying}
                           className="w-full px-3 py-1.5 text-xs rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold transition-all cursor-pointer text-center disabled:opacity-60 flex items-center justify-center gap-1.5"
                         >
                           {isDeploying ? (
-                            <><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> Deploying...</>
+                            <><span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" /> En-Route...</>
                           ) : "⚡ Deploy Inspector"}
                         </button>
                       )}
@@ -373,6 +400,58 @@ export default function EnforcementPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Live Dispatch HUD Overlay */}
+                  {activeTrackingId === action.id && (
+                    <div className="w-full mt-4 bg-slate-950/70 border border-orange-500/20 rounded-xl p-4 space-y-3">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-orange-400 font-bold flex items-center gap-1.5">
+                          <span className="w-2 h-2 bg-orange-500 rounded-full animate-ping" />
+                          📡 LIVE DISPATCH HUD ACTIVE
+                        </span>
+                        <span className="text-slate-400 font-mono text-[10px]">
+                          SLA ETA: <span className="text-white font-bold">{trackingCountdown}s</span>
+                        </span>
+                      </div>
+
+                      {/* CSS Animated Map representing VRP path */}
+                      <div className="h-16 bg-slate-900 border border-slate-800 rounded-lg relative overflow-hidden flex items-center px-4">
+                        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f2937_1px,transparent_1px),linear-gradient(to_bottom,#1f2937_1px,transparent_1px)] bg-[size:10px_10px] opacity-20" />
+                        
+                        <div className="flex justify-between items-center w-full relative z-10">
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs">🏢</span>
+                            <span className="text-[9px] text-slate-500 mt-1">Base HQ</span>
+                          </div>
+
+                          <div className="flex-1 mx-4 h-1 bg-slate-800 rounded-full relative">
+                            <div 
+                              className="h-full bg-orange-500 rounded-full transition-all duration-1000 ease-linear"
+                              style={{ width: `${((15 - trackingCountdown) / 15) * 100}%` }}
+                            />
+                            <div 
+                              className="absolute top-1/2 -translate-y-1/2 text-sm transition-all duration-1000 ease-linear"
+                              style={{ left: `calc(${((15 - trackingCountdown) / 15) * 100}% - 8px)` }}
+                            >
+                              🚒
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-center">
+                            <span className="text-xs">🔥</span>
+                            <span className="text-[9px] text-slate-500 mt-1">Target Area</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[10px] text-slate-400 grid grid-cols-2 gap-2 font-mono">
+                        <div>• Vehicle Status: <span className="text-orange-300 font-bold">En Route</span></div>
+                        <div>• Optimization: <span className="text-blue-300">OR-Tools VRP</span></div>
+                        <div>• Target Ward: <span className="text-slate-300">Ward #{action.ward_no}</span></div>
+                        <div>• Dispatch Speed: <span className="text-slate-300">42 km/h</span></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

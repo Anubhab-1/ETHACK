@@ -298,6 +298,57 @@ export default function AdvisoryPage() {
   // Right panel tab: "chat" | "risk"
   const [rightTab, setRightTab] = useState<"chat" | "risk">("chat");
 
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
+  const toggleSpeakAdvisory = useCallback((msgId: string, text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    if (speakingMessageId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    // Strip markdown formatting before reading
+    const cleanText = text.replace(/[*#_`~\[\]()\-]/g, " ").replace(/\s+/g, " ").trim();
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    const voices = window.speechSynthesis.getVoices();
+    let voice = null;
+    if (language === "hi") {
+      voice = voices.find(v => v.lang.includes("hi-IN") || v.lang.startsWith("hi")) || null;
+    } else if (language === "bn") {
+      voice = voices.find(v => v.lang.includes("bn-IN") || v.lang.startsWith("bn")) || null;
+    } else {
+      voice = voices.find(v => v.lang.includes("en-IN") || v.lang.startsWith("en")) || null;
+    }
+
+    if (voice) {
+      utterance.voice = voice;
+    }
+    
+    utterance.onend = () => {
+      setSpeakingMessageId(null);
+    };
+    
+    utterance.onerror = () => {
+      setSpeakingMessageId(null);
+    };
+
+    setSpeakingMessageId(msgId);
+    window.speechSynthesis.speak(utterance);
+  }, [speakingMessageId, language]);
+
+  // Stop synthesis when context changes
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setSpeakingMessageId(null);
+    }
+  }, [language, rightTab]);
+
   // City average AQI for risk calculator
   const cityAvgAQI = useMemo(() => {
     const valid = liveData.filter((s) => s.aqi !== null);
@@ -639,10 +690,19 @@ export default function AdvisoryPage() {
                         {msg.text}
                       </div>
 
-                      {/* Context AQI Badge */}
-                      {msg.role === "aether" && msg.aqi !== null && msg.aqi !== undefined && (
-                        <div className="flex items-center gap-2 px-2">
-                          <AQIBadge aqi={msg.aqi} size="sm" />
+                      {/* Context AQI Badge & Audio Playback */}
+                      {msg.role === "aether" && (
+                        <div className="flex items-center gap-2 px-2 flex-wrap">
+                          {msg.aqi !== null && msg.aqi !== undefined && (
+                            <AQIBadge aqi={msg.aqi} size="sm" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => toggleSpeakAdvisory(msg.id, msg.text)}
+                            className="p-1 rounded bg-gray-900 hover:bg-gray-800 border border-white/5 text-[9px] text-gray-400 hover:text-gray-200 transition-colors cursor-pointer flex items-center gap-1 select-none"
+                          >
+                            {speakingMessageId === msg.id ? "⏹️ Stop" : "🔊 Listen"}
+                          </button>
                           <span className="text-[9px] text-gray-500">
                             {selectedWardDetail ? selectedWardDetail.name : "Active location"} • {new Date(msg.timestamp).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                           </span>

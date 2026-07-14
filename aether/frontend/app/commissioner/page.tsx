@@ -78,6 +78,8 @@ export default function CommissionerPage() {
   const [avgResponseTime, setAvgResponseTime] = useState("9.2 min");
   const [activeInterventions, setActiveInterventions] = useState(14);
   const [healthSavings, setHealthSavings] = useState("₹82.6L");
+  const [budgetLimit, setBudgetLimit] = useState<number>(10);
+  const [isOptimizerActive, setIsOptimizerActive] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -175,6 +177,48 @@ export default function CommissionerPage() {
     const baseTons = activeInterventions * 8.5 * scale;
     return baseTons.toFixed(1);
   }, [activeInterventions, avgAQI]);
+
+  const optimizedInterventions = useMemo(() => {
+    if (!isOptimizerActive) return [];
+    
+    // Sort by ROI descending to prioritize highest ROI actions
+    const sortedROI = [...dynamicROI].sort((a, b) => b.roi - a.roi);
+    
+    let currentCost = 0;
+    const selected: string[] = [];
+    
+    for (const item of sortedROI) {
+      if (currentCost + item.cost_lakhs <= budgetLimit) {
+        selected.push(item.action);
+        currentCost += item.cost_lakhs;
+      }
+    }
+    return selected;
+  }, [dynamicROI, budgetLimit, isOptimizerActive]);
+
+  // Sum statistics of selected policies
+  const optimizerSummary = useMemo(() => {
+    let cost = 0;
+    let reduction = 0;
+    let savings = 0;
+    let co2 = 0;
+    
+    dynamicROI.forEach(item => {
+      if (optimizedInterventions.includes(item.action)) {
+        cost += item.cost_lakhs;
+        reduction += item.aqi_reduction;
+        savings += item.health_savings;
+        co2 += item.co2_avoided_tons;
+      }
+    });
+    
+    return {
+      cost: parseFloat(cost.toFixed(1)),
+      reduction,
+      savings: parseFloat(savings.toFixed(1)),
+      co2: parseFloat(co2.toFixed(1))
+    };
+  }, [dynamicROI, optimizedInterventions]);
 
   const bgTheme = crisisMode
     ? "from-red-950/50 via-slate-950 to-slate-950"
@@ -316,6 +360,77 @@ export default function CommissionerPage() {
               <p className="text-slate-400 text-xs mb-4">
                 WHO dose-response curves + synthetic control causal analysis. For every Rs 1 spent on enforcement, Rs <span className="text-emerald-400 font-bold">9–32</span> saved in health costs.
               </p>
+
+              {/* AI Budget Optimizer Dashboard Controls */}
+              <div className="bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 mb-5 space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex-1 w-full">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-slate-300 text-xs font-bold uppercase tracking-wider">💰 Mitigation Budget Limit</span>
+                      <span className="text-emerald-400 font-mono font-bold text-sm bg-emerald-950/60 border border-emerald-800/40 px-2.5 py-0.5 rounded-full">
+                        ₹{budgetLimit.toFixed(1)} Lakh
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="25.0"
+                      step="0.5"
+                      value={budgetLimit}
+                      onChange={(e) => setBudgetLimit(parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                      <span>₹0.5L</span>
+                      <span>₹10.0L</span>
+                      <span>₹20.0L</span>
+                      <span>₹25.0L</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 bg-slate-800/60 border border-slate-700/50 p-2.5 rounded-lg flex-none">
+                    <span className="text-xs text-slate-300 font-semibold">AI Optimizer</span>
+                    <button
+                      onClick={() => setIsOptimizerActive(!isOptimizerActive)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                        isOptimizerActive ? "bg-emerald-600" : "bg-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isOptimizerActive ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {isOptimizerActive && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/40 border border-slate-800/60 rounded-lg p-3 text-center">
+                    <div>
+                      <div className="text-[10px] text-slate-400">Projected Cost</div>
+                      <div className="text-sm font-black text-slate-200">₹{optimizerSummary.cost.toFixed(1)}L</div>
+                      <div className="text-[8px] text-slate-500">of ₹{budgetLimit.toFixed(1)}L limit</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400">AQI Reduction</div>
+                      <div className="text-sm font-black text-emerald-400 font-mono">↓{optimizerSummary.reduction}</div>
+                      <div className="text-[8px] text-slate-500">μg/m³ cumulative</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400">Health Savings</div>
+                      <div className="text-sm font-black text-emerald-400">₹{optimizerSummary.savings.toFixed(1)}L</div>
+                      <div className="text-[8px] text-slate-500">WHO dose-response</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-slate-400">Carbon Offset</div>
+                      <div className="text-sm font-black text-emerald-400">🌱 {optimizerSummary.co2.toFixed(1)} t</div>
+                      <div className="text-[8px] text-slate-500">CO₂ avoided</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -326,26 +441,36 @@ export default function CommissionerPage() {
                     </tr>
                   </thead>
                   <tbody className="space-y-1">
-                    {dynamicROI.sort((a, b) => b.roi - a.roi).map((row, i) => (
-                      <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-700/20 transition-colors">
-                        <td className="py-2.5 pr-4 text-slate-200 font-medium">{row.action}</td>
-                        <td className="py-2.5 pr-4 text-slate-300">₹{row.cost_lakhs.toFixed(1)}L</td>
-                        <td className="py-2.5 pr-4">
-                          <span className="text-emerald-400 font-bold">↓{row.aqi_reduction}</span>
-                          <span className="text-slate-500 text-xs ml-1">μg/m³</span>
-                        </td>
-                        <td className="py-2.5 pr-4 text-emerald-400">₹{row.health_savings.toFixed(1)}L</td>
-                        <td className="py-2.5 pr-4 text-emerald-400 font-mono text-xs">
-                          🌱 {row.co2_avoided_tons.toFixed(1)} <span className="text-slate-500 text-[10px]">t/day</span>
-                        </td>
-                        <td className="py-2.5 pr-4">
-                          <span className={`font-bold ${row.roi > 10 ? "text-emerald-300" : row.roi > 5 ? "text-yellow-300" : "text-orange-300"}`}>
-                            {row.roi.toFixed(1)}×
-                          </span>
-                        </td>
-                        <td className="py-2.5 text-slate-400 text-xs">{row.time_hrs}h</td>
-                      </tr>
-                    ))}
+                    {dynamicROI.sort((a, b) => b.roi - a.roi).map((row, i) => {
+                      const isSelected = optimizedInterventions.includes(row.action);
+                      return (
+                        <tr 
+                          key={i} 
+                          className={`border-b border-slate-800/50 hover:bg-slate-700/20 transition-all ${
+                            isOptimizerActive && isSelected 
+                              ? "bg-emerald-950/20 border-l-2 border-emerald-500" 
+                              : isOptimizerActive ? "opacity-40 hover:opacity-100" : ""
+                          }`}
+                        >
+                          <td className="py-2.5 pr-4 text-slate-200 font-medium">{row.action}</td>
+                          <td className="py-2.5 pr-4 text-slate-300">₹{row.cost_lakhs.toFixed(1)}L</td>
+                          <td className="py-2.5 pr-4">
+                            <span className="text-emerald-400 font-bold">↓{row.aqi_reduction}</span>
+                            <span className="text-slate-500 text-xs ml-1">μg/m³</span>
+                          </td>
+                          <td className="py-2.5 pr-4 text-emerald-400">₹{row.health_savings.toFixed(1)}L</td>
+                          <td className="py-2.5 pr-4 text-emerald-400 font-mono text-xs">
+                            🌱 {row.co2_avoided_tons.toFixed(1)} <span className="text-slate-500 text-[10px]">t/day</span>
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            <span className={`font-bold ${row.roi > 10 ? "text-emerald-300" : row.roi > 5 ? "text-yellow-300" : "text-orange-300"}`}>
+                              {row.roi.toFixed(1)}×
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-slate-400 text-xs">{row.time_hrs}h</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
