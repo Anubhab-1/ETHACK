@@ -266,7 +266,7 @@ export default function ComparePage() {
                   <h2 className="font-bold text-gray-200 text-base">City Air Quality Leaderboard</h2>
                   <p className="text-xs text-gray-500">Ranked by average AQI — worst to best</p>
                 </div>
-                <span className="text-[10px] text-gray-500 bg-gray-900 border border-gray-800 px-2 py-1 rounded font-mono">
+                <span className="text-[10px] text-gray-500 bg-gray-900 border border-gray-800 px-2 py-1 rounded font-mono" suppressHydrationWarning>
                   LIVE · {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>

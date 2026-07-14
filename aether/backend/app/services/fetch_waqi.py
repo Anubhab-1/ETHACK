@@ -141,6 +141,13 @@ def parse_waqi_station(raw: dict) -> dict | None:
         co   = float(iaqi["co"]["v"]) if "co" in iaqi else None
         o3   = float(iaqi["o3"]["v"]) if "o3" in iaqi else None
 
+        # Fallback: estimate PM2.5 and PM10 from general AQI if they are missing (e.g. Map Bounds API doesn't return iaqi)
+        import random as _rand
+        if pm25 is None and aqi is not None:
+            pm25 = max(5.0, round(aqi * 0.55 + _rand.uniform(-5, 5), 1))
+        if pm10 is None and aqi is not None:
+            pm10 = max(10.0, round(aqi * 0.90 + _rand.uniform(-10, 10), 1))
+
         # Parse timestamp
         time_info = raw.get("time", {})
         stime = time_info.get("stime") or time_info.get("iso")

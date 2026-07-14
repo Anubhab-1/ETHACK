@@ -136,7 +136,7 @@ function SidebarContent({
             <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">{city} AQI</span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: aqiColor }} />
-              <span className="text-[10px] text-slate-400 font-mono">{timeStr}</span>
+              <span className="text-[10px] text-slate-400 font-mono" suppressHydrationWarning>{timeStr}</span>
             </span>
           </div>
           {liveAQI !== undefined && liveAQI !== null ? (
@@ -210,7 +210,7 @@ function SidebarContent({
               {online ? <Wifi size={10} className="text-emerald-500" /> : <WifiOff size={10} className="text-red-500" />}
               {online ? "Connected" : "Offline"}
             </span>
-            <span>{dateStr}</span>
+            <span suppressHydrationWarning>{dateStr}</span>
           </div>
         ) : (
           <div className="flex justify-center">
