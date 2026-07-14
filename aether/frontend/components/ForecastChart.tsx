@@ -2,14 +2,15 @@
 /**
  * AETHER — Forecast Chart Component
  * Recharts area chart with 72h AQI forecast + ±1σ confidence band + GRAP stage badge.
+ * Now shows 72 hourly points (not 3 aggregated) with Open-Meteo weather overlay.
  */
 
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
+  Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine, Line, ComposedChart,
 } from "recharts";
 import { ForecastPoint } from "@/lib/api";
-import { getAQIColor, getAQILevel } from "@/lib/aqi-colors";
+import { getAQILevel } from "@/lib/aqi-colors";
 import { format, parseISO } from "date-fns";
 
 interface ForecastChartProps {
@@ -22,6 +23,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const aqiPayload = payload.find((p: any) => p.dataKey === "aqi");
     const upperPayload = payload.find((p: any) => p.dataKey === "upper");
     const lowerPayload = payload.find((p: any) => p.dataKey === "lower");
+    const tempPayload  = payload.find((p: any) => p.dataKey === "temp_c");
 
     const aqi = aqiPayload ? aqiPayload.value : null;
     const upper = upperPayload ? upperPayload.value : null;
@@ -41,6 +43,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           <p className="text-xs text-gray-500 mt-1">
             ±1σ Range: {Math.round(lower)} – {Math.round(upper)}
           </p>
+        )}
+        {tempPayload && (
+          <p className="text-xs text-blue-400 mt-0.5">🌡 {tempPayload.value}°C</p>
         )}
       </div>
     );
@@ -108,34 +113,53 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
     );
   }
 
+  // Detect forecast method from first data point (all share same method)
+  const method = (forecasts[0] as any)?.method || "Persistence+Weather";
+  const isXGB = method.startsWith("XGBoost");
+
+  // Show every 6th tick label for 72-point datasets
+  const tickInterval = forecasts.length > 10 ? 5 : 0;
+
   const data = forecasts.map((f) => ({
-    time: format(parseISO(f.forecast_for), "dd MMM HH:mm"),
+    time: format(parseISO(f.forecast_for), forecasts.length > 10 ? "dd HH:mm" : "dd MMM HH:mm"),
     aqi: f.predicted_aqi,
     lower: f.confidence_lower ?? Math.max(0, f.predicted_aqi * 0.85),
     upper: f.confidence_upper ?? f.predicted_aqi * 1.15,
     category: f.predicted_category,
-    band: [f.confidence_lower ?? f.predicted_aqi * 0.85, f.confidence_upper ?? f.predicted_aqi * 1.15],
+    temp_c: (f as any).temp_c ?? null,
   }));
 
-  // AQI threshold lines
   const thresholds = [
-    { value: 50, label: "Good", color: "#00e400" },
-    { value: 100, label: "Satisfactory", color: "#92d050" },
-    { value: 200, label: "Moderate", color: "#ffff00" },
-    { value: 300, label: "Poor", color: "#ff7e00" },
-    { value: 400, label: "Very Poor", color: "#ff0000" },
+    { value: 50,  color: "#00e400" },
+    { value: 100, color: "#92d050" },
+    { value: 200, color: "#ffff00" },
+    { value: 300, color: "#ff7e00" },
+    { value: 400, color: "#ff0000" },
   ];
 
   const maxAQI = Math.max(...data.map((d) => d.upper), currentAQI || 0, 200);
-
-  // Peak forecast AQI for GRAP badge
   const peakForecastAQI = data.length > 0 ? Math.max(...data.map((d) => d.aqi)) : currentAQI;
+  const hasTemp = data.some((d) => d.temp_c !== null);
 
   return (
     <div>
+      {/* Method + source badge */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+          isXGB
+            ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+            : "bg-gray-700/50 text-gray-400 border border-gray-600/30"
+        }`}>
+          {isXGB ? "⚡ XGBoost+Weather" : "📊 Persistence+Weather"}
+        </span>
+        <span className="text-[9px] text-gray-600">
+          {forecasts.length}h · Open-Meteo
+        </span>
+      </div>
+
       <div style={{ width: "100%", height: 220, minWidth: 0 }}>
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+          <ComposedChart data={data} margin={{ top: 5, right: hasTemp ? 30 : 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="aqiGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#f97316" stopOpacity={0.4} />
@@ -152,7 +176,7 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
               tick={{ fill: "#6b7280", fontSize: 10 }}
               tickLine={false}
               axisLine={{ stroke: "#374151" }}
-              interval="preserveStartEnd"
+              interval={tickInterval}
             />
             <YAxis
               domain={[0, maxAQI + 50]}
@@ -160,9 +184,19 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
               tickLine={false}
               axisLine={false}
             />
+            {hasTemp && (
+              <YAxis
+                yAxisId="temp"
+                orientation="right"
+                domain={["auto", "auto"]}
+                tick={{ fill: "#3b82f6", fontSize: 9 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => `${v}°`}
+              />
+            )}
             <Tooltip content={<CustomTooltip />} />
 
-            {/* AQI threshold reference lines */}
             {thresholds.map((t) => (
               <ReferenceLine
                 key={t.value}
@@ -174,7 +208,7 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
               />
             ))}
 
-            {/* ±1σ Confidence band — upper envelope (orange tint) */}
+            {/* Upper CI band */}
             <Area
               type="monotone"
               dataKey="upper"
@@ -185,7 +219,7 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
               name="Upper σ"
             />
 
-            {/* ±1σ Confidence band — lower mask fills back to chart bg */}
+            {/* Lower CI mask */}
             <Area
               type="monotone"
               dataKey="lower"
@@ -196,7 +230,7 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
               name="Lower σ"
             />
 
-            {/* Main AQI forecast line */}
+            {/* Main AQI line */}
             <Area
               type="monotone"
               dataKey="aqi"
@@ -207,10 +241,23 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
               activeDot={{ r: 5, fill: "#f97316", strokeWidth: 2, stroke: "#fff" }}
               name="AQI"
             />
-          </AreaChart>
+
+            {/* Temperature overlay */}
+            {hasTemp && (
+              <Line
+                yAxisId="temp"
+                type="monotone"
+                dataKey="temp_c"
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                dot={false}
+                strokeDasharray="4 2"
+                name="Temp °C"
+              />
+            )}
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
-      {/* GRAP compliance badge */}
       <GRAPBadge aqi={peakForecastAQI} />
     </div>
   );

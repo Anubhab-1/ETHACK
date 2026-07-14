@@ -16,19 +16,6 @@ logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-def scheduled_refresh():
-    """Trigger data refresh on schedule."""
-    from app.database import SessionLocal
-    from app.scripts.refresh_data import refresh_all
-    logger.info("⏰ Background job: Starting automated hourly data refresh...")
-    db = SessionLocal()
-    try:
-        refresh_all(db)
-        logger.info("⏰ Background job: Automated data refresh complete.")
-    except Exception as e:
-        logger.error(f"⏰ Background job failed: {e}")
-    finally:
-        db.close()
 
 
 @asynccontextmanager
@@ -164,11 +151,8 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Knowledge graph seed failed (non-critical): {e}")
 
         # Start APScheduler background scheduler
-        from apscheduler.schedulers.background import BackgroundScheduler
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(scheduled_refresh, "interval", hours=1, id="cpcb_refresh")
-        scheduler.start()
-        logger.info("⏰ Background scheduler started (running every 1 hour)")
+        from app.scheduler import start_scheduler
+        start_scheduler()
     else:
         logger.info("🧪 Running in testing mode — skipping DB migrations, seeds, external API syncs, and scheduler.")
 
@@ -177,7 +161,8 @@ async def lifespan(app: FastAPI):
 
     if not is_testing:
         logger.info("AETHER shutting down background scheduler...")
-        scheduler.shutdown()
+        from app.scheduler import shutdown_scheduler
+        shutdown_scheduler()
     logger.info("AETHER shutting down...")
 
 

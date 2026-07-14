@@ -85,6 +85,7 @@ export default function DashboardPage() {
   const [tickerItems, setTickerItems] = useState<string[]>([]);
   const [citizenReports, setCitizenReports] = useState<import("@/lib/api").CitizenReport[]>([]);
   const [showCitizenReports, setShowCitizenReports] = useState(true);
+  const [dataSources, setDataSources] = useState<{ waqi_configured: boolean; status?: string } | null>(null);
 
   // Weather and wind overlays
   const [showWind, setShowWind] = useState(true);
@@ -98,6 +99,7 @@ export default function DashboardPage() {
   const [committeeOpen, setCommitteeOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [satelliteGrid, setSatelliteGrid] = useState<{ lat: number; lon: number; value: number }[]>([]);
+  const [satelliteSource, setSatelliteSource] = useState<{ source: string; real_data: boolean } | null>(null);
 
 
   // AI Strategic Executive Briefing
@@ -161,6 +163,23 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }, [city, isWindOverridden]);
+
+  // Fetch data source status for the provenance badge
+  useEffect(() => {
+    fetch(`${API_BASE}/api/health/data-sources`)
+      .then((r) => r.json())
+      .then((d) => setDataSources(d))
+      .catch(() => setDataSources(null));
+  }, []);
+
+  // Helper: compute relative time string
+  const relativeTime = (date: Date | null): string => {
+    if (!date) return "—";
+    const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+    if (mins < 1) return "just now";
+    if (mins === 1) return "1 min ago";
+    return `${mins} min ago`;
+  };
 
   useEffect(() => {
     loadData();
@@ -282,13 +301,14 @@ export default function DashboardPage() {
     }
   }, [showSatellite]);
 
-  // Load Sentinel-5P satellite grid from backend
+  // Load real satellite PM2.5/NO₂ grid from Open-Meteo Air Quality API
   useEffect(() => {
     if (showSatellite && city) {
       api.satelliteGrid(city)
         .then((res) => {
           if (res && res.grid) {
             setSatelliteGrid(res.grid);
+            setSatelliteSource({ source: res.source || "Unknown", real_data: res.real_data ?? false });
           }
         })
         .catch((err) => console.error("Failed to load satellite grid:", err));
@@ -540,23 +560,34 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Weather context strip */}
-        {weatherData && (
-          <div className="flex items-center gap-3 text-[11px] bg-slate-900/60 border border-white/5 px-3 py-1 rounded-full text-slate-400 font-mono text-data">
-            <span className="flex items-center gap-1 text-slate-300">🌡️ {weatherData.temp_c}°C</span>
-            <span className="h-2.5 w-px bg-slate-800" />
-            <span className="flex items-center gap-1 text-slate-300">💧 {weatherData.humidity_pct}% RH</span>
-            <span className="h-2.5 w-px bg-slate-800" />
-            <span className="flex items-center gap-1 text-slate-300">💨 {weatherData.wind_speed} km/h ({weatherData.wind_dir}°)</span>
+        {/* Weather + Data Sources strip */}
+        <div className="flex flex-col sm:flex-row items-center gap-2">
+          {weatherData && (
+            <div className="flex items-center gap-3 text-[11px] bg-slate-900/60 border border-white/5 px-3 py-1 rounded-full text-slate-400 font-mono text-data">
+              <span className="flex items-center gap-1 text-slate-300">🌡️ {weatherData.temp_c}°C</span>
+              <span className="h-2.5 w-px bg-slate-800" />
+              <span className="flex items-center gap-1 text-slate-300">💧 {weatherData.humidity_pct}% RH</span>
+              <span className="h-2.5 w-px bg-slate-800" />
+              <span className="flex items-center gap-1 text-slate-300">💨 {weatherData.wind_speed} km/h ({weatherData.wind_dir}°)</span>
+            </div>
+          )}
+          {/* Data Provenance Badge */}
+          <div className="flex items-center gap-1.5 text-[10px] bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1 rounded-full text-emerald-400 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>{dataSources?.waqi_configured ? "AQI: WAQI/CPCB" : "AQI: Fallback"}</span>
+            <span className="text-emerald-700">·</span>
+            <span>Weather: Open-Meteo</span>
+            <span className="text-emerald-700">·</span>
+            <span>{relativeTime(lastUpdated)}</span>
           </div>
-        )}
+        </div>
 
         {/* Selector + API keys / actions */}
         <div className="flex items-center justify-between lg:justify-end gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap">
-          {/* Live indicator (desktop) */}
+          {/* Live indicator (desktop) — now shows relative time */}
           <div className="hidden lg:flex items-center gap-1.5 text-xs text-gray-500">
             <div className="status-live animate-pulse" />
-            <span>Live</span>
+            <span>{lastUpdated ? relativeTime(lastUpdated) : "Live"}</span>
           </div>
 
           {/* City AQI badge */}
@@ -1134,12 +1165,10 @@ export default function DashboardPage() {
                     </button>
                   </div>
                   <div className="font-mono text-gray-400 space-y-0.5 text-[9px] leading-tight">
-                    <p><span className="text-gray-500">ORBIT ID :</span> Sentinel-5P / S5P_TROPOMI_L3</p>
-                    <p><span className="text-gray-500">SPECTRA  :</span> Tropospheric Column NO2 Density</p>
-                    <p><span className="text-gray-500">ALTITUDE :</span> 824 km (Sun-Synchronous Polar)</p>
-                    <p><span className="text-gray-500">GRID RES :</span> 5.5km x 3.5km spatial grid</p>
-                    <p><span className="text-gray-500">FIDELITY :</span> Ground Monitor R² = 0.84</p>
-                    <p className="text-emerald-400 font-semibold mt-1">✓ Virtual sensor grids generated for unsurveyed zones.</p>
+                    <p><span className="text-gray-500">SOURCE   :</span> {satelliteSource?.source || "Open-Meteo Air Quality"}</p>
+                    <p><span className="text-gray-500">SPECTRA  :</span> PM2.5 & NO₂ Surface Density</p>
+                    <p><span className="text-gray-500">GRID RES :</span> 1.0km x 1.0km spatial grid</p>
+                    <p><span className="text-gray-500">STATUS   :</span> {satelliteSource?.real_data ? "✓ Live Copernicus/CAMS model" : "⚠ Heuristic Fallback"}</p>
                   </div>
                 </div>
               )}

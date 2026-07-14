@@ -13,6 +13,9 @@ from app.schemas import (
 )
 from app.services.attributor import run_attribution_for_ward, get_current_aqi_for_ward, run_pmf_attribution
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

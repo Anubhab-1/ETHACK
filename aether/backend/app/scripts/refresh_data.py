@@ -6,41 +6,55 @@ from app.models import Station
 
 logger = logging.getLogger(__name__)
 
+# Module-level status registry — read by the health endpoint
+LAST_REFRESH_STATUS: dict[str, dict] = {}
+
 
 def refresh_all(db: Session):
-    """Fetch latest AQI + weather data for all cities."""
-    from app.services.fetch_cpcb import fetch_live_cpcb, upsert_readings
+    """
+    Fetch latest AQI + weather data for all cities.
+    Primary source: WAQI (real CPCB data via aqicn.org).
+    Fallback: legacy data.gov.in CPCB fetcher (requires CPCB_API_KEY).
+    """
+    from app.services.fetch_waqi import fetch_and_store_waqi
     from app.services.fetch_weather import fetch_weather, upsert_weather
 
     cities = ["Kolkata", "Delhi", "Mumbai"]
 
     for city in cities:
         try:
-            # Build station map for this city
-            stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
-            station_map = {s.station_code: s for s in stations}
+            # ── Primary: WAQI real AQI data ────────────────────────────────
+            waqi_result = fetch_and_store_waqi(city, db)
+            LAST_REFRESH_STATUS[city] = waqi_result
 
-            if not station_map:
-                logger.warning(f"No stations found for {city}, skipping")
-                continue
+            if waqi_result["status"] != "ok":
+                # WAQI failed (likely no token) — fall back to legacy CPCB fetcher
+                logger.warning(
+                    f"WAQI unavailable for {city} ({waqi_result.get('reason')}). "
+                    "Falling back to legacy CPCB fetcher."
+                )
+                from app.services.fetch_cpcb import fetch_live_cpcb, upsert_readings
+                stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+                station_map = {s.station_code: s for s in stations}
+                if station_map:
+                    records = fetch_live_cpcb(city=city, db=db)
+                    upsert_readings(records, station_map, db)
 
-            # Fetch and insert AQI data
-            records = fetch_live_cpcb(city=city, db=db)
-            upsert_readings(records, station_map, db)
-
-            # Fetch and insert weather data
+            # ── Weather: Open-Meteo (no key, always real) ──────────────────
             weather_records = fetch_weather(city=city, db=db)
             upsert_weather(weather_records, city, db)
 
-            # Trigger automated anomaly detection
+            # ── Enforcement: automated spike detection ─────────────────────
             from app.services.enforcement_scorer import detect_spikes_and_auto_escalate
-            anomalies_created = detect_spikes_and_auto_escalate(db, city)
-            if anomalies_created > 0:
-                logger.info(f"🚨 Automated spike detection: created {anomalies_created} enforcement actions for {city}")
+            anomalies = detect_spikes_and_auto_escalate(db, city)
+            if anomalies > 0:
+                logger.info(f"🚨 Spike detection: {anomalies} enforcement actions created for {city}")
 
-            logger.info(f"✅ Refreshed data for {city}")
+            logger.info(f"✅ Refreshed data for {city} (WAQI: {waqi_result['status']})")
+
         except Exception as e:
             logger.error(f"Error refreshing {city}: {e}")
+            LAST_REFRESH_STATUS[city] = {"status": "error", "reason": str(e)}
 
 
 if __name__ == "__main__":

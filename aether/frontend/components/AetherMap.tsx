@@ -191,9 +191,18 @@ export function AetherMap({
                   <>
                     <div className="text-gray-400">Updated</div>
                     <div className="text-right text-gray-500 text-[10px]">
-                      {new Date(station.measured_at).toLocaleTimeString("en-IN", {
-                        hour: "2-digit", minute: "2-digit"
-                      })}
+                      {(() => {
+                        const elapsed = Date.now() - new Date(station.measured_at).getTime();
+                        const mins = Math.floor(elapsed / 60000);
+                        if (mins < 1) return "just now";
+                        if (mins < 60) return `${mins}m ago`;
+                        const hours = Math.floor(mins / 60);
+                        if (hours < 24) return `${hours}h ago`;
+                        return new Date(station.measured_at).toLocaleDateString("en-IN", {
+                          month: "short",
+                          day: "numeric",
+                        });
+                      })()}
                     </div>
                   </>
                 )}

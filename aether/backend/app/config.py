@@ -30,12 +30,16 @@ class Settings(BaseSettings):
     # Admin security key — set ADMIN_KEY env var on Render
     admin_key: str = "supersecretkey"
 
-    # CPCB API
+    # CPCB API (legacy — superseded by WAQI)
     cpcb_resource_id: str = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
     cpcb_api_base: str = "https://api.data.gov.in/resource"
 
+    # WAQI (World Air Quality Index) — real CPCB data, free token at https://aqicn.org/api/
+    waqi_token: str = ""
+
     # Open-Meteo
     open_meteo_base: str = "https://api.open-meteo.com/v1/forecast"
+    open_meteo_airquality_base: str = "https://air-quality-api.open-meteo.com/v1/air-quality"
 
     class Config:
         env_file = ".env"
@@ -43,14 +47,10 @@ class Settings(BaseSettings):
 
     def __init__(self, **values):
         super().__init__(**values)
-        if "your_" in self.cpcb_api_key:
-            self.cpcb_api_key = ""
-        if "your_" in self.openai_api_key:
-            self.openai_api_key = ""
-        if "your_" in self.twilio_account_sid:
-            self.twilio_account_sid = ""
-        if "your_" in self.twilio_auth_token:
-            self.twilio_auth_token = ""
+        for placeholder_field in ["cpcb_api_key", "openai_api_key", "twilio_account_sid", "twilio_auth_token", "waqi_token"]:
+            val = getattr(self, placeholder_field, "")
+            if val and ("your_" in val or val in ("YOUR_TOKEN", "changeme")):
+                setattr(self, placeholder_field, "")
 
 
 @lru_cache()

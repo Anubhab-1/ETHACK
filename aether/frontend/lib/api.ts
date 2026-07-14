@@ -85,6 +85,9 @@ export interface ForecastPoint {
   predicted_category: string;
   confidence_lower: number | null;
   confidence_upper: number | null;
+  temp_c?: number | null;
+  wind_speed?: number | null;
+  method?: string;
 }
 
 export interface ForecastResponse {

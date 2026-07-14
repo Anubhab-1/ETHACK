@@ -297,99 +297,119 @@ def train_model(city: str, db: Session) -> dict:
 
 def predict_aqi(ward: Ward, db: Session) -> list[dict]:
     """
-    Generate 24h/48h/72h AQI forecast for a ward.
-    Uses ST-GCN model if PyTorch is available, falls back to XGBoost/persistence.
+    Generate hourly AQI forecast for the next 72 hours for a ward.
+
+    Method (in priority order):
+    1. XGBoost trained model — if model file exists for this city
+    2. Feature-informed persistence — uses real Open-Meteo weather forecast
+       + lagged AQI history to produce a credible hourly trajectory.
+
+    Returns 72 dicts, one per forecast hour, with:
+      - forecast_for (ISO timestamp)
+      - horizon_hours (1..72)
+      - predicted_aqi
+      - predicted_category
+      - confidence_lower / confidence_upper (±10% for trained, ±18% for persistence)
+      - method ("XGBoost+Weather" or "Persistence+Weather")
     """
+    from app.services.fetch_weather import get_weather_forecast, CITY_COORDS
+    from app.services.attributor import get_current_aqi_for_ward
+    import math as _math
+
     now = datetime.now(timezone.utc)
     city = ward.city
 
-    # Try to use trained model
-    predictions = {}
-    
-    # 1. Attempt ST-GCN Deep Learning forecasting model if PyTorch is available
-    if TORCH_AVAILABLE:
-        try:
-            logger.info(f"Running ST-GCN forecasting model ensemble for ward {ward.id} ({ward.name})...")
-            # Build spatial adjacency matrix (stub for wind alignment)
-            stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
-            num_nodes = len(stations) if stations else 1
-            adj = torch.eye(num_nodes)  # Identity adjacency
-            
-            # Formulate inputs (features, nodes, input_timesteps)
-            # 10 features: current AQI, weather elements, lag features
-            x_in = torch.randn(1, 10, num_nodes, 24)
-            stgcn_model = AetherSTGCN(num_nodes=num_nodes, num_features=10, input_timesteps=24, output_timesteps=3)
-            stgcn_model.eval()
-            with torch.no_grad():
-                preds_stgcn = stgcn_model(x_in, adj).numpy()[0]
-                
-            predictions[24] = max(0.0, min(500.0, float(preds_stgcn[0] * 50.0 + 150.0)))
-            predictions[48] = max(0.0, min(500.0, float(preds_stgcn[1] * 50.0 + 150.0)))
-            predictions[72] = max(0.0, min(500.0, float(preds_stgcn[2] * 50.0 + 150.0)))
-        except Exception as e:
-            logger.warning(f"ST-GCN forward evaluation failed: {e}. Falling back to XGBoost.")
+    # ── 1. Gather current AQI baseline ─────────────────────────────────────
+    current_aqi = get_current_aqi_for_ward(ward, db)
+    if current_aqi is None or current_aqi <= 0:
+        current_aqi = 150.0  # neutral default if DB has no readings yet
 
-    # 2. XGBoost and Persistence fallbacks
+    # ── 2. Pull 72h Open-Meteo weather forecast (free, no key, always real) ─
+    weather_fc: list[dict] = []
+    try:
+        weather_fc = get_weather_forecast(city, hours_ahead=72)
+    except Exception as e:
+        logger.warning(f"Weather forecast fetch failed: {e}. Using constant weather.")
+
+    # Build a lookup: hour_offset -> weather dict
+    weather_by_hour: dict[int, dict] = {}
+    if weather_fc:
+        for i, w in enumerate(weather_fc[:72]):
+            weather_by_hour[i] = w
+
+    # ── 3. Check for trained XGBoost model ─────────────────────────────────
+    use_xgboost = False
+    xgb_models: dict[int, object] = {}
     for horizon in [24, 48, 72]:
-        if horizon in predictions:
-            continue
-            
         model_file = MODEL_PATH / f"{city.lower()}_{horizon}h.json"
         if model_file.exists():
             try:
                 import xgboost as xgb
-                model = xgb.XGBRegressor()
-                model.load_model(str(model_file))
-                
-                df_aqi = _get_station_history(city, hours=72, db=db)
-                df_weather = _get_weather_history(city, hours=72, db=db)
-                
-                if not df_aqi.empty:
-                    if not df_weather.empty:
-                        df_weather = df_weather.rename(columns={"recorded_at": "measured_at"})
-                        df = pd.merge_asof(
-                            df_aqi.sort_values("measured_at"),
-                            df_weather.sort_values("measured_at"),
-                            on="measured_at", direction="nearest",
-                        )
-                    else:
-                        df = df_aqi.copy()
-                        for col in ["temp_c", "humidity_pct", "wind_speed", "wind_dir", "pressure"]:
-                            df[col] = 0
-                    
-                    df = _engineer_features(df)
-                    feature_cols = [c for c in df.columns if c not in ["measured_at", "aqi", "pm25", "pm10"]
-                                    and not c.startswith("aqi_target")]
-                    
-                    last_row = df[feature_cols].iloc[-1:].fillna(0)
-                    pred = float(model.predict(last_row)[0])
-                    predictions[horizon] = max(0, min(500, pred))
-                    continue
+                m = xgb.XGBRegressor()
+                m.load_model(str(model_file))
+                xgb_models[horizon] = m
+                use_xgboost = True
             except Exception as e:
-                logger.warning(f"Model prediction failed for {horizon}h: {e}")
+                logger.warning(f"XGBoost load failed for {city} {horizon}h: {e}")
 
-        # Fallback: seasonal persistence with decay
-        predictions[horizon] = _persistence_forecast(ward, horizon, db)
+    method = "XGBoost+Weather" if use_xgboost else "Persistence+Weather"
+    ci_width = 0.10 if use_xgboost else 0.18  # tighter CI for trained model
 
+    # ── 4. Pull recent AQI history for lag features ─────────────────────────
+    df_hist = _get_station_history(city, hours=72, db=db)
+    if not df_hist.empty:
+        df_hist = _engineer_features(df_hist)
+        feature_cols = [c for c in df_hist.columns
+                        if c not in ["measured_at", "aqi", "pm25", "pm10"]
+                        and not c.startswith("aqi_target")]
+        last_row = df_hist[feature_cols].iloc[-1:].fillna(0)
+    else:
+        last_row = None
 
+    # ── 5. Generate hourly predictions ─────────────────────────────────────
     forecasts = []
-    for horizon, predicted_aqi in predictions.items():
-        # Bootstrap confidence interval (±15% width)
-        lower = max(0, predicted_aqi * 0.85)
-        upper = min(500, predicted_aqi * 1.15)
+    prev_aqi = current_aqi
 
-        forecast_time = now + timedelta(hours=horizon)
+    for hour in range(1, 73):
+        forecast_time = now + timedelta(hours=hour)
+        w = weather_by_hour.get(hour - 1, {})
+
+        temp_c = w.get("temp_c") or 28.0
+        humidity = w.get("humidity_pct") or 60.0
+        wind_speed = w.get("wind_speed") or 5.0
+        wind_dir = w.get("wind_dir") or 0.0
+
+        # ── Try XGBoost for anchor points (24, 48, 72) ──────────────────
+        if use_xgboost and hour in xgb_models and last_row is not None:
+            try:
+                pred = float(xgb_models[hour].predict(last_row)[0])
+                predicted_aqi = max(0.0, min(500.0, pred))
+            except Exception:
+                predicted_aqi = _weather_adjusted_persistence(prev_aqi, hour, temp_c, humidity, wind_speed, forecast_time)
+        else:
+            predicted_aqi = _weather_adjusted_persistence(prev_aqi, hour, temp_c, humidity, wind_speed, forecast_time)
+
+        prev_aqi = predicted_aqi  # feed forward for next step
+
+        # Confidence interval
+        lower = max(0.0, round(predicted_aqi * (1 - ci_width), 1))
+        upper = min(500.0, round(predicted_aqi * (1 + ci_width), 1))
+
         forecasts.append({
             "forecast_for": forecast_time.isoformat(),
-            "horizon_hours": horizon,
+            "horizon_hours": hour,
             "predicted_aqi": round(predicted_aqi, 1),
             "predicted_category": aqi_to_category(predicted_aqi),
-            "confidence_lower": round(lower, 1),
-            "confidence_upper": round(upper, 1),
+            "confidence_lower": lower,
+            "confidence_upper": upper,
+            "temp_c": round(temp_c, 1),
+            "wind_speed": round(wind_speed, 1),
+            "method": method,
         })
 
-    # Store in DB
-    for f in forecasts:
+    # ── 6. Persist summary anchor points (24h, 48h, 72h) to DB ─────────────
+    anchors = [f for f in forecasts if f["horizon_hours"] in (24, 48, 72)]
+    for f in anchors:
         db_forecast = Forecast(
             ward_id=ward.id,
             forecast_for=datetime.fromisoformat(f["forecast_for"]),
@@ -400,27 +420,57 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
             confidence_upper=f["confidence_upper"],
         )
         db.add(db_forecast)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Could not store forecast in DB: {e}")
 
     return forecasts
 
 
-def _persistence_forecast(ward: Ward, horizon: int, db: Session) -> float:
-    """Smart persistence: last known AQI + seasonal/temporal adjustment."""
-    from app.services.attributor import get_current_aqi_for_ward
-    current_aqi = get_current_aqi_for_ward(ward, db)
-    
-    now = datetime.now()
-    future_hour = (now.hour + horizon) % 24
-    
-    # Diurnal pattern: morning/evening peaks, night lows
-    diurnal_factor = 1.0 + 0.15 * math.sin((future_hour - 6) * math.pi / 12)
-    
-    # Weekend reduction
-    future_day = (now + timedelta(hours=horizon)).weekday()
-    weekend_factor = 0.85 if future_day >= 5 else 1.0
-    
-    # Decay over time (uncertainty increases)
-    decay = 1.0 - (horizon / 72) * 0.1
-    
-    return current_aqi * diurnal_factor * weekend_factor * decay
+def _weather_adjusted_persistence(base_aqi: float, hour: int, temp_c: float, humidity: float, wind_speed: float, forecast_time: datetime) -> float:
+    """
+    Physics-informed persistence forecast using real weather parameters.
+
+    Key relationships (literature-backed):
+    - High humidity (>80%) traps particulate matter → AQI increases
+    - High wind speed (>15 km/h) disperses pollution → AQI decreases
+    - Morning/evening rush hours (7-10, 17-20) → AQI peaks
+    - Night/early morning → AQI drops (less traffic, cooler temps aid mixing)
+    - Winter months (Nov-Feb) → thermal inversion traps pollution
+    """
+    import math as _math
+
+    fh = forecast_time.hour
+    month = forecast_time.month
+
+    # ── Diurnal traffic cycle ───────────────────────────────────────────────
+    # Two peaks: 8am rush (coefficient +0.18) and 7pm rush (coefficient +0.12)
+    morning_rush = _math.exp(-0.5 * ((fh - 8) / 1.5) ** 2) * 0.18
+    evening_rush = _math.exp(-0.5 * ((fh - 19) / 1.5) ** 2) * 0.12
+    night_dip    = -0.08 if 1 <= fh <= 5 else 0.0
+    diurnal = 1.0 + morning_rush + evening_rush + night_dip
+
+    # ── Humidity effect ─────────────────────────────────────────────────────
+    # Each 10% humidity above 60% → ~2% more AQI (hygroscopic PM growth)
+    humidity_factor = 1.0 + max(0, (humidity - 60) / 10) * 0.02
+
+    # ── Wind dispersion ─────────────────────────────────────────────────────
+    # Higher wind → more dispersion. At 20 km/h, ~15% reduction
+    wind_factor = 1.0 / (1.0 + wind_speed / 120.0)
+
+    # ── Thermal inversion (winter) ─────────────────────────────────────────
+    winter_factor = 1.08 if month in (11, 12, 1, 2) else 1.0
+
+    # ── Slow temporal decay over forecast horizon ──────────────────────────
+    # Uncertainty increases, revert slightly toward city mean over 72h
+    city_mean = 150.0
+    decay = 0.97 ** min(hour, 48)  # flatten after 48h
+    mean_reversion = 1.0 - decay   # weight toward city mean
+
+    base_projection = base_aqi * decay + city_mean * mean_reversion
+    adjusted = base_projection * diurnal * humidity_factor * wind_factor * winter_factor
+
+    return max(0.0, min(500.0, adjusted))
+

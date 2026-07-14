@@ -26,6 +26,38 @@ def health_check(db: Session = Depends(get_db)):
     )
 
 
+@router.get("/health/data-sources")
+def data_source_status():
+    """
+    Returns real-time status of all external data sources.
+    Used by the frontend to show the Data Sources transparency badge.
+    """
+    from app.scripts.refresh_data import LAST_REFRESH_STATUS
+    from datetime import datetime, timezone
+
+    waqi_configured = bool(settings.waqi_token)
+    openai_configured = bool(settings.openai_api_key)
+
+    cities_status = {}
+    for city, status in LAST_REFRESH_STATUS.items():
+        cities_status[city] = {
+            "aqi_source": "WAQI/CPCB" if status.get("status") == "ok" else "Fallback",
+            "readings_inserted": status.get("readings_inserted", 0),
+            "fetched_at": status.get("fetched_at"),
+            "status": status.get("status", "unknown"),
+        }
+
+    return {
+        "waqi_configured": waqi_configured,
+        "openai_configured": openai_configured,
+        "weather_source": "Open-Meteo (real, no key)",
+        "satellite_source": "Open-Meteo Air Quality API (real, no key)",
+        "cities": cities_status,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+
 @router.get("/cities")
 def list_cities(db: Session = Depends(get_db)):
     from app.models import Station
