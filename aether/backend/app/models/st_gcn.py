@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 # Try to import torch and torch_geometric
 try:
-    import torch
-    import torch.nn as nn
+    import torch  # type: ignore
+    import torch.nn as nn  # type: ignore
     TORCH_AVAILABLE = True
 except Exception:
     TORCH_AVAILABLE = False
@@ -25,7 +25,7 @@ except Exception:
     logger.warning("torch not available. STGCN models will stub out.")
 
 try:
-    from torch_geometric.nn import GCNConv
+    from torch_geometric.nn import GCNConv  # type: ignore
 except Exception:
     if TORCH_AVAILABLE:
         class GCNConv(nn.Module):

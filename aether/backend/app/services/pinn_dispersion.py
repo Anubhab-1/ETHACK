@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 # Try to import torch for PINN physics-informed learning
 try:
-    import torch
-    import torch.nn as nn
+    import torch  # type: ignore
+    import torch.nn as nn  # type: ignore
     TORCH_AVAILABLE = True
 except Exception:
     TORCH_AVAILABLE = False

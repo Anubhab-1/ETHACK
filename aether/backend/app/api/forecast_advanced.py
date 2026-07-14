@@ -18,7 +18,7 @@ from app.models import Reading, Station, Ward, Weather
 from app.models.st_gcn import TORCH_AVAILABLE, AetherSTGCN, build_wind_aligned_graph
 
 if TORCH_AVAILABLE:
-    import torch
+    import torch  # type: ignore
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/forecast-advanced", tags=["forecast"])
