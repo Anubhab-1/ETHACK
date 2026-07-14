@@ -101,8 +101,10 @@ class AetherKnowledgeGraph:
                         "lat": ward.lat + i * 0.002,
                         "lon": ward.lon + i * 0.002,
                         "permit_status": "active" if permit_valid else "expired",
+                        "permit_valid": permit_valid,
                         "days_since_inspection": last_inspection_days,
                         "historical_violations": violation_count,
+                        "violation_count": violation_count,
                         "risk_score": round(
                             (violation_count * 0.15 + (0.3 if not permit_valid else 0) +
                              min(1.0, last_inspection_days / 200) * 0.2), 2
@@ -117,12 +119,16 @@ class AetherKnowledgeGraph:
                     node_id=stack_id,
                     node_type="Stack",
                     props={
+                        "name": f"Stack {i+1}",
                         "industry_id": industry_id,
                         "lat": ward.lat + i * 0.002,
                         "lon": ward.lon + i * 0.002,
                         "pm25_mg_nm3": round(max(20, pm_emission), 1),
                         "so2_mg_nm3": round(ward.industrial_score * 0.4, 1),
                         "compliant": pm_emission <= 150,
+                        "height": rng.randint(20, 80),
+                        "diameter": round(rng.uniform(1.0, 4.0), 1),
+                        "cems_active": rng.random() > 0.1,
                     }
                 )
 
@@ -140,16 +146,23 @@ class AetherKnowledgeGraph:
                     violation_id = f"VIO-{ward.ward_no:03d}-{i+1:02d}-{v+1:02d}"
                     days_ago = rng.randint(5, 180)
                     severity = rng.choice(["low", "medium", "high", "critical"])
+                    violation_type = rng.choice(["excess_pm_emissions", "permit_expired", "cpcb_norm_violation"])
+                    regulatory_limit = 150.0
+                    measured_value = round(regulatory_limit + rng.uniform(10.0, 120.0), 1)
 
                     self._add_node(
                         node_id=violation_id,
                         node_type="Violation",
                         props={
+                            "name": violation_type.replace("_", " ").title(),
                             "industry_id": industry_id,
                             "date": (datetime.utcnow() - timedelta(days=days_ago)).strftime("%Y-%m-%d"),
                             "severity": severity,
-                            "type": rng.choice(["excess_pm_emissions", "permit_expired", "cpcb_norm_violation"]),
+                            "type": violation_type,
                             "days_ago": days_ago,
+                            "pollutant": "PM2.5" if violation_type == "excess_pm_emissions" else "N/A",
+                            "measured_value": measured_value,
+                            "regulatory_limit": regulatory_limit,
                         }
                     )
 
@@ -159,11 +172,15 @@ class AetherKnowledgeGraph:
                     if severity in ["high", "critical"]:
                         enforcement_id = f"ENF-{ward.ward_no:03d}-{i+1:02d}-{v+1:02d}"
                         ate = round(rng.uniform(-80, -20), 1)  # AQI drop
+                        action_type = rng.choice(["show_cause_notice", "closure_direction", "penalty"])
                         self._add_node(
                             node_id=enforcement_id,
                             node_type="EnforcementAction",
                             props={
-                                "type": rng.choice(["show_cause_notice", "closure_direction", "penalty"]),
+                                "name": action_type.replace("_", " ").title(),
+                                "action_type": action_type.replace("_", " ").title(),
+                                "severity": severity.title(),
+                                "enforcing_authority": "West Bengal Pollution Control Board",
                                 "status": rng.choice(["issued", "complied", "pending_court"]),
                                 "issued_date": (datetime.utcnow() - timedelta(days=days_ago - 5)).strftime("%Y-%m-%d"),
                                 "outcome_aqi_drop": ate if ate < -30 else None,
@@ -174,19 +191,34 @@ class AetherKnowledgeGraph:
                         self._add_edge(violation_id, enforcement_id, "TRIGGERS", {})
                         self._add_edge(enforcement_id, industry_id, "TARGETS", {})
 
+                        # Add outcome node if drop is substantial
+                        if ate < -30:
+                            outcome_id = f"OUT-{ward.ward_no:03d}-{i+1:02d}-{v+1:02d}"
+                            self._add_node(
+                                node_id=outcome_id,
+                                node_type="Outcome",
+                                props={
+                                    "name": "Intervention Outcome",
+                                    "aqi_drop_effect": f"{abs(ate)} AQI Point Drop",
+                                    "causal_p_value": round(rng.uniform(0.001, 0.049), 3),
+                                    "health_savings_lakhs": round(rng.uniform(5.0, 50.0), 1),
+                                }
+                            )
+                            self._add_edge(enforcement_id, outcome_id, "RESULTED_IN", {})
+
         logger.info(f"Knowledge graph seeded: {len(self._nodes)} nodes, {len(self._edges)} edges")
 
     # ─── Internal graph ops ────────────────────────────────────────────────────
 
     def _add_node(self, node_id: str, node_type: str, props: Dict):
-        self._nodes[node_id] = {"id": node_id, "type": node_type, **props}
+        self._nodes[node_id] = {"id": node_id, **props, "type": node_type}
         if _NX_AVAILABLE and self._graph is not None:
-            self._graph.add_node(node_id, node_type=node_type, **props)
+            self._graph.add_node(node_id, **props, node_type=node_type)
 
     def _add_edge(self, src: str, dst: str, rel_type: str, props: Dict):
-        self._edges.append({"src": src, "dst": dst, "rel": rel_type, **props})
+        self._edges.append({"src": src, "dst": dst, **props, "rel": rel_type})
         if _NX_AVAILABLE and self._graph is not None:
-            self._graph.add_edge(src, dst, rel_type=rel_type, **props)
+            self._graph.add_edge(src, dst, **props, rel_type=rel_type)
 
     # ─── Query API ─────────────────────────────────────────────────────────────
 
@@ -225,24 +257,59 @@ class AetherKnowledgeGraph:
         # Compile result
         graph_nodes = []
         graph_edges = []
+        seen_node_ids = set()
 
         if ward_node_id in self._nodes:
             graph_nodes.append(self._nodes[ward_node_id])
+            seen_node_ids.add(ward_node_id)
 
         for ind_id in industries_in_ward:
-            if ind_id in self._nodes:
+            if ind_id in self._nodes and ind_id not in seen_node_ids:
                 graph_nodes.append(self._nodes[ind_id])
+                seen_node_ids.add(ind_id)
             for stack_id in stacks_in_ward:
                 if stack_id in self._nodes:
                     stack = self._nodes[stack_id]
                     if stack.get("industry_id") == ind_id:
-                        graph_nodes.append(stack)
+                        if stack_id not in seen_node_ids:
+                            graph_nodes.append(stack)
+                            seen_node_ids.add(stack_id)
                         graph_edges.append({"source": ind_id, "target": stack_id, "relation": "OPERATES"})
                         graph_edges.append({"source": stack_id, "target": ward_node_id, "relation": "EMITS_INTO"})
 
             for vio in violations_by_industry.get(ind_id, []):
-                graph_nodes.append(vio)
-                graph_edges.append({"source": ind_id, "target": vio["id"], "relation": "HAS_VIOLATION"})
+                vio_id = vio["id"]
+                if vio_id not in seen_node_ids:
+                    graph_nodes.append(vio)
+                    seen_node_ids.add(vio_id)
+                graph_edges.append({"source": ind_id, "target": vio_id, "relation": "HAS_VIOLATION"})
+
+                # Find enforcement actions triggered by this violation
+                triggered_enforcements = [
+                    self._nodes[e["dst"]]
+                    for e in self._edges
+                    if e["rel"] == "TRIGGERS" and e["src"] == vio_id and e["dst"] in self._nodes
+                ]
+                for enf in triggered_enforcements:
+                    enf_id = enf["id"]
+                    if enf_id not in seen_node_ids:
+                        graph_nodes.append(enf)
+                        seen_node_ids.add(enf_id)
+                    graph_edges.append({"source": vio_id, "target": enf_id, "relation": "TRIGGERS"})
+                    graph_edges.append({"source": enf_id, "target": ind_id, "relation": "TARGETS"})
+
+                    # Find outcomes resulting from this enforcement action
+                    resulting_outcomes = [
+                        self._nodes[e["dst"]]
+                        for e in self._edges
+                        if e["rel"] == "RESULTED_IN" and e["src"] == enf_id and e["dst"] in self._nodes
+                    ]
+                    for out in resulting_outcomes:
+                        out_id = out["id"]
+                        if out_id not in seen_node_ids:
+                            graph_nodes.append(out)
+                            seen_node_ids.add(out_id)
+                        graph_edges.append({"source": enf_id, "target": out_id, "relation": "RESULTED_IN"})
 
         # Top risk industries
         industry_nodes = [n for n in graph_nodes if n.get("type") == "Industry"]

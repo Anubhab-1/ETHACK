@@ -473,10 +473,14 @@ export function InteractiveKnowledgeGraph({ wardId }: InteractiveKnowledgeGraphP
               )}
               {hoveredNode.type === "Violation" && (
                 <>
-                  <p><span className="text-slate-500">POLLUTANT:</span> {hoveredNode.props.pollutant}</p>
-                  <p><span className="text-slate-500">MEASURED:</span> {hoveredNode.props.measured_value} ug/m³</p>
-                  <p><span className="text-slate-500">LIMIT:</span> {hoveredNode.props.regulatory_limit} ug/m³</p>
-                  <p className="text-orange-400 mt-1 whitespace-pre-wrap leading-normal font-sans">Warning threshold violated by {(hoveredNode.props.measured_value - hoveredNode.props.regulatory_limit).toFixed(1)} units.</p>
+                  <p><span className="text-slate-500">POLLUTANT:</span> {hoveredNode.props.pollutant || "N/A"}</p>
+                  <p><span className="text-slate-500">MEASURED:</span> {hoveredNode.props.measured_value || 0} ug/m³</p>
+                  <p><span className="text-slate-500">LIMIT:</span> {hoveredNode.props.regulatory_limit || 0} ug/m³</p>
+                  {hoveredNode.props.measured_value !== undefined && hoveredNode.props.regulatory_limit !== undefined && (
+                    <p className="text-orange-400 mt-1 whitespace-pre-wrap leading-normal font-sans">
+                      Warning threshold violated by {(hoveredNode.props.measured_value - hoveredNode.props.regulatory_limit).toFixed(1)} units.
+                    </p>
+                  )}
                 </>
               )}
               {hoveredNode.type === "EnforcementAction" && (
