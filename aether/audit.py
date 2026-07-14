@@ -1,11 +1,30 @@
 """
 AETHER -- Full Platform Functional Audit Script
-Tests every backend API endpoint and reports pass/fail with response data.
 """
 import requests
 import json
 import sys
 import os
+
+class TeeStdout:
+    def __init__(self, filepath):
+        self.file = open(filepath, "w", encoding="utf-8")
+        self.stdout = sys.stdout
+
+    def write(self, data):
+        self.stdout.write(data)
+        self.file.write(data)
+        self.file.flush()
+
+    def flush(self):
+        self.stdout.flush()
+        self.file.flush()
+
+    def close(self):
+        self.file.close()
+
+# Redirect stdout to both console and audit_result.txt with explicit UTF-8 encoding
+sys.stdout = TeeStdout("audit_result.txt")
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
@@ -31,7 +50,8 @@ def get(path, **params):
     return r.json()
 
 def post(path, body):
-    r = requests.post(f"{BASE}{path}", json=body, timeout=20)
+    headers = {"X-Admin-Key": "supersecretkey"}
+    r = requests.post(f"{BASE}{path}", json=body, headers=headers, timeout=20)
     r.raise_for_status()
     return r.json()
 
@@ -122,7 +142,8 @@ test("GET /api/enforcement/stats?city=Kolkata", check_enf_stats)
 
 # 15. Recompute enforcement
 def check_recompute():
-    r = requests.post(f"{BASE}/api/enforcement/recompute?city=Kolkata", timeout=30)
+    headers = {"X-Admin-Key": "supersecretkey"}
+    r = requests.post(f"{BASE}/api/enforcement/recompute?city=Kolkata", headers=headers, timeout=30)
     r.raise_for_status()
     return f"HTTP {r.status_code} OK"
 test("POST /api/enforcement/recompute", check_recompute)

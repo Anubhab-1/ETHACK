@@ -2,7 +2,8 @@ from __future__ import annotations
 """AETHER — Attribution and Enforcement endpoints v2.0.
 Includes PMF/NMF source apportionment with 95% CI (Phase 2 National Upgrade).
 """
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, HTTPException
+from app.config import get_settings
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Ward, Attribution, EnforcementAction
@@ -195,8 +196,15 @@ def update_enforcement_status(
 
 
 @router.post("/enforcement/{action_id}/broadcast")
-def broadcast_alerts(action_id: int, db: Session = Depends(get_db)):
+def broadcast_alerts(
+    action_id: int,
+    db: Session = Depends(get_db),
+    x_admin_key: str | None = Header(None, alias="X-Admin-Key"),
+):
     """Broadcast localized alerts to residents in the ward. Simulates and sends IVR / WhatsApp / SMS alerts."""
+    settings = get_settings()
+    if x_admin_key != settings.admin_key:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid X-Admin-Key")
     import random
     import requests
     from app.config import get_settings
@@ -258,8 +266,15 @@ def broadcast_alerts(action_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/enforcement/{action_id}/alert/confirm")
-def confirm_alert_receipt(action_id: int, db: Session = Depends(get_db)):
+def confirm_alert_receipt(
+    action_id: int,
+    db: Session = Depends(get_db),
+    x_admin_key: str | None = Header(None, alias="X-Admin-Key"),
+):
     """Simulate a citizen confirming receipt of alert via WhatsApp or IVR response."""
+    settings = get_settings()
+    if x_admin_key != settings.admin_key:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid X-Admin-Key")
     action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -307,7 +322,11 @@ def recompute_queue(
     background_tasks: BackgroundTasks,
     city: str = Query("Kolkata"),
     db: Session = Depends(get_db),
+    x_admin_key: str | None = Header(None, alias="X-Admin-Key"),
 ):
+    settings = get_settings()
+    if x_admin_key != settings.admin_key:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid X-Admin-Key")
     """
     Trigger an async recompute of the enforcement priority queue for all wards.
     Returns 202 Accepted immediately; computation runs in the background.

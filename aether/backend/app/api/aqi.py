@@ -43,9 +43,32 @@ def idw_interpolate(target_lat: float, target_lon: float, points: list) -> float
     return round(total_v / total_w, 1)
 
 
+def ensure_readings_exist(city: str, db: Session):
+    """Ensure that at least one station in the city has Reading rows. If not, trigger synchronous live CPCB fetch."""
+    import logging
+    log = logging.getLogger(__name__)
+    stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+    station_ids = [st.id for st in stations]
+    if not station_ids:
+        return
+    
+    has_readings = db.query(Reading).filter(Reading.station_id.in_(station_ids)).first() is not None
+    if not has_readings:
+        log.info(f"No readings found in DB for {city} stations. Fetching live CPCB data synchronously...")
+        try:
+            from app.services.fetch_cpcb import fetch_live_cpcb, upsert_readings
+            station_map = {s.station_code: s for s in stations}
+            records = fetch_live_cpcb(city=city, db=db)
+            upsert_readings(records, station_map, db)
+            log.info(f"Synchronous live CPCB data fetch for {city} complete.")
+        except Exception as e:
+            log.error(f"Synchronous live CPCB fetch failed for {city}: {e}")
+
+
 @router.get("/aqi/live")
 def get_live_aqi(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     """Get latest AQI reading per station with batch fetching."""
+    ensure_readings_exist(city, db)
     # Subquery for latest reading per station
     latest_readings = db.query(
         Reading.station_id,
@@ -83,6 +106,7 @@ def get_live_aqi(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
 @router.get("/aqi/heatmap")
 def get_aqi_heatmap(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     """Get interpolated AQI for each ward center using batched readings."""
+    ensure_readings_exist(city, db)
     latest_readings = db.query(
         Reading.station_id,
         func.max(Reading.measured_at).label("latest_time")

@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     twilio_from_number: str = ""
     twilio_to_number: str = ""
 
+    # Admin security key — set ADMIN_KEY env var on Render
+    admin_key: str = "supersecretkey"
+
     # CPCB API
     cpcb_resource_id: str = "3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69"
     cpcb_api_base: str = "https://api.data.gov.in/resource"

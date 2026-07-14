@@ -8,10 +8,6 @@ pandas==2.2.2
 numpy==1.26.4
 scikit-learn==1.5.0
 xgboost==2.0.3
-geopandas==0.14.4
-osmnx==1.9.3
-langchain==0.2.5
-langchain-openai==0.1.9
 openai==1.35.3
 pydantic==2.7.4
 pydantic-settings==2.3.4
@@ -25,9 +21,5 @@ joblib==1.4.2
 networkx==3.1
 # Phase 4: Inspector Routing
 ortools==9.10.4067
-# Phase 2: Feature importance for risk scoring
-shap==0.45.1
-# Database & Streaming drivers
+# Database drivers
 psycopg2-binary==2.9.9
-kafka-python==2.0.2
-

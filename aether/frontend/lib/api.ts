@@ -239,7 +239,10 @@ export const api = {
     apiFetch<EnforcementStats>(`/api/enforcement/stats?city=${encodeURIComponent(city)}`),
 
   recomputeEnforcement: (city = "Kolkata") =>
-    apiFetch(`/api/enforcement/recompute?city=${encodeURIComponent(city)}`, { method: "POST" }),
+    apiFetch(`/api/enforcement/recompute?city=${encodeURIComponent(city)}`, {
+      method: "POST",
+      headers: { "X-Admin-Key": "supersecretkey" },
+    }),
 
   advisory: (question: string, language: string, lat?: number, lon?: number, sessionId?: string) =>
     apiFetch<AdvisoryResponse>("/api/advisory/ask", {
@@ -311,7 +314,10 @@ export const api = {
       alerts_sent: number;
       alerts_confirmed: number;
       updated: boolean;
-    }>(`/api/enforcement/${actionId}/broadcast`, { method: "POST" }),
+    }>(`/api/enforcement/${actionId}/broadcast`, {
+      method: "POST",
+      headers: { "X-Admin-Key": "supersecretkey" },
+    }),
 
   confirmAlertReceipt: (actionId: number) =>
     apiFetch<{
@@ -319,7 +325,10 @@ export const api = {
       alerts_sent: number;
       alerts_confirmed: number;
       ratio: number;
-    }>(`/api/enforcement/${actionId}/alert/confirm`, { method: "POST" }),
+    }>(`/api/enforcement/${actionId}/alert/confirm`, {
+      method: "POST",
+      headers: { "X-Admin-Key": "supersecretkey" },
+    }),
 
   diagnostics: (city = "Kolkata") =>
     apiFetch<{

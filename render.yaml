@@ -1,6 +1,12 @@
 # Render Blueprint — AETHER Platform
 # Docs: https://render.com/docs/blueprint-spec
 
+databases:
+  - name: aether-db
+    databaseName: aether_db
+    user: aether_user
+    plan: free
+
 services:
   # ── FastAPI Backend ────────────────────────────────────────────────────────
   - type: web
@@ -11,7 +17,9 @@ services:
     plan: free
     envVars:
       - key: DATABASE_URL
-        value: sqlite:///./aether.db
+        fromDatabase:
+          name: aether-db
+          property: connectionString
       - key: DEFAULT_CITY
         value: Kolkata
       - key: APP_ENV

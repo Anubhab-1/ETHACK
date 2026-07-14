@@ -1,0 +1,22 @@
+﻿# Dev-only / notebook dependencies -- NOT installed on Render free tier
+# Install locally with: pip install -r requirements-dev.txt
+-r requirements.txt
+
+# Geospatial (heavy binary wheels)
+geopandas==0.14.4
+osmnx==1.9.3
+
+# LLM orchestration (not used in request-serving path)
+langchain==0.2.5
+langchain-openai==0.1.9
+
+# SHAP explainability (optional, gracefully skipped if absent)
+shap==0.45.1
+
+# Kafka streaming pipeline stubs (falls back to APScheduler)
+kafka-python==2.0.2
+
+# Notebook / analysis tooling
+jupyter
+matplotlib
+seaborn
