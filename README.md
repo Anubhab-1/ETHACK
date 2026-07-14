@@ -85,7 +85,7 @@ ETHACK/
 
 ---
 
-## ✅ Current Build Status (as of 2026-07-13)
+## ✅ Current Build Status (as of 2026-07-14)
 
 ### What Works End-to-End
 
@@ -122,6 +122,7 @@ ETHACK/
 
 | Key | Source | What It Unlocks |
 |---|---|---|
+| `WAQI_TOKEN` | [aqicn.org/api/](https://aqicn.org/api/) | Real-time CPCB station feeds across India |
 | `CPCB_API_KEY` | [data.gov.in](https://data.gov.in) | Live CPCB station readings (800+ stations) |
 | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) | GPT-4o-mini briefings + LLM advisory |
 
