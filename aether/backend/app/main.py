@@ -1,12 +1,16 @@
-from __future__ import annotations
 """
 AETHER — FastAPI Main Application
 Urban Air Quality Intelligence Platform
 """
+
+from __future__ import annotations
+
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.config import get_settings
 from app.database import create_tables
 
@@ -22,24 +26,29 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup: create tables, seed initial data, and start scheduler."""
     logger.info("🌫️  AETHER starting up...")
-    
+
     import os
     import sys
     is_testing = os.environ.get("APP_ENV") == "testing" or "pytest" in sys.modules
 
     if not is_testing:
         create_tables()
-        
+
         # Seed data on first run
         from app.database import SessionLocal
         db = SessionLocal()
         try:
-            from app.models import Station, CitizenReport, Ward
             from datetime import datetime
+
+            from app.models import CitizenReport, Station, Ward
             if db.query(Station).count() == 0:
                 logger.info("First run detected — seeding stations and wards...")
                 from app.scripts.seed_stations import seed_all_stations
-                from app.scripts.seed_wards import seed_kolkata_wards, seed_delhi_wards, seed_mumbai_wards
+                from app.scripts.seed_wards import (
+                    seed_delhi_wards,
+                    seed_kolkata_wards,
+                    seed_mumbai_wards,
+                )
                 seed_all_stations(db)
                 seed_kolkata_wards(db)
                 seed_delhi_wards(db)
@@ -50,7 +59,7 @@ async def lifespan(app: FastAPI):
                 kolkata_wards = db.query(Ward).filter(Ward.city == "Kolkata").limit(5).all()
                 delhi_wards = db.query(Ward).filter(Ward.city == "Delhi").limit(2).all()
                 mumbai_wards = db.query(Ward).filter(Ward.city == "Mumbai").limit(2).all()
-                
+
                 reports = []
                 if len(kolkata_wards) >= 3:
                     reports.append(CitizenReport(
@@ -120,7 +129,7 @@ async def lifespan(app: FastAPI):
                         upvote_count=8,
                         created_at=datetime.utcnow()
                     ))
-                
+
                 if reports:
                     db.add_all(reports)
                     db.commit()
@@ -141,8 +150,8 @@ async def lifespan(app: FastAPI):
 
         # Seed Knowledge Graph (in-memory graph of industries, violations, outcomes)
         try:
-            from app.services.knowledge_graph import seed_knowledge_graph
             from app.database import SessionLocal as KGSession
+            from app.services.knowledge_graph import seed_knowledge_graph
             kg_db = KGSession()
             seed_knowledge_graph(db=kg_db, city="Kolkata")
             kg_db.close()
@@ -197,8 +206,23 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Request-ID", "Accept"],
 )
 
-from app.api import health, aqi, forecast, attribution, advisory, agents, diagnostics, simulation, reports, ws
-from app.api import forecast_advanced, attribution_advanced, causal_impact, enforcement_advanced, agents_advanced
+from app.api import (  # noqa: E402
+    advisory,
+    agents,
+    agents_advanced,
+    aqi,
+    attribution,
+    attribution_advanced,
+    causal_impact,
+    diagnostics,
+    enforcement_advanced,
+    forecast,
+    forecast_advanced,
+    health,
+    reports,
+    simulation,
+    ws,
+)
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(aqi.router, prefix="/api", tags=["AQI"])

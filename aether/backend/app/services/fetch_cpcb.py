@@ -1,15 +1,19 @@
-from __future__ import annotations
 """
 AETHER — CPCB AQI Data Fetcher
 Fetches live AQI data from data.gov.in API (CPCB).
 Falls back to generated realistic data if API key is not set.
 """
-import requests
+
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
+
+import requests
 from sqlalchemy.orm import Session
-from app.models import Station, Reading
+
 from app.config import get_settings
+from app.models import Reading
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -105,13 +109,13 @@ def fetch_live_cpcb(city: str = "Kolkata", db: Session = None) -> list[dict]:
 
 def _generate_fallback_data(city: str) -> list[dict]:
     """Generate realistic fallback data when API key is unavailable."""
-    import random
     import math
-    
+    import random
+
     hour = datetime.now().hour
     # Morning rush / evening rush / night pattern
     base_aqi = 80 + 40 * math.sin((hour - 8) * math.pi / 12) + random.uniform(-20, 20)
-    
+
     stations_data = _get_city_station_defaults(city)
     results = []
     for s in stations_data:

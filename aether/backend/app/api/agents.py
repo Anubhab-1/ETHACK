@@ -1,4 +1,3 @@
-from __future__ import annotations
 """
 AETHER — Hierarchical Multi-Agent Intelligence Engine v2.0
 National Upgrade: 5 specialist agents with real tool use + constitutional deliberation.
@@ -18,37 +17,38 @@ Constitutional Principles (enforced before every decree):
   4. LEGAL DEFENSIBILITY: Enforcement actions cite specific legal provisions
   5. PRECEDENT: Past interventions and their measured outcomes are considered
 """
-import logging
+
+from __future__ import annotations
+
 import json
-from typing import List, Dict, Optional, Any
+import logging
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+from app.config import get_settings
 from app.database import get_db
 from app.models import Ward, Weather
-from app.config import get_settings
-from app.services.agent_tools import invoke_tool, TOOL_REGISTRY
-from app.services.causal_impact import compute_causal_impact, get_intervention_history_for_ward
-from app.services.knowledge_graph import get_knowledge_graph
+from app.schemas import AgentSimulationResponse, AgentTurn, CausalEvidence
+from app.services.agent_committee import (
+    AGENT_CONFIGS,
+    _get_recommended_action,
+    run_agent_react_loop,
+    run_constitutional_checks,
+    synthesize_decree,
+)
+from app.services.agent_tools import TOOL_REGISTRY, invoke_tool
 from app.services.attributor import get_current_aqi_for_ward
-from app.api.forecast import find_nearest_ward
-import math
-from datetime import datetime
+from app.services.causal_impact import (
+    compute_causal_impact,
+)
+from app.services.knowledge_graph import get_knowledge_graph
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter()
-
-
-from app.schemas import AgentSimulationResponse, AgentTurn, CausalEvidence
-from app.services.agent_committee import (
-    run_agent_react_loop,
-    run_constitutional_checks,
-    synthesize_decree,
-    AGENT_CONFIGS,
-    _get_recommended_action
-)
-
 
 # ─── Main Endpoint ────────────────────────────────────────────────────────────
 
@@ -268,7 +268,7 @@ def process_voice_command(
     command_text = req.command
     city_context = req.city
     wards_list = req.wards
-    
+
     # ─── Fallback Local Rules Parser ───
     def local_fallback():
         text = command_text.lower()
@@ -277,7 +277,7 @@ def process_voice_command(
             "parameters": {},
             "speech_response": "Command not understood."
         }
-        
+
         # City switch
         for c in ["delhi", "mumbai", "kolkata"]:
             if c in text:
@@ -285,7 +285,7 @@ def process_voice_command(
                 res["parameters"]["city"] = c.capitalize()
                 res["speech_response"] = f"Switching view to {c.capitalize()}."
                 return res
-                
+
         # Toggle layers
         if "wind" in text:
             res["action"] = "toggle_layer"
@@ -305,7 +305,7 @@ def process_voice_command(
             res["parameters"]["layer_state"] = None
             res["speech_response"] = "Toggling citizen incident feed."
             return res
-            
+
         # Action triggers
         if "committee" in text or "simulation" in text or "run" in text or "convene" in text:
             res["action"] = "run_simulation"
@@ -316,7 +316,7 @@ def process_voice_command(
             res["parameters"]["briefing"] = True
             res["speech_response"] = "Synthesizing executive briefing."
             return res
-            
+
         # Focus ward
         for w in wards_list:
             if w.lower() in text:
@@ -324,14 +324,14 @@ def process_voice_command(
                 res["parameters"]["ward_name"] = w
                 res["speech_response"] = f"Centering map on {w} ward."
                 return res
-                
+
         return res
 
     # Check for LLM key
     if not settings.openai_api_key:
         logger.info("No LLM key — using local rules fallback for voice routing")
         return local_fallback()
-        
+
     try:
         from openai import OpenAI
         client = OpenAI(
@@ -340,7 +340,7 @@ def process_voice_command(
             timeout=5.0,
             max_retries=0
         )
-        
+
         system_prompt = f"""You are AETHER Jarvis, a smart city voice interface router.
 Given a spoken command, the current city, and a list of available wards in that city, map the user's intent to one of the structured actions.
 
@@ -375,12 +375,12 @@ Response must contain ONLY the valid JSON, no markdown code block tags, no comme
             temperature=0.0,
             response_format={"type": "json_object"}
         )
-        
+
         content = resp.choices[0].message.content.strip()
         parsed = json.loads(content)
         logger.info(f"Jarvis LLM match: {parsed}")
         return parsed
-        
+
     except Exception as e:
         logger.warning(f"Voice LLM match failed: {e}. Falling back to local rules.")
         return local_fallback()

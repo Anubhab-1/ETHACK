@@ -1,15 +1,19 @@
-from __future__ import annotations
 """
 AETHER — Live WebSocket Telemetry Route
 Pushes real-time station AQI readings to connected clients.
 """
+
+from __future__ import annotations
+
 import asyncio
 import logging
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import func
-from app.database import SessionLocal
-from app.models import Station, Reading
+
 from app.api.aqi import aqi_to_category
+from app.database import SessionLocal
+from app.models import Reading, Station
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -23,15 +27,15 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
     """
     await websocket.accept()
     logger.info(f"🔌 WebSocket subscriber connected: city={city}")
-    
+
     try:
         while True:
             db = SessionLocal()
             try:
-                stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+                stations = db.query(Station).filter(Station.city == city, Station.active).all()
                 station_ids = [s.id for s in stations]
                 station_map = {s.id: s for s in stations}
-                
+
                 if station_ids:
                     # Query latest readings for active stations
                     latest_subq = (
@@ -43,13 +47,13 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
                         .group_by(Reading.station_id)
                         .subquery()
                     )
-                    
+
                     readings = (
                         db.query(Reading)
                         .join(latest_subq, (Reading.station_id == latest_subq.c.station_id) & (Reading.measured_at == latest_subq.c.max_ts))
                         .all()
                     )
-                    
+
                     points = []
                     for r in readings:
                         if r.station_id in station_map:
@@ -67,7 +71,7 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
                                 "pm10": r.pm10,
                                 "measured_at": r.measured_at.isoformat() if r.measured_at else None,
                             })
-                    
+
                     # Push telemetry package
                     await websocket.send_json({
                         "type": "telemetry_update",
@@ -79,9 +83,9 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
                 logger.error(f"Error preparing telemetry package inside WebSocket: {e}")
             finally:
                 db.close()
-                
+
             # Sleep for 10 seconds before broadcasting next tick
             await asyncio.sleep(10)
-            
+
     except WebSocketDisconnect:
         logger.info(f"🔌 WebSocket subscriber disconnected: city={city}")

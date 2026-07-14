@@ -1,10 +1,14 @@
-from __future__ import annotations
 """
 AETHER — Background Scheduler
 Uses APScheduler to periodically refresh live air quality (WAQI) and weather (Open-Meteo) data.
 """
+
+from __future__ import annotations
+
 import logging
+
 from apscheduler.schedulers.background import BackgroundScheduler
+
 from app.database import SessionLocal
 from app.scripts.refresh_data import refresh_all
 

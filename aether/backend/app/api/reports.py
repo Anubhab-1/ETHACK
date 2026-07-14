@@ -1,12 +1,21 @@
-from __future__ import annotations
 """AETHER — Citizen Incident Reporting endpoints."""
+
+from __future__ import annotations
+
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, Query, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models import CitizenReport, Ward, EnforcementAction
-from app.schemas import CitizenReportIn, CitizenReportOut, InspectorRoutesInput, LegalQueryInput
+from app.models import CitizenReport, EnforcementAction, Ward
+from app.schemas import (
+    CitizenReportIn,
+    CitizenReportOut,
+    InspectorRoutesInput,
+    LegalQueryInput,
+)
 
 router = APIRouter()
 
@@ -108,7 +117,7 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
     # Check if report has crossed verification threshold (5 upvotes)
     if report.upvote_count >= 5 and report.status == "pending":
         report.status = "verified"
-        
+
         ward = db.query(Ward).filter(Ward.id == report.ward_id).first()
         ward_name = ward.name if ward else f"Ward #{report.ward_id}"
 

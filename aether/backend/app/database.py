@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import logging
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -39,13 +42,14 @@ def get_db():
 
 def create_tables():
     """Create all tables in the database. Enable extensions and hypertables if PostgreSQL."""
-    from app import models  # noqa: F401
     from sqlalchemy import text
-    
-    is_postgres = "postgresql" in str(engine.url)
-    
+
+    from app import models  # noqa: F401
+
+    "postgresql" in str(engine.url)
+
     Base.metadata.create_all(bind=engine)
-    
+
     if _is_postgres:
         with engine.connect() as conn:
             try:

@@ -1,16 +1,26 @@
-from __future__ import annotations
 """
 AETHER — SQLAlchemy ORM Models
 All database tables for the platform.
 Python 3.8 compatible.
 """
+
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Optional
+
 from sqlalchemy import (
-    Integer, String, Float, Text, DateTime, Boolean,
-    ForeignKey, Index
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.database import Base
 
 

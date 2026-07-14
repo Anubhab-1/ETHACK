@@ -5,16 +5,17 @@ Uses lagged AQI + weather features as inputs.
 Falls back to XGBoost or intelligent persistence if deep models are not available.
 """
 from __future__ import annotations
-import os
-import math
+
 import logging
-from typing import Optional, List, Dict
-import numpy as np
-import pandas as pd
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 from sqlalchemy.orm import Session
-from app.models import Reading, Weather, Ward, Forecast, Station
+
+from app.models import Forecast, Reading, Station, Ward, Weather
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,8 @@ except ImportError:
     TORCH_AVAILABLE = False
     # Stub nn.Module when PyTorch is not installed
     class nn:
-        class Module: pass
+        class Module:
+            pass
     logger.info("PyTorch not available. ST-GCN forecasting model will fall back to XGBoost.")
 
 class STGCNBlock(nn.Module):
@@ -112,27 +114,27 @@ def aqi_to_category(aqi: float) -> str:
 def _get_station_history(city: str, hours: int, db: Session) -> pd.DataFrame:
     """Pull historical readings for all stations in a city."""
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
-    stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+    stations = db.query(Station).filter(Station.city == city, Station.active).all()
     station_ids = [s.id for s in stations]
-    
+
     rows = db.query(Reading).filter(
         Reading.station_id.in_(station_ids),
         Reading.measured_at >= since,
     ).order_by(Reading.measured_at.asc()).all()
-    
+
     if not rows:
         return pd.DataFrame()
-    
+
     data = [{
         "measured_at": r.measured_at,
         "aqi": r.aqi or 0,
         "pm25": r.pm25 or 0,
         "pm10": r.pm10 or 0,
     } for r in rows if r.aqi]
-    
+
     if not data:
         return pd.DataFrame()
-    
+
     df = pd.DataFrame(data)
     df["measured_at"] = pd.to_datetime(df["measured_at"])
     df = df.set_index("measured_at").resample("1h").mean().reset_index()
@@ -147,10 +149,10 @@ def _get_weather_history(city: str, hours: int, db: Session) -> pd.DataFrame:
         Weather.city == city,
         Weather.recorded_at >= since,
     ).order_by(Weather.recorded_at.asc()).all()
-    
+
     if not rows:
         return pd.DataFrame()
-    
+
     data = [{
         "recorded_at": r.recorded_at,
         "temp_c": r.temp_c or 28,
@@ -159,7 +161,7 @@ def _get_weather_history(city: str, hours: int, db: Session) -> pd.DataFrame:
         "wind_dir": r.wind_dir or 0,
         "pressure": r.pressure or 1013,
     } for r in rows]
-    
+
     df = pd.DataFrame(data)
     df["recorded_at"] = pd.to_datetime(df["recorded_at"])
     df = df.set_index("recorded_at").resample("1h").mean().reset_index()
@@ -203,7 +205,7 @@ def train_model(city: str, db: Session) -> dict:
     """Train XGBoost model for a city. Returns validation metrics."""
     try:
         import xgboost as xgb
-        from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+        from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
     except ImportError:
         return {"error": "xgboost not installed"}
 
@@ -280,7 +282,7 @@ def train_model(city: str, db: Session) -> dict:
         # Save model
         model_file = MODEL_PATH / f"{city.lower()}_{horizon}h.json"
         model.save_model(str(model_file))
-        
+
         results[f"{horizon}h"] = {
             "rmse_model": round(rmse_model, 2),
             "rmse_baseline": round(rmse_baseline, 2),
@@ -312,9 +314,9 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
       - confidence_lower / confidence_upper (±10% for trained, ±18% for persistence)
       - method ("XGBoost+Weather" or "Persistence+Weather")
     """
-    from app.services.fetch_weather import get_weather_forecast, CITY_COORDS
+
     from app.services.attributor import get_current_aqi_for_ward
-    import math as _math
+    from app.services.fetch_weather import get_weather_forecast
 
     now = datetime.now(timezone.utc)
     city = ward.city
@@ -377,7 +379,7 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
         temp_c = w.get("temp_c") or 28.0
         humidity = w.get("humidity_pct") or 60.0
         wind_speed = w.get("wind_speed") or 5.0
-        wind_dir = w.get("wind_dir") or 0.0
+        w.get("wind_dir") or 0.0
 
         # ── Try XGBoost for anchor points (24, 48, 72) ──────────────────
         if use_xgboost and hour in xgb_models and last_row is not None:

@@ -4,15 +4,16 @@ Provides real-time ingestion topics for CPCB, satellite, weather, traffic, and I
 Falls back to APScheduler polling if Kafka broker is unavailable or library is not installed.
 """
 from __future__ import annotations
-import logging
+
 import json
-from typing import Dict, Any, Callable
+import logging
+from typing import Any, Callable, Dict
 
 logger = logging.getLogger(__name__)
 
 # Try importing kafka for streaming ingestion
 try:
-    from kafka import KafkaProducer, KafkaConsumer
+    from kafka import KafkaConsumer, KafkaProducer
     KAFKA_AVAILABLE = True
 except ImportError:
     KAFKA_AVAILABLE = False
@@ -40,7 +41,7 @@ class KafkaStreamManager:
         self.bootstrap_servers = bootstrap_servers
         self.producer = None
         self.consumers = {}
-        
+
         if KAFKA_AVAILABLE:
             try:
                 self.producer = KafkaProducer(
@@ -72,7 +73,7 @@ class KafkaStreamManager:
                 return True
             except Exception as e:
                 logger.error(f"Error publishing to topic {topic}: {e}")
-                
+
         # Fallback to local log emission
         logger.info(f"[POLLING FALLBACK] Ingested raw event for '{topic}': {list(data.keys())[:3]}")
         return True

@@ -11,11 +11,11 @@ Graph schema:
   Edges: EMITS_INTO, HAS_VIOLATION, TRIGGERS, RESULTED_IN, TARGETS, OPERATES
 """
 from __future__ import annotations
+
 import logging
 import random
-import math
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +54,14 @@ class AetherKnowledgeGraph:
         logger.info("Seeding AETHER knowledge graph...")
 
         try:
-            from app.models import Ward, EnforcementAction
+            from app.models import EnforcementAction, Ward
             if db:
                 wards = db.query(Ward).filter(Ward.city == city).all()
-                actions = db.query(EnforcementAction).filter(EnforcementAction.city == city).all()
+                db.query(EnforcementAction).filter(EnforcementAction.city == city).all()
             else:
-                wards, actions = [], []
+                wards, _actions = [], []
         except Exception:
-            wards, actions = [], []
+            wards, _actions = [], []
 
         # Add ward nodes
         for ward in wards:

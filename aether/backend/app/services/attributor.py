@@ -11,13 +11,16 @@ The NMF layer activates when enough multi-pollutant data is present.
 Both methods are combined: NMF refines heuristic weights using measured speciation.
 """
 from __future__ import annotations
-import math
+
 import logging
+import math
 import random
-from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.orm import Session
-from app.models import Ward, Attribution, Reading, Weather, Station
+
+from app.models import Attribution, Reading, Station, Ward, Weather
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +35,7 @@ def _build_speciation_matrix(ward: Ward, db: Session) -> Optional[List[List[floa
     Returns None if insufficient data (<20 readings).
     """
     stations = db.query(Station).filter(
-        Station.city == ward.city, Station.active == True
+        Station.city == ward.city, Station.active
     ).limit(5).all()
 
     if not stations:
@@ -236,10 +239,10 @@ def get_current_weather_for_ward(ward: Ward, db: Session) -> Dict:
     weather = db.query(Weather).filter(
         Weather.city == ward.city
     ).order_by(Weather.recorded_at.desc()).first()
-    
+
     if not weather:
         return {"wind_dir": 0, "wind_speed": 5, "temp_c": 28}
-    
+
     return {
         "wind_dir": weather.wind_dir or 0,
         "wind_speed": weather.wind_speed or 5,
@@ -257,7 +260,7 @@ def get_current_aqi_for_ward(
     """Get interpolated AQI for a ward using nearest stations."""
     # Get all stations in the same city if not pre-fetched
     if stations is None:
-        stations = db.query(Station).filter(Station.city == ward.city, Station.active == True).all()
+        stations = db.query(Station).filter(Station.city == ward.city, Station.active).all()
     if not stations:
         return 150.0  # Default moderate
 
@@ -266,11 +269,11 @@ def get_current_aqi_for_ward(
     for st in stations:
         dist = math.sqrt((st.lat - ward.lat) ** 2 + (st.lon - ward.lon) ** 2)
         distances.append((dist, st))
-    
+
     # Sort by distance, take nearest 3
     distances.sort(key=lambda x: x[0])
     nearest = distances[:3]
-    
+
     # Inverse distance weighted average
     weights = []
     aqis = []
@@ -289,10 +292,10 @@ def get_current_aqi_for_ward(
                 w = 1.0 / max(dist, 0.001)
                 weights.append(w)
                 aqis.append(reading.aqi)
-    
+
     if not aqis:
         return 150.0
-    
+
     total_w = sum(weights)
     aqi = sum(a * w for a, w in zip(aqis, weights)) / total_w
     return round(aqi, 1)
@@ -301,18 +304,20 @@ def get_current_aqi_for_ward(
 def get_pm_ratio(ward: Ward, db: Session) -> float:  # noqa
     """Get PM10/PM2.5 ratio as proxy for construction dust."""
     stations = db.query(Station).filter(
-        Station.city == ward.city, Station.active == True
+        Station.city == ward.city, Station.active
     ).limit(3).all()
-    
+
     pm10_vals, pm25_vals = [], []
     for st in stations:
         r = db.query(Reading).filter(
             Reading.station_id == st.id
         ).order_by(Reading.measured_at.desc()).first()
         if r:
-            if r.pm10: pm10_vals.append(r.pm10)
-            if r.pm25: pm25_vals.append(r.pm25)
-    
+            if r.pm10:
+                pm10_vals.append(r.pm10)
+            if r.pm25:
+                pm25_vals.append(r.pm25)
+
     if not pm10_vals or not pm25_vals:
         return 1.5
     return (sum(pm10_vals) / len(pm10_vals)) / max(sum(pm25_vals) / len(pm25_vals), 1)
@@ -321,7 +326,7 @@ def get_pm_ratio(ward: Ward, db: Session) -> float:  # noqa
 def attribute_sources(ward: Ward, aqi: float, weather: dict, time_features: dict, pm10: Optional[float] = None) -> dict:
     """
     Compute pollution source attribution for a ward.
-    
+
     Returns:
         {
             "breakdown": {"traffic": 45.2, "industrial": 22.1, ...},
@@ -407,17 +412,17 @@ def _generate_explanation(primary: str, breakdown: dict, ward: Ward, weather: di
     hour = time_features["hour"]
     is_rush = 7 <= hour <= 10 or 17 <= hour <= 20
     wind_dir = weather.get("wind_dir", 0)
-    
+
     explanations = {
         "traffic": (
             f"Ward {ward.ward_no} is primarily affected by vehicular traffic emissions "
             f"({breakdown['traffic']:.0f}%). "
             + ("Rush hour conditions are amplifying road-source pollutants. " if is_rush else "")
-            + f"Road density in this area contributes significantly to PM2.5 and NOx levels."
+            + "Road density in this area contributes significantly to PM2.5 and NOx levels."
         ),
         "industrial": (
             f"Industrial emissions account for {breakdown['industrial']:.0f}% of ward pollution. "
-            + (f"Low wind speeds ({weather.get('wind_speed', 0):.1f} km/h) are trapping stack emissions. " 
+            + (f"Low wind speeds ({weather.get('wind_speed', 0):.1f} km/h) are trapping stack emissions. "
                if weather.get("wind_speed", 5) < 5 else "")
             + "Proximity to industrial zones is the dominant factor."
         ),
@@ -428,13 +433,13 @@ def _generate_explanation(primary: str, breakdown: dict, ward: Ward, weather: di
         ),
         "biomass": (
             f"Biomass burning (stubble/agricultural fires) is the primary source ({breakdown['biomass']:.0f}%). "
-            + (f"North-westerly winds ({wind_dir:.0f}°) are transporting Gangetic plain smoke. " 
+            + (f"North-westerly winds ({wind_dir:.0f}°) are transporting Gangetic plain smoke. "
                if 290 <= wind_dir <= 340 else "")
             + "Winter inversion layer is trapping smoke close to the surface."
         ),
         "residential": (
             f"Residential sources (cooking, waste burning) dominate at {breakdown['residential']:.0f}%. "
-            + ("Evening cooking hours elevate biomass combustion from households. " 
+            + ("Evening cooking hours elevate biomass combustion from households. "
                if 17 <= hour <= 21 else "")
             + "Low industrial/traffic activity makes residential sources the relative leader."
         ),

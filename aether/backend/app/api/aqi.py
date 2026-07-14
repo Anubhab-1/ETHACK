@@ -1,13 +1,17 @@
-from __future__ import annotations
 """AETHER — AQI data endpoints."""
+
+from __future__ import annotations
+
 import math
-from fastapi import APIRouter, Depends, Query, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.database import get_db
+
 from app.config import get_settings
-from app.models import Station, Reading, Ward, Attribution
-from app.schemas import LiveAQIPoint, HeatmapPoint, WardOut, WardDetail
+from app.database import get_db
+from app.models import Attribution, Reading, Station, Ward
+from app.schemas import HeatmapPoint, LiveAQIPoint, WardDetail, WardOut
 from app.services.attributor import get_current_aqi_for_ward
 
 router = APIRouter()
@@ -48,11 +52,11 @@ def ensure_readings_exist(city: str, db: Session):
     """Ensure that at least one station in the city has Reading rows. If not, trigger synchronous live data fetch."""
     import logging
     log = logging.getLogger(__name__)
-    stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+    stations = db.query(Station).filter(Station.city == city, Station.active).all()
     station_ids = [st.id for st in stations]
     if not station_ids:
         return
-    
+
     has_readings = db.query(Reading).filter(Reading.station_id.in_(station_ids)).first() is not None
     if not has_readings:
         log.info(f"No readings found in DB for {city} stations. Fetching live data synchronously...")
@@ -62,9 +66,9 @@ def ensure_readings_exist(city: str, db: Session):
             if waqi_res and waqi_res.get("status") == "ok":
                 log.info(f"Synchronous live WAQI data fetch for {city} complete.")
                 return
-            
+
             # If WAQI is not configured or failed, fall back to legacy CPCB
-            log.info(f"WAQI not configured or failed. Falling back to legacy CPCB fetcher.")
+            log.info("WAQI not configured or failed. Falling back to legacy CPCB fetcher.")
             from app.services.fetch_cpcb import fetch_live_cpcb, upsert_readings
             station_map = {s.station_code: s for s in stations}
             records = fetch_live_cpcb(city=city, db=db)
@@ -89,10 +93,10 @@ def get_live_aqi(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
         (Reading.station_id == latest_readings.c.station_id) &
         (Reading.measured_at == latest_readings.c.latest_time)
     ).all()
-    
+
     reading_map = {r.station_id: r for r in latest_data}
-    stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
-    
+    stations = db.query(Station).filter(Station.city == city, Station.active).all()
+
     result = []
     for st in stations:
         reading = reading_map.get(st.id)
@@ -126,9 +130,9 @@ def get_aqi_heatmap(city: str = Query("Kolkata"), db: Session = Depends(get_db))
         (Reading.station_id == latest_readings.c.station_id) &
         (Reading.measured_at == latest_readings.c.latest_time)
     ).all()
-    
+
     station_map = {st.id: st for st in db.query(Station).filter(Station.city == city).all()}
-    station_points = [(station_map[r.station_id].lat, station_map[r.station_id].lon, r.aqi) 
+    station_points = [(station_map[r.station_id].lat, station_map[r.station_id].lon, r.aqi)
                       for r in latest_data if r.station_id in station_map and r.aqi]
 
     wards = db.query(Ward).filter(Ward.city == city).all()
@@ -204,8 +208,9 @@ def get_satellite_grid(city: str = Query("Kolkata"), db: Session = Depends(get_d
     Data source: Open-Meteo Air Quality API (free, no key, 1km resolution).
     Results are cached for 1 hour to stay within rate limits.
     """
-    import requests as _req
     import time as _time
+
+    import requests as _req
 
     # City bounding boxes
     BOUNDS = {

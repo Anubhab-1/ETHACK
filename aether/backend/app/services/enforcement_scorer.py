@@ -1,13 +1,17 @@
-from __future__ import annotations
 """
 AETHER — Enforcement Priority Scoring Engine
 Ranks wards by intervention priority based on severity, exposure,
 actionability, and trend. Outputs a ranked list for inspectors.
 """
+
+from __future__ import annotations
+
 import logging
 from datetime import datetime
+
 from sqlalchemy.orm import Session
-from app.models import Ward, EnforcementAction, Attribution, Forecast
+
+from app.models import Attribution, EnforcementAction, Forecast, Ward
 from app.services.attributor import get_current_aqi_for_ward, run_attribution_for_ward
 
 logger = logging.getLogger(__name__)
@@ -58,7 +62,7 @@ def compute_priority(
 ) -> float:
     """
     Compute enforcement priority score (0–100).
-    
+
     Formula:
         priority = severity (35%) + exposure (25%) + actionability (20%) + trend (20%)
     """
@@ -105,7 +109,7 @@ def recompute_enforcement_queue(city: str, db: Session, limit: int = 20):
     """Recompute enforcement priority for all wards in a city."""
     wards = db.query(Ward).filter(Ward.city == city).all()
     logger.info(f"Recomputing enforcement queue for {len(wards)} wards in {city}")
-    
+
     created = 0
     for ward in wards:
         try:
@@ -117,7 +121,7 @@ def recompute_enforcement_queue(city: str, db: Session, limit: int = 20):
             attribution_rec = db.query(Attribution).filter(
                 Attribution.ward_id == ward.id
             ).order_by(Attribution.computed_at.desc()).first()
-            
+
             if not attribution_rec:
                 attr_result = run_attribution_for_ward(ward, db)
             else:
@@ -190,36 +194,37 @@ def detect_spikes_and_auto_escalate(db: Session, city: str = "Kolkata") -> int:
     Spike definition: AQI > 300 (Severe), or AQI spiked by 50% compared to typical baseline.
     """
     from datetime import timedelta
-    from app.models import Reading, Station, Ward
-    
+
+    from app.models import Ward
+
     wards = db.query(Ward).filter(Ward.city == city).all()
     created = 0
-    
+
     for ward in wards:
         try:
             current_aqi = get_current_aqi_for_ward(ward, db)
             if current_aqi < 200:
                 continue # Only check moderate/severe conditions
-            
+
             # Check if there is an existing open action
             existing = db.query(EnforcementAction).filter(
                 EnforcementAction.ward_id == ward.id,
                 EnforcementAction.status == "open"
             ).first()
-            
+
             if existing:
                 continue
-                
+
             is_anomaly = False
             trigger_reason = ""
-            
+
             if current_aqi >= 300:
                 is_anomaly = True
                 trigger_reason = f"Critical AQI Spike: Severe air quality levels ({round(current_aqi)} AQI) detected by monitoring network."
             elif current_aqi >= 220:
                 is_anomaly = True
                 trigger_reason = f"Sudden AQI Surge: Rapid elevation to {round(current_aqi)} AQI detected."
-                
+
             if is_anomaly:
                 import random
                 # Retrieve primary source attribution
@@ -227,9 +232,9 @@ def detect_spikes_and_auto_escalate(db: Session, city: str = "Kolkata") -> int:
                     Attribution.ward_id == ward.id
                 ).order_by(Attribution.computed_at.desc()).first()
                 primary_source = attribution_rec.primary_source if attribution_rec else "traffic"
-                
+
                 detected_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 12))
-                
+
                 action = EnforcementAction(
                     ward_id=ward.id,
                     city=city,
@@ -245,12 +250,12 @@ def detect_spikes_and_auto_escalate(db: Session, city: str = "Kolkata") -> int:
         except Exception as e:
             logger.warning(f"Error checking anomalies for ward {ward.id}: {e}")
             continue
-            
+
     if created > 0:
         try:
             db.commit()
         except Exception as e:
             logger.error(f"Failed to commit anomaly enforcement actions: {e}")
             db.rollback()
-            
+
     return created

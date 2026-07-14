@@ -1,14 +1,18 @@
-from __future__ import annotations
 """
 AETHER — Seed Kolkata KMC Ward Data.
 Generates 144 Kolkata Municipal Corporation wards with realistic coordinates,
 population estimates, and OSM-derived features.
 """
+
+from __future__ import annotations
+
+import logging
 import math
 import random
+
 from sqlalchemy.orm import Session
+
 from app.models import Ward
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -72,30 +76,30 @@ def seed_kolkata_wards(db: Session):
         return existing
 
     random.seed(42)  # deterministic
-    
+
     # Create a 12x12 grid roughly covering Kolkata
     lat_range = 22.64 - 22.46
     lon_range = 88.52 - 88.26
     rows, cols = 12, 12
-    
+
     wards_created = 0
     ward_no = 1
-    
+
     for row in range(rows):
         for col in range(cols):
             if ward_no > 144:
                 break
-            
+
             # Compute centroid with jitter
             base_lat = 22.46 + (row / rows) * lat_range + (lat_range / rows) * 0.5
             base_lon = 88.26 + (col / cols) * lon_range + (lon_range / cols) * 0.5
             lat = base_lat + random.uniform(-0.005, 0.005)
             lon = base_lon + random.uniform(-0.005, 0.005)
-            
+
             # Name
             name_idx = (ward_no - 1) % len(AREA_NAMES)
             name = f"{AREA_NAMES[name_idx]} Ward {ward_no}"
-            
+
             # Features
             industrial_score = _compute_industrial_score(lat, lon)
             road_density = random.uniform(0.3, 1.0) * (0.8 + 0.4 * min(industrial_score / 100, 1))
@@ -128,7 +132,7 @@ def seed_kolkata_wards(db: Session):
             db.add(ward)
             ward_no += 1
             wards_created += 1
-    
+
     db.commit()
     logger.info(f"Seeded {wards_created} Kolkata wards")
     return wards_created
@@ -139,7 +143,7 @@ def seed_delhi_wards(db: Session):
     existing = db.query(Ward).filter(Ward.city == "Delhi").count()
     if existing >= 20:
         return existing
-    
+
     random.seed(43)
     delhi_zones = [
         {"name": "Anand Vihar", "lat": 28.6469, "lon": 77.3161, "ind": 85},
@@ -153,7 +157,7 @@ def seed_delhi_wards(db: Session):
         {"name": "Wazirpur", "lat": 28.6956, "lon": 77.1720, "ind": 78},
         {"name": "Shahdara", "lat": 28.6644, "lon": 77.2902, "ind": 72},
     ]
-    
+
     for i, z in enumerate(delhi_zones):
         elderly_percentage = round(random.uniform(5.0, 16.0), 2)
         child_percentage = round(random.uniform(4.0, 12.0), 2)
@@ -178,7 +182,7 @@ def seed_delhi_wards(db: Session):
             svi_index=svi_index,
         )
         db.add(ward)
-    
+
     db.commit()
     logger.info("Seeded Delhi zones")
     return len(delhi_zones)
@@ -189,7 +193,7 @@ def seed_mumbai_wards(db: Session):
     existing = db.query(Ward).filter(Ward.city == "Mumbai").count()
     if existing >= 5:
         return existing
-    
+
     random.seed(44)
     mumbai_zones = [
         {"name": "Bandra Kurla Complex", "lat": 19.0596, "lon": 72.8656, "ind": 45},
@@ -201,7 +205,7 @@ def seed_mumbai_wards(db: Session):
         {"name": "Worli", "lat": 19.0176, "lon": 72.8183, "ind": 40},
         {"name": "Malad", "lat": 19.1862, "lon": 72.8481, "ind": 45},
     ]
-    
+
     for i, z in enumerate(mumbai_zones):
         elderly_percentage = round(random.uniform(5.0, 16.0), 2)
         child_percentage = round(random.uniform(4.0, 12.0), 2)
@@ -226,7 +230,7 @@ def seed_mumbai_wards(db: Session):
             svi_index=svi_index,
         )
         db.add(ward)
-    
+
     db.commit()
     logger.info("Seeded Mumbai zones")
     return len(mumbai_zones)

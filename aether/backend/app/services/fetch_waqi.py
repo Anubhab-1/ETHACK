@@ -1,4 +1,3 @@
-from __future__ import annotations
 """
 AETHER — WAQI (World Air Quality Index) Real-Time Data Fetcher
 Replaces the fake fallback data generator.
@@ -12,12 +11,17 @@ Usage:
     Without a token, the system falls into honest error mode
     (shows a banner instead of silent fake data).
 """
-import requests
+
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
+
+import requests
 from sqlalchemy.orm import Session
-from app.models import Station, Reading
+
 from app.config import get_settings
+from app.models import Reading, Station
 
 logger = logging.getLogger(__name__)
 
@@ -186,13 +190,13 @@ def upsert_waqi_readings(city: str, stations_raw: list[dict], db: Session) -> in
     1. Find the nearest matching AETHER station in the DB by name or proximity.
     2. Insert a new Reading row with real measured values.
     """
-    db_stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+    db_stations = db.query(Station).filter(Station.city == city, Station.active).all()
     if not db_stations:
         logger.warning(f"No AETHER stations in DB for {city}, skipping WAQI upsert")
         return 0
 
     inserted = 0
-    now = datetime.now(timezone.utc)
+    datetime.now(timezone.utc)
 
     for raw in stations_raw:
         parsed = parse_waqi_station(raw)

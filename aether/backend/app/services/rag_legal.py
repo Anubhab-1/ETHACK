@@ -1,16 +1,20 @@
-from __future__ import annotations
 """
 AETHER — RAG Legal Advisory Service
 Uses TF-IDF + Cosine Similarity over SQLite documents table for legal advisory.
 Fully functional in offline/free tiers with zero dependencies except scikit-learn.
 """
+
+from __future__ import annotations
+
 import json
 import logging
-from typing import List, Dict, Any
-from sqlalchemy.orm import Session
-from app.models import Document
+from typing import Any, Dict, List
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from sqlalchemy.orm import Session
+
+from app.models import Document
 
 logger = logging.getLogger(__name__)
 
@@ -89,23 +93,23 @@ def query_legal(question: str, db: Session, limit: int = 3) -> List[Dict[str, An
     """
     # Ensure database is seeded
     seed_documents_if_empty(db)
-    
+
     try:
         docs = db.query(Document).all()
         if not docs:
             return []
-            
+
         corpus = [d.content for d in docs]
         vectorizer = TfidfVectorizer(stop_words='english')
         tfidf_matrix = vectorizer.fit_transform(corpus)
-        
+
         query_vec = vectorizer.transform([question])
         similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
-        
+
         # Rank and filter top matches
         results = []
         top_indices = similarities.argsort()[::-1][:limit]
-        
+
         for idx in top_indices:
             score = float(similarities[idx])
             if score > 0.05:  # Relevance threshold

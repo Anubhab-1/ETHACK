@@ -3,23 +3,22 @@ AETHER — Multi-Agent Committee Service
 5 specialist agents with tool use and constitutional coordinator.
 """
 from __future__ import annotations
-import logging
+
 import json
+import logging
 from datetime import datetime
-from typing import TypedDict, List, Dict, Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
+
+from sqlalchemy.orm import Session
+
+from app.models import Ward, Weather
+from app.schemas import AgentTurn, CausalEvidence, ConstitutionalCheck, ToolCall
+from app.services.agent_tools import invoke_tool
 
 logger = logging.getLogger(__name__)
 
-from sqlalchemy.orm import Session
-from app.models import Ward, Weather
-from app.schemas import ToolCall, AgentTurn, ConstitutionalCheck, CausalEvidence
-from app.services.agent_tools import invoke_tool
-import math
-
 # Fallbacks for langchain/langgraph
 try:
-    from langchain.agents import Tool  # type: ignore
-    from langgraph.graph import StateGraph, END  # type: ignore
     LANGCHAIN_AVAILABLE = True
 except Exception:
     LANGCHAIN_AVAILABLE = False
@@ -91,7 +90,7 @@ class SpecialistAgent:
         self.role = role
         self.principles = principles
         self.tools = tools
-        
+
     def deliberate(self, state: AgentState, db: Optional[Any] = None) -> Dict:
         # Gather evidence using registered tools
         evidence = {}
@@ -119,7 +118,7 @@ class SpecialistAgent:
 
         # Structural deliberation fallback
         rec, confidence = self._generate_recommendation_logic(state, evidence)
-        
+
         return {
             "agent": self.name,
             "role": self.role,
@@ -133,33 +132,33 @@ class SpecialistAgent:
         }
 
     def _generate_recommendation_logic(self, state: AgentState, evidence: Dict) -> Tuple[str, float]:
-        aqi = state['current_aqi']
+        state['current_aqi']
         if self.name == "Meteorological Agent":
             w = evidence.get("get_weather", {})
             speed = w.get("wind_speed_kmh", 5.5)
             direction = w.get("wind_direction_cardinal", "N")
             return f"Ventilation is low due to wind speed {speed} km/h from {direction}. Recommend mist spraying to accelerate deposition.", 0.85
-            
+
         elif self.name == "Traffic & Mobility Agent":
             t = evidence.get("get_traffic", {})
             congestion = t.get("congestion_level", "MODERATE")
             return f"Traffic congestion index is {congestion}. Recommend implementing heavy vehicle diversion and odd-even rules.", 0.8
-            
+
         elif self.name == "Industrial Compliance Agent":
             c = evidence.get("get_industrial_cems", {})
             violations = c.get("violations_detected", 0)
             return f"CEMS identified {violations} violations. Recommend issuing Section 31A notices and 50% curtailment.", 0.9
-            
+
         elif self.name == "Health Impact Agent":
             h = evidence.get("get_vulnerable_locations", {})
             total_v = h.get("vulnerable_population", {}).get("total_vulnerable", 20000)
             return f"Protected school districts contain {total_v} vulnerable residents. School health closure advisories are mandatory.", 0.95
-            
+
         elif self.name == "Enforcement Logistics Agent":
             out = evidence.get("get_historical_outcomes", {})
             rate = out.get("summary", {}).get("success_rate_pct", 80)
             return f"Historical enforcement success rate is {rate}%. Proactive inspector routes should be immediately deployed.", 0.88
-            
+
         return "Manual override recommendation.", 0.5
 
 # Initialize 5 agents
@@ -226,7 +225,7 @@ class ConstitutionalCoordinator:
     Synthesizes agent recommendations using constitutional principles.
     Can override agents if they conflict with higher principles.
     """
-    
+
     CONSTITUTION = [
         "HEALTH FIRST: The protection of vulnerable populations overrides economic concerns",
         "EVIDENCE REQUIRED: Every recommendation must cite specific, verifiable data sources",
@@ -234,24 +233,24 @@ class ConstitutionalCoordinator:
         "LEGAL DEFENSIBILITY: Enforcement actions must have clear statutory basis",
         "PRECEDENT: Past intervention outcomes inform current recommendations"
     ]
-    
+
     def synthesize(self, state: AgentState) -> Dict:
         agent_outputs = state['agent_outputs']
-        
+
         # Build synthesis decree
         timeline = "Within 4 hours"
         consensus_action = "Integrated Heavy Vehicle Ban + 50% Industrial Curtailment Order + School Closure Advisory."
         expected_drop = 35.0  # AQI points
         health_impact = "Avoids ~15 respiratory admissions over 24h."
         cost = "Moderate economic impact on logistics."
-        
+
         dissenting = []
         for a in agent_outputs:
             if a['confidence'] < 0.82:
                 dissenting.append(f"{a['agent']} noted risk: {a['risks']}")
-                
+
         dissent_text = " | ".join(dissenting) if dissenting else "No significant agent dissent recorded."
-        
+
         consensus = {
             "consensus_action": consensus_action,
             "expected_aqi_reduction": expected_drop,
@@ -262,7 +261,7 @@ class ConstitutionalCoordinator:
             "evidence_citations": ["CEMS telemetry logs", "Kolkata road density maps", "School district coordinates"],
             "timeline": timeline
         }
-        
+
         return {
             "ward_id": state['ward_id'],
             "consensus": consensus,
@@ -272,7 +271,7 @@ class ConstitutionalCoordinator:
             "timestamp": datetime.now().isoformat()
         }
 
-def run_agent_committee(ward_id: str, current_aqi: float, forecast_24h: float, 
+def run_agent_committee(ward_id: str, current_aqi: float, forecast_24h: float,
                         source_breakdown: Dict, db: Optional[Any] = None) -> Dict:
     """
     Main entry point: run all 5 agents, then coordinate.
@@ -291,12 +290,12 @@ def run_agent_committee(ward_id: str, current_aqi: float, forecast_24h: float,
         confidence=0.0,
         timestamp=datetime.now().isoformat()
     )
-    
+
     # Run the deliberate step for each agent
     for agent_key, agent in AGENTS.items():
         output = agent.deliberate(state, db)
         state['agent_outputs'].append(output)
-        
+
     # Coordinate and synthesize
     coordinator = ConstitutionalCoordinator()
     result = coordinator.synthesize(state)
@@ -447,7 +446,7 @@ def run_agent_react_loop(
     # Augment params for specific tools
     if "simulate_intervention" in tools:
         tool_params_sim = {"ward_id": ward.id, "action_type": _get_recommended_action(agent_name, ward)}
-    
+
     result = invoke_tool(primary_tool, tool_params, db)
     tool_calls_made.append(ToolCall(
         tool_name=primary_tool,
@@ -611,7 +610,7 @@ def _derive_recommendation(
             f"Overall compliance rate: {compliance:.0f}%. "
             + (f"Show-cause notice generated (Case: {case_id}) under Air Act 1981 Section 31A. "
                f"Legal proceedings can begin within 24 hours. " if case_id != "N/A" else "")
-            + f"Industrial curtailment can reduce AQI by up to 50% over 8 hours if compliance is enforced."
+            + "Industrial curtailment can reduce AQI by up to 50% over 8 hours if compliance is enforced."
         )
 
     elif agent_name == "Health Impact":
@@ -642,8 +641,8 @@ def _derive_recommendation(
             f"{base_context}: Knowledge graph shows {history.get('summary', {}).get('total_precedents', 2)} historical precedents. "
             f"Average ATE: {abs(avg_ate):.0f} μg/m³ reduction, success rate {success_rate:.0f}% (confidence: {confidence}). "
             + (f"{expired} expired permits identified — operating without consent is prima facie violation. " if expired > 0 else "")
-            + f"Based on institutional memory, recommend COMBINED approach: "
-              f"immediate show-cause + traffic ban for highest historical efficacy."
+            + "Based on institutional memory, recommend COMBINED approach: "
+              "immediate show-cause + traffic ban for highest historical efficacy."
         )
 
     return f"{base_context}: Evidence gathered. Multi-source intervention recommended."
@@ -679,7 +678,7 @@ def synthesize_decree(
             action = f"School closure advisory for {ward.school_count} institutions" if ward.school_count > 0 else "Public health advisory broadcast"
             actions.append(f"**Health:** {action} + mask distribution at {ward.hospital_count} hospitals (Source: Health Impact Agent)")
         elif turn.agent == "Enforcement Logistics":
-            actions.append(f"**Enforcement:** Inspector deployment to top-risk industrial units. Show-cause notices to expired-permit holders (Source: Enforcement Logistics Agent)")
+            actions.append("**Enforcement:** Inspector deployment to top-risk industrial units. Show-cause notices to expired-permit holders (Source: Enforcement Logistics Agent)")
 
     action_text = "\n".join(f"{i+1}. {a}" for i, a in enumerate(actions))
 

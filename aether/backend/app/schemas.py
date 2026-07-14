@@ -1,12 +1,14 @@
-from __future__ import annotations
 """
 AETHER — Pydantic Schemas for API request/response validation.
 Compatible with Python 3.8+
 """
-from datetime import datetime
-from typing import Optional, List, Dict, Literal, Any
-from pydantic import BaseModel, Field, field_validator
 
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, Field, field_validator
 
 # ── Station ────────────────────────────────────────────────────────────────────
 

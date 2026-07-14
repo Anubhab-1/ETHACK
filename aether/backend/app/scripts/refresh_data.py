@@ -1,7 +1,11 @@
-from __future__ import annotations
 """AETHER — Data refresh script (called on startup and by scheduler)."""
+
+from __future__ import annotations
+
 import logging
+
 from sqlalchemy.orm import Session
+
 from app.models import Station
 
 logger = logging.getLogger(__name__)
@@ -34,7 +38,7 @@ def refresh_all(db: Session):
                     "Falling back to legacy CPCB fetcher."
                 )
                 from app.services.fetch_cpcb import fetch_live_cpcb, upsert_readings
-                stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+                stations = db.query(Station).filter(Station.city == city, Station.active).all()
                 station_map = {s.station_code: s for s in stations}
                 if station_map:
                     records = fetch_live_cpcb(city=city, db=db)

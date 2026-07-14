@@ -1,17 +1,21 @@
-from __future__ import annotations
 """AETHER — Advisory chatbot endpoint (LangChain + GPT-4o-mini)."""
-import uuid
-import math
+
+from __future__ import annotations
+
 import logging
-from fastapi import APIRouter, Depends, Query, HTTPException
+import math
+import uuid
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.schemas import AdvisoryRequest, AdvisoryResponse
-from app.models import AdvisoryLog, Ward, Station, Reading, EnforcementAction, Weather
+
+from app.api.aqi import AQI_CATEGORIES, idw_interpolate
 from app.config import get_settings
+from app.database import get_db
+from app.models import AdvisoryLog, EnforcementAction, Reading, Station, Ward, Weather
+from app.schemas import AdvisoryRequest, AdvisoryResponse
 from app.services.attributor import get_current_aqi_for_ward
-from app.api.aqi import aqi_to_category, idw_interpolate, AQI_CATEGORIES
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -75,7 +79,7 @@ def generate_advisory_with_llm(request: AdvisoryRequest, aqi: float | None, cate
     settings = _get_settings()
     if not settings.openai_api_key:
         return None
-    
+
     try:
         from openai import OpenAI
         client = OpenAI(
@@ -84,10 +88,10 @@ def generate_advisory_with_llm(request: AdvisoryRequest, aqi: float | None, cate
             timeout=5.0,
             max_retries=0
         )
-        
+
         lang_map = {"en": "English", "bn": "Bengali", "hi": "Hindi"}
         lang = lang_map.get(request.language, "English")
-        
+
         # RAG search for relevant regulations if applicable
         rag_context = ""
         try:
@@ -99,7 +103,7 @@ def generate_advisory_with_llm(request: AdvisoryRequest, aqi: float | None, cate
                     rag_context += f"- Title: {doc['title']}\n  Content: {doc['content']}\n"
         except Exception as e:
             logger.warning(f"RAG lookup in advisory failed: {e}")
-        
+
         system_prompt = f"""You are AETHER, an air quality health advisor for Kolkata, Delhi, and Mumbai residents.
 Answer in {lang} only. Be concise (2-3 sentences max).
 Include specific AQI numbers and actionable advice.
@@ -279,7 +283,7 @@ OFFLINE_TOPIC_ADVISORIES = {
 def get_offline_advisory(question: str, aqi: float | None, category: str, lang: str) -> str | None:
     """Keyword-based Local NLP fallback engine for offline/free advisory chats."""
     q_lower = question.lower()
-    
+
     # Multilingual topic detection
     topic = None
     if any(k in q_lower for k in [
@@ -324,14 +328,14 @@ def get_offline_advisory(question: str, aqi: float | None, category: str, lang: 
 
     lang_data = OFFLINE_TOPIC_ADVISORIES.get(lang, OFFLINE_TOPIC_ADVISORIES["en"])
     topic_data = lang_data.get(topic)
-    
+
     # Resolve category key
     cat_key = category
     if cat_key not in ["Good", "Satisfactory", "Moderate", "Poor", "Very Poor", "Severe"]:
         cat_key = "Moderate"
 
     advice = topic_data.get(cat_key, topic_data["Moderate"])
-    
+
     # Format standard header prefix
     header = ""
     aqi_str = f" (AQI {round(aqi)})" if aqi else ""
@@ -351,22 +355,22 @@ def ask_advisory(request: AdvisoryRequest, db: Session = Depends(get_db)):
     """Get a health advisory for the user's question and location."""
     session_id = request.session_id or str(uuid.uuid4())
     lang = request.language if request.language in ["en", "bn", "hi"] else "en"
-    
+
     aqi, category = get_aqi_for_location(request.lat, request.lon, db)
 
     # Try LLM first
     answer = generate_advisory_with_llm(request, aqi, category, db)
-    
+
     # Try Topic-specific offline fallback
     if not answer:
         answer = get_offline_advisory(request.question, aqi, category, lang)
-        
+
     # Fall back to general template
     if not answer:
         templates = ADVISORY_TEMPLATES.get(lang, ADVISORY_TEMPLATES["en"])
         template = templates.get(category, templates["Moderate"])
         answer = template.format(aqi=round(aqi, 0) if aqi else "N/A")
-        
+
         # Add question context
         q_lower = request.question.lower()
         if "jog" in q_lower or "run" in q_lower or "exercise" in q_lower:
@@ -414,7 +418,7 @@ def get_briefing(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     from sqlalchemy import desc
     settings = _get_settings()
 
-    stations = db.query(Station).filter(Station.city == city, Station.active == True).all()
+    stations = db.query(Station).filter(Station.city == city, Station.active).all()
     station_ids = [s.id for s in stations]
     station_map = {s.id: s for s in stations}
 
@@ -444,7 +448,6 @@ def get_briefing(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     ]
 
     wards = db.query(Ward).filter(Ward.city == city).all()
-    from app.api.aqi import idw_interpolate
 
     ward_aqis = [(w, idw_interpolate(w.lat, w.lon, station_points)) for w in wards]
     ward_aqis.sort(key=lambda x: x[1], reverse=True)
@@ -474,7 +477,7 @@ def get_briefing(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
                 timeout=5.0,
                 max_retries=0
             )
-            
+
             system_prompt = f"""You are AETHER, the Chief Environmental Intelligence Agent.
 Write a strategic "AI Executive Briefing" for the City Commissioner of {city}.
 The briefing must be highly professional, structured in clean markdown, and use bullet points where necessary.
@@ -502,7 +505,7 @@ Current Parameters:
             briefing_markdown = response.choices[0].message.content.strip()
         except Exception as e:
             logger.warning(f"Failed to generate LLM briefing: {e}")
-            
+
     if not briefing_markdown:
         category = "Satisfactory" if avg_aqi <= 100 else ("Moderate" if avg_aqi <= 200 else "Poor")
         briefing_markdown = f"""### 🌫️ AETHER Strategic Morning Briefing — {city}

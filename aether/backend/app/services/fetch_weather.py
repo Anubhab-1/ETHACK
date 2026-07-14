@@ -1,15 +1,19 @@
-from __future__ import annotations
 """
 AETHER — Open-Meteo Weather Data Fetcher
 Fetches free hourly weather data for any city.
 No API key required.
 """
-import requests
+
+from __future__ import annotations
+
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+
+import requests
 from sqlalchemy.orm import Session
-from app.models import Weather
+
 from app.config import get_settings
+from app.models import Weather
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -24,7 +28,7 @@ CITY_COORDS = {
 def fetch_weather(city: str = "Kolkata", db: Session = None) -> list[dict]:
     """Fetch hourly weather from Open-Meteo API (free, no key)."""
     coords = CITY_COORDS.get(city, CITY_COORDS["Kolkata"])
-    
+
     try:
         params = {
             "latitude": coords["lat"],
@@ -37,7 +41,7 @@ def fetch_weather(city: str = "Kolkata", db: Session = None) -> list[dict]:
         resp = requests.get(settings.open_meteo_base, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-        
+
         hourly = data.get("hourly", {})
         times = hourly.get("time", [])
         temps = hourly.get("temperature_2m", [])
@@ -46,7 +50,7 @@ def fetch_weather(city: str = "Kolkata", db: Session = None) -> list[dict]:
         wind_dirs = hourly.get("wind_direction_10m", [])
         pressures = hourly.get("surface_pressure", [])
         precips = hourly.get("precipitation", [])
-        
+
         records = []
         for i, t in enumerate(times):
             records.append({
@@ -58,10 +62,10 @@ def fetch_weather(city: str = "Kolkata", db: Session = None) -> list[dict]:
                 "pressure": pressures[i] if i < len(pressures) else None,
                 "precipitation": precips[i] if i < len(precips) else None,
             })
-        
+
         logger.info(f"Fetched {len(records)} weather records for {city}")
         return records
-        
+
     except Exception as e:
         logger.error(f"Open-Meteo API error: {e}")
         return []
@@ -75,7 +79,7 @@ def upsert_weather(records: list[dict], city: str, db: Session) -> int:
             dt = datetime.fromisoformat(rec["time"])
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
-            
+
             # Check if record exists
             existing = db.query(Weather).filter(
                 Weather.city == city,
@@ -83,7 +87,7 @@ def upsert_weather(records: list[dict], city: str, db: Session) -> int:
             ).first()
             if existing:
                 continue
-            
+
             w = Weather(
                 city=city,
                 recorded_at=dt,
@@ -99,7 +103,7 @@ def upsert_weather(records: list[dict], city: str, db: Session) -> int:
         except Exception as e:
             logger.warning(f"Skipping weather record: {e}")
             continue
-    
+
     db.commit()
     logger.info(f"Inserted {inserted} new weather records for {city}")
     return inserted
@@ -110,10 +114,10 @@ def get_current_weather(city: str, db: Session) -> dict | None:
     rec = db.query(Weather).filter(
         Weather.city == city
     ).order_by(Weather.recorded_at.desc()).first()
-    
+
     if not rec:
         return None
-    
+
     return {
         "temp_c": rec.temp_c,
         "humidity_pct": rec.humidity_pct,
@@ -139,11 +143,11 @@ def get_weather_forecast(city: str, hours_ahead: int = 72) -> list[dict]:
         resp = requests.get(settings.open_meteo_base, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-        
+
         hourly = data.get("hourly", {})
         times = hourly.get("time", [])
-        now = datetime.now()
-        
+        datetime.now()
+
         result = []
         for i, t in enumerate(times[:hours_ahead]):
             result.append({

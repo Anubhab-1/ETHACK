@@ -1,15 +1,19 @@
-from __future__ import annotations
 """
 AETHER — Auto-Evidence & Legal Document Generator
 Generates comprehensive audit packages demonstrating causal links between sources and receptors.
 Correlates stack emissions with downwind ward AQI readings and legal provisions.
 """
-import math
+
+from __future__ import annotations
+
 import logging
+import math
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from typing import Any, Dict
+
 from sqlalchemy.orm import Session
-from app.models import Ward, Weather, Reading
+
+from app.models import Ward, Weather
 from app.services.rag_legal import query_legal
 
 logger = logging.getLogger(__name__)
@@ -35,10 +39,10 @@ def calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> flo
     lat1_r = math.radians(lat1)
     lat2_r = math.radians(lat2)
     dlon_r = math.radians(lon2 - lon1)
-    
+
     y = math.sin(dlon_r) * math.cos(lat2_r)
     x = math.cos(lat1_r) * math.sin(lat2_r) - math.sin(lat1_r) * math.cos(lat2_r) * math.cos(dlon_r)
-    
+
     bearing = math.atan2(y, x)
     return (math.degrees(bearing) + 360) % 360
 
@@ -58,7 +62,7 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
                 industry = ind
                 city = c
                 break
-    
+
     if not industry:
         # Fallback placeholder
         industry = {
@@ -71,16 +75,16 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
             "permit_expiry": "2026-12-31",
             "stack_height_meters": 40.0
         }
-    
+
     # 2. Get nearest ward and current weather
     wards = db.query(Ward).filter(Ward.city == city).all()
     nearest_ward = None
     if wards:
         nearest_ward = min(
-            wards, 
+            wards,
             key=lambda w: math.sqrt((w.lat - industry["lat"])**2 + (w.lon - industry["lon"])**2)
         )
-    
+
     # Fetch weather
     weather = (
         db.query(Weather)
@@ -90,13 +94,13 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
     )
     wind_speed = weather.wind_speed if weather and weather.wind_speed else 8.5
     wind_dir = weather.wind_dir if weather and weather.wind_dir else 210.0
-    
+
     # 3. Wind Correlation Analysis
     # Calculates bearing from source (industry) to receptor (ward centroid)
     bearing = 0.0
     wind_correlation = "LOW"
     bearing_diff = 180.0
-    
+
     if nearest_ward:
         bearing = calculate_bearing(
             industry["lat"], industry["lon"],
@@ -107,7 +111,7 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
         bearing_diff = abs(wind_dir - bearing)
         if bearing_diff > 180:
             bearing_diff = 360 - bearing_diff
-        
+
         if bearing_diff <= 45:
             wind_correlation = "CRITICAL (DOWNWIND RECEPTOR)"
         elif bearing_diff <= 90:

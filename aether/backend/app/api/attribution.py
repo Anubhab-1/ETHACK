@@ -1,19 +1,27 @@
-from __future__ import annotations
 """AETHER — Attribution and Enforcement endpoints v2.0.
 Includes PMF/NMF source apportionment with 95% CI (Phase 2 National Upgrade).
 """
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, HTTPException
-from app.config import get_settings
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models import Ward, Attribution, EnforcementAction
-from app.schemas import (
-    AttributionResponse, EnforcementActionOut,
-    EnforcementStatusUpdate, EnforcementStats
-)
-from app.services.attributor import run_attribution_for_ward, get_current_aqi_for_ward, run_pmf_attribution
-from datetime import datetime
+
+from __future__ import annotations
+
 import logging
+from datetime import datetime
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+from app.database import get_db
+from app.models import Attribution, EnforcementAction, Ward
+from app.schemas import (
+    AttributionResponse,
+    EnforcementStats,
+    EnforcementStatusUpdate,
+)
+from app.services.attributor import (
+    run_attribution_for_ward,
+    run_pmf_attribution,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,13 +97,12 @@ def get_attribution(ward_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ward not found")
 
     # Check for recent cached attribution (< 2 hours old)
-    from datetime import timedelta
     from sqlalchemy import desc
-    
+
     recent = db.query(Attribution).filter(
         Attribution.ward_id == ward_id,
     ).order_by(desc(Attribution.computed_at)).first()
-    
+
     if recent and (datetime.utcnow() - recent.computed_at).total_seconds() < 7200:
         return AttributionResponse(
             ward_id=ward.id,
@@ -111,7 +118,7 @@ def get_attribution(ward_id: int, db: Session = Depends(get_db)):
             confidence=recent.confidence,
             explanation=recent.explanation or "",
         )
-    
+
     # Compute fresh
     result = run_attribution_for_ward(ward, db)
     return AttributionResponse(
@@ -180,11 +187,11 @@ def update_enforcement_status(
     action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-    
+
     valid_statuses = ["open", "deployed", "resolved"]
     if update.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Status must be one of {valid_statuses}")
-    
+
     action.status = update.status
     if update.status == "deployed":
         action.acknowledged_at = datetime.utcnow()
@@ -192,7 +199,7 @@ def update_enforcement_status(
         action.resolved_at = datetime.utcnow()
         if not action.acknowledged_at:
             action.acknowledged_at = datetime.utcnow() # safe fallback
-    
+
     db.commit()
     db.refresh(action)
     return {"id": action.id, "status": action.status, "updated": True}
@@ -209,35 +216,34 @@ def broadcast_alerts(
     if x_admin_key != settings.admin_key:
         raise HTTPException(status_code=403, detail="Forbidden: Invalid X-Admin-Key")
     import random
+
     import requests
-    from app.config import get_settings
-    
-    settings = get_settings()
+
     action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-    
+
     # Broadcast alerts to random count of residents (e.g. 120 to 240)
     action.alerts_sent = random.randint(120, 240)
     action.alerts_confirmed = 0
     action.status = "deployed"
-    
+
     # Attempt real Twilio SMS if credentials are configured
     twilio_status = "simulated"
-    if (settings.twilio_account_sid and settings.twilio_auth_token and 
+    if (settings.twilio_account_sid and settings.twilio_auth_token and
             settings.twilio_from_number and settings.twilio_to_number):
         try:
             from app.models import Ward
             from app.services.attributor import get_current_aqi_for_ward
             ward = db.query(Ward).filter(Ward.id == action.ward_id).first()
             aqi_val = get_current_aqi_for_ward(ward, db) if ward else "N/A"
-            
+
             message_body = (
                 f"KMC Alert: Ward {ward.ward_no if ward else '?' } ({ward.name if ward else '?'}) "
                 f"AQI is severe ({round(aqi_val) if isinstance(aqi_val, (int, float)) else aqi_val}). "
                 f"Enforcement action '{action.target_type}' deployed. Citizens advised to wear masks and limit outdoor activities."
             )
-            
+
             url = f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json"
             auth = (settings.twilio_account_sid, settings.twilio_auth_token)
             data = {
@@ -281,10 +287,10 @@ def confirm_alert_receipt(
     action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-        
+
     if not action.alerts_sent:
         action.alerts_sent = 150  # fallback baseline
-        
+
     # Increment alert confirmed by a random amount
     import random
     increment = random.randint(8, 18)
@@ -302,8 +308,7 @@ def confirm_alert_receipt(
 @router.get("/enforcement/stats", response_model=EnforcementStats)
 def get_enforcement_stats(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     """Get enforcement action counts by status."""
-    from sqlalchemy import func
-    
+
     counts = {}
     for status in ["open", "deployed", "resolved"]:
         count = db.query(EnforcementAction).filter(
@@ -311,7 +316,7 @@ def get_enforcement_stats(city: str = Query("Kolkata"), db: Session = Depends(ge
             EnforcementAction.status == status,
         ).count()
         counts[status] = count
-    
+
     return EnforcementStats(
         open=counts["open"],
         deployed=counts["deployed"],

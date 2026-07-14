@@ -4,12 +4,14 @@ Predicts the probability of environmental violations in wards using XGBoost.
 Provides explainable AI feature attribution via SHAP values.
 """
 from __future__ import annotations
+
 import logging
-import random
 import math
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 from sqlalchemy.orm import Session
-from app.models import Ward, Weather, CitizenReport, EnforcementAction
+
+from app.models import CitizenReport, EnforcementAction, Ward, Weather
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +124,7 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
             np.random.seed(42)
             n_samples = 300
             X_train = np.zeros((n_samples, len(feature_names)), dtype=np.float32)
-            
+
             for s in range(n_samples):
                 ind_score = np.random.uniform(10.0, 90.0)
                 road_dens = np.random.uniform(2.0, 8.0)
@@ -135,7 +137,7 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 t_c = np.random.uniform(15.0, 42.0)
                 w_s = np.random.uniform(2.0, 25.0)
                 hum = np.random.uniform(40.0, 95.0)
-                
+
                 compl_dens = complaints / max(1.0, road_dens)
                 ind_exp = ind_score * (schools + hospitals)
                 wind_stag = 1.0 / max(0.5, w_s)
@@ -150,14 +152,14 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 pop_dens = (pop * 100000.0) / max(1.0, road_dens)
                 hist_sev = hist_viols * 2.5
                 base_p = 0.05
-                
+
                 row = [
                     ind_score, road_dens, const_cnt, pop, schools, hospitals, complaints, hist_viols,
                     t_c, w_s, hum, compl_dens, ind_exp, wind_stag, high_temp_r, low_wind_r,
                     has_hosp, has_sch, risk_int_1, risk_int_2, risk_int_3, const_exp, pop_dens, hist_sev, base_p
                 ]
                 X_train[s] = row
-            
+
             # Physically consistent label logic (z score thresholding)
             z = (
                 X_train[:, 0] * 0.006 +      # industrial_score
@@ -170,7 +172,7 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 np.random.normal(0, 0.1, n_samples)
             )
             y_train = (z > 0.95).astype(int)
-            
+
             clf.fit(X_train, y_train)
 
             # Predict probabilities
@@ -204,7 +206,7 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
     results = []
     for i, w in enumerate(ward_info):
         prob = float(probs[i])
-        
+
         # Determine SHAP feature importances for this specific ward
         shap_contribs = {}
         if shap_values is not None and len(shap_values.shape) > 1:

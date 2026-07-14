@@ -5,18 +5,19 @@ Each tool returns structured data that agents use to reason and make decisions.
 Fully functional in offline mode — no external API keys required.
 """
 from __future__ import annotations
-import math
+
 import logging
+import math
 import random
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Any
-from sqlalchemy.orm import Session
-from app.models import Ward, Weather, Reading, Station, EnforcementAction
+from typing import Any, Dict
 
-logger = logging.getLogger(__name__)
-from app.services.pinn_dispersion import simulate_dispersion
+from sqlalchemy.orm import Session
+
+from app.models import EnforcementAction, Reading, Station, Ward, Weather
 from app.services.attributor import get_current_aqi_for_ward
 
+logger = logging.getLogger(__name__)
 
 # ─── Tool Registry ─────────────────────────────────────────────────────────────
 
@@ -275,7 +276,7 @@ def simulate_intervention(ward_id: int, action_type: str, db: Session) -> Dict[s
     total_w = traffic_w + industrial_w + construction_w + biomass_w
 
     # Fetch live stations and latest readings in this city to compute actual current AQI
-    stations = db.query(Station).filter(Station.city == ward.city, Station.active == True).all()
+    stations = db.query(Station).filter(Station.city == ward.city, Station.active).all()
     station_ids = [s.id for s in stations]
     latest_readings = {}
     if station_ids:
@@ -292,7 +293,7 @@ def simulate_intervention(ward_id: int, action_type: str, db: Session) -> Dict[s
             .all()
         )
         latest_readings = {r.station_id: r.aqi for r in latest_rows if r.aqi is not None}
-    
+
     current_aqi = get_current_aqi_for_ward(ward, db, stations=stations, latest_readings=latest_readings)
 
     # AQI reduction from intervention
@@ -359,7 +360,7 @@ def get_historical_outcomes(ward_id: int, action_type: str, db: Session) -> Dict
         return {"error": "Ward not found"}
 
     # Query enforcement actions from DB
-    recent_actions = (
+    (
         db.query(EnforcementAction)
         .filter(EnforcementAction.city == ward.city)
         .filter(EnforcementAction.status == "resolved")

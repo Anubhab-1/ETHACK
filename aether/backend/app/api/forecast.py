@@ -1,12 +1,16 @@
-from __future__ import annotations
 """AETHER — Forecast endpoint."""
+
+from __future__ import annotations
+
 import math
-from fastapi import APIRouter, Depends, Query, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models import Ward, Station
-from app.services.forecaster import predict_aqi
+from app.models import Ward
 from app.services.attributor import get_current_aqi_for_ward
+from app.services.forecaster import predict_aqi
 
 router = APIRouter()
 
@@ -34,7 +38,7 @@ def get_forecast(
 
     current_aqi = get_current_aqi_for_ward(ward, db)
     forecasts = predict_aqi(ward, db)
-    
+
     # Filter to requested horizon
     filtered = [f for f in forecasts if f["horizon_hours"] <= hours]
 

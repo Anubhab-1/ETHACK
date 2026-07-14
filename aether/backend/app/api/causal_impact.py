@@ -2,12 +2,18 @@
 AETHER — Causal Impact Analysis API Router
 """
 from __future__ import annotations
+
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, Query, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.services.causal_impact import compute_causal_impact, get_intervention_history_for_ward
+from app.services.causal_impact import (
+    compute_causal_impact,
+    get_intervention_history_for_ward,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/causal-impact", tags=["causal-impact"])
@@ -28,7 +34,7 @@ async def analyze_causal_impact(ward_id: str, intervention_date: str = Query("20
             if not w:
                 raise HTTPException(status_code=404, detail=f"Ward '{ward_id}' not found")
             w_id = w.id
-            
+
         result = compute_causal_impact(
             ward_id=w_id,
             intervention_type="Construction halt + Truck ban",
@@ -76,7 +82,7 @@ async def get_causal_history(ward_id: str, db: Session = Depends(get_db)):
             if not w:
                 raise HTTPException(status_code=404, detail=f"Ward '{ward_id}' not found")
             w_id = w.id
-            
+
         return get_intervention_history_for_ward(w_id, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -96,7 +102,7 @@ async def get_city_causal_history(city: str = Query("Kolkata"), db: Session = De
             .limit(10)
             .all()
         )
-        
+
         results = []
         for action, ward in actions:
             try:
@@ -127,15 +133,14 @@ async def get_city_causal_history(city: str = Query("Kolkata"), db: Session = De
                     "health_savings": 12.5,
                     "date": action.resolved_at.strftime("%Y-%m-%d") if action.resolved_at else action.created_at.strftime("%Y-%m-%d")
                 })
-                
+
         # If no real resolved actions exist yet, return high quality seeded defaults
         if not results:
-            import random
             from datetime import timedelta
             # Let's seed with some realistic looking history for the UI
             wards = db.query(Ward).filter(Ward.city == city).limit(5).all()
             ward_names = [w.name for w in wards] if wards else ["Salt Lake", "Topsia", "Metiabruz", "Belgachia", "Howrah"]
-            
+
             interventions = [
                 ("Heavy Vehicle Ban", -89.0, 0.003, 14.2),
                 ("Show-Cause Notice", -67.0, 0.007, 10.8),
@@ -143,7 +148,7 @@ async def get_city_causal_history(city: str = Query("Kolkata"), db: Session = De
                 ("Combined Emergency", -173.0, 0.0004, 27.7),
                 ("Construction Halt", -67.0, 0.019, 10.7)
             ]
-            
+
             for i, (int_name, ate, p, savings) in enumerate(interventions):
                 w_name = ward_names[i % len(ward_names)]
                 days_ago = 5 + i * 8
@@ -157,7 +162,7 @@ async def get_city_causal_history(city: str = Query("Kolkata"), db: Session = De
                     "health_savings": savings,
                     "date": date_str
                 })
-                
+
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -2,10 +2,13 @@
 AETHER — Coordinated Agent Committee API Router
 """
 from __future__ import annotations
+
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from app.database import get_db
 from app.models import Ward
 from app.services.agent_committee import run_agent_committee
@@ -29,20 +32,23 @@ async def run_advanced_deliberation(ward_id: str, background_tasks: BackgroundTa
         ward = db.query(Ward).filter(Ward.id == w_id).first()
     except ValueError:
         ward = db.query(Ward).filter(Ward.name.like(f"%{ward_id}%")).first()
-        
+
     if not ward:
         raise HTTPException(status_code=404, detail=f"Ward '{ward_id}' not found")
-        
+
     # 2. Fetch current data
-    from app.services.attributor import get_current_aqi_for_ward, run_attribution_for_ward
+    from app.services.attributor import (
+        get_current_aqi_for_ward,
+        run_attribution_for_ward,
+    )
     current_aqi = get_current_aqi_for_ward(ward, db)
     attribution = run_attribution_for_ward(ward, db)
-    
+
     # 3. Predict forecast
     from app.services.forecaster import predict_aqi
     forecasts = predict_aqi(ward, db)
     forecast_24h = forecasts[0]["predicted_aqi"] if forecasts else current_aqi * 1.1
-    
+
     # 4. Run committee consensus
     result = run_agent_committee(
         ward_id=str(ward.id),
@@ -51,14 +57,14 @@ async def run_advanced_deliberation(ward_id: str, background_tasks: BackgroundTa
         source_breakdown=attribution,
         db=db
     )
-    
+
     # Add metadata
     result["ward_name"] = ward.name
     result["current_aqi"] = current_aqi
-    
+
     # Async audit log
     background_tasks.add_task(log_deliberation_to_db, result)
-    
+
     return result
 
 @router.get("/audit/{ward_id}")
@@ -71,10 +77,10 @@ async def get_deliberation_history(ward_id: str, limit: int = 10, db: Session = 
         ward = db.query(Ward).filter(Ward.id == w_id).first()
     except ValueError:
         ward = db.query(Ward).filter(Ward.name.like(f"%{ward_id}%")).first()
-        
+
     if not ward:
         raise HTTPException(status_code=404, detail=f"Ward '{ward_id}' not found")
-        
+
     # Simulated audit logs reflecting past consensus decrees
     now = datetime.now()
     history = [
@@ -86,7 +92,7 @@ async def get_deliberation_history(ward_id: str, limit: int = 10, db: Session = 
         }
         for i in range(1, 4)
     ]
-    
+
     return {
         "ward_id": ward.id,
         "ward_name": ward.name,

@@ -1,11 +1,15 @@
-from __future__ import annotations
 """
 AETHER — Seed all CPCB stations for Kolkata, Delhi, Mumbai.
 """
+
+from __future__ import annotations
+
+import logging
+
 from sqlalchemy.orm import Session
+
 from app.models import Station
 from app.services.fetch_cpcb import _get_city_station_defaults
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,7 @@ def seed_all_stations(db: Session):
                 )
                 db.add(station)
                 total += 1
-    
+
     db.commit()
     logger.info(f"Seeded {total} stations")
     return total
