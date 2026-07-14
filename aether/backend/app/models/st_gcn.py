@@ -23,6 +23,8 @@ except Exception:
     class nn:
         class Module:
             pass
+    class GCNConv:
+        pass
     logger.warning("torch or torch-geometric not available. STGCN models will stub out.")
 
 class STGCNBlock(nn.Module):
