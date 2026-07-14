@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 try:
     import torch
     import torch.nn as nn
-    from torch_geometric.nn import GCNConv
     TORCH_AVAILABLE = True
 except Exception:
     TORCH_AVAILABLE = False
@@ -23,9 +22,26 @@ except Exception:
     class nn:
         class Module:
             pass
-    class GCNConv:
-        pass
-    logger.warning("torch or torch-geometric not available. STGCN models will stub out.")
+    logger.warning("torch not available. STGCN models will stub out.")
+
+try:
+    from torch_geometric.nn import GCNConv
+except Exception:
+    if TORCH_AVAILABLE:
+        class GCNConv(nn.Module):
+            def __init__(self, in_channels, out_channels):
+                super().__init__()
+                self.linear = nn.Linear(in_channels, out_channels)
+
+            def forward(self, x, edge_index=None, edge_weight=None):
+                return self.linear(x)
+    else:
+        class GCNConv:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def __call__(self, *args, **kwargs):
+                pass
 
 class STGCNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3):
