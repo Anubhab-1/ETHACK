@@ -471,5 +471,8 @@ export const api = {
       city: string;
       bounds: [[number, number], [number, number]];
       grid: { lat: number; lon: number; value: number; unit: string }[];
+      source?: string;
+      real_data?: boolean;
+      fetched_at?: string;
     }>(`/api/aqi/satellite?city=${encodeURIComponent(city)}`),
 };
