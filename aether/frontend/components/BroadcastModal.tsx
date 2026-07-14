@@ -209,6 +209,7 @@ export function BroadcastModal({
     const voices = window.speechSynthesis.getVoices();
     const voiceLang = language === "bn" ? "bn" : language === "hi" ? "hi" : "en";
     const selectedVoice = voices.find((v) => v.lang.startsWith(voiceLang));
+    utterance.lang = language === "hi" ? "hi-IN" : language === "bn" ? "bn-IN" : "en-US";
     if (selectedVoice) utterance.voice = selectedVoice;
 
     utterance.onend = () => {

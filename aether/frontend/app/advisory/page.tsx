@@ -325,6 +325,7 @@ export default function AdvisoryPage() {
       voice = voices.find(v => v.lang.includes("en-IN") || v.lang.startsWith("en")) || null;
     }
 
+    utterance.lang = language === "hi" ? "hi-IN" : language === "bn" ? "bn-IN" : "en-US";
     if (voice) {
       utterance.voice = voice;
     }
