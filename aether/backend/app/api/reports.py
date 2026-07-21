@@ -64,6 +64,7 @@ def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
         lon=report_in.lon,
         status="pending",
         upvote_count=0,
+        photo_url=report_in.photo_url,
         created_at=datetime.utcnow()
     )
 
@@ -102,6 +103,24 @@ def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
     # Formulate output with ward name
     out = CitizenReportOut.model_validate(new_report)
     out.ward_name = ward.name
+    return out
+
+
+@router.get("/reports/{report_id}", response_model=CitizenReportOut)
+def get_report_by_id(report_id: int, db: Session = Depends(get_db)):
+    """Retrieve details and status for a specific citizen report."""
+    result = (
+        db.query(CitizenReport, Ward.name.label("ward_name"))
+        .outerjoin(Ward, CitizenReport.ward_id == Ward.id)
+        .filter(CitizenReport.id == report_id)
+        .first()
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    report, ward_name = result
+    out = CitizenReportOut.model_validate(report)
+    out.ward_name = ward_name or f"Ward #{report.ward_id}"
     return out
 
 

@@ -201,10 +201,38 @@ app.add_middleware(
     allow_origins=origins,
     allow_origin_regex=r"https://.*\.(vercel\.app|railway\.app|up\.railway\.app|onrender\.com)$",
     allow_credentials=True,
-    # Restricted to only the HTTP methods this API actually uses
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Request-ID", "Accept"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_request_tracing(request, call_next):
+    import time
+    import uuid
+    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    request.state.request_id = request_id
+    
+    logger.info(f"[{request_id}] {request.method} {request.url.path} - STARTED")
+    start_time = time.time()
+    
+    try:
+        response = await call_next(request)
+        process_time = (time.time() - start_time) * 1000
+        logger.info(
+            f"[{request_id}] {request.method} {request.url.path} - "
+            f"{response.status_code} ({process_time:.2f}ms)"
+        )
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Process-Time-Ms"] = f"{process_time:.2f}"
+        return response
+    except Exception as e:
+        process_time = (time.time() - start_time) * 1000
+        logger.error(
+            f"[{request_id}] {request.method} {request.url.path} - "
+            f"FAILED with exception: {e} ({process_time:.2f}ms)"
+        )
+        raise e
 
 from app.api import (  # noqa: E402
     advisory,
@@ -222,6 +250,8 @@ from app.api import (  # noqa: E402
     reports,
     simulation,
     ws,
+    forecast_models,
+    citizen,
 )
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
@@ -234,9 +264,11 @@ app.include_router(diagnostics.router, prefix="/api", tags=["Diagnostics"])
 app.include_router(simulation.router, prefix="/api", tags=["Simulation"])
 app.include_router(reports.router, prefix="/api", tags=["Citizen Reports"])
 app.include_router(ws.router, prefix="/api", tags=["WebSockets"])
+app.include_router(citizen.router, prefix="/api", tags=["Citizen Alerts"])
 
 # Advanced National Upgrade Routers
 app.include_router(forecast_advanced.router, tags=["Forecast Advanced"])
+app.include_router(forecast_models.router, tags=["Models"])
 app.include_router(attribution_advanced.router, tags=["Attribution Advanced"])
 app.include_router(causal_impact.router, tags=["Causal Impact"])
 app.include_router(enforcement_advanced.router, tags=["Enforcement Advanced"])

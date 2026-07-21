@@ -35,7 +35,8 @@ const AetherMap = dynamic(() => import("@/components/AetherMap").then((m) => m.A
   ),
 });
 
-type TaskStatus = "pending" | "in_progress" | "completed" | "escalated";
+type TaskStatus = "pending" | "in_progress" | "completed" | "escalated" | "evidence_collected";
+
 
 interface TaskState {
   actionId: number;
@@ -86,38 +87,17 @@ export default function FieldOfficerPage() {
   const [evidenceSubmitted, setEvidenceSubmitted] = useState(false);
   const [submittingEvidence, setSubmittingEvidence] = useState(false);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setPhotoUrl(url);
-    }
-  };
+  // Offline states
+  const [isOffline, setIsOffline] = useState(false);
+  const [syncingOffline, setSyncingOffline] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
-  const submitEvidence = () => {
-    setSubmittingEvidence(true);
-    setTimeout(() => {
-      setSubmittingEvidence(false);
-      setEvidenceSubmitted(true);
-      setTimeout(() => {
-        setEvidenceSubmitted(false);
-        setPhotoUrl(null);
-        setEvidenceNotes("");
-        setActiveTab("tasks");
-      }, 1500);
-    }, 1000);
-  };
+  const [optimizedRoute, setOptimizedRoute] = useState<EnforcementAction[]>([]);
+  const [reoptimizing, setReoptimizing] = useState(false);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setGpsStamp(`${pos.coords.latitude.toFixed(4)}°N ${pos.coords.longitude.toFixed(4)}°E`),
-        () => setGpsStamp("22.5428°N 88.3273°E")
-      );
-    } else {
-      setGpsStamp("22.5428°N 88.3273°E");
-    }
-  }, []);
+    setOptimizedRoute(actions.slice(0, 5));
+  }, [actions]);
 
   const loadTasks = useCallback(async () => {
     setError(null);
@@ -150,14 +130,228 @@ export default function FieldOfficerPage() {
     loadTasks();
   }, [loadTasks]);
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const submitEvidence = async () => {
+    if (expandedId === null) return;
+    setSubmittingEvidence(true);
+    
+    const evidencePayload = {
+      actionId: expandedId,
+      notes: evidenceNotes,
+      photoUrl: photoUrl || "",
+      severity: evidenceSeverity
+    };
+
+    if (isOffline) {
+      try {
+        const cached = localStorage.getItem("aether_offline_evidence");
+        const queue = cached ? JSON.parse(cached) : [];
+        queue.push(evidencePayload);
+        localStorage.setItem("aether_offline_evidence", JSON.stringify(queue));
+        
+        setTaskStates(prev => ({
+          ...prev,
+          [expandedId]: { ...prev[expandedId], status: "evidence_collected" }
+        }));
+        
+        setSubmittingEvidence(false);
+        setEvidenceSubmitted(true);
+        setSyncMessage("💾 Evidence cached offline. Will auto-sync when online.");
+        
+        setTimeout(() => {
+          setEvidenceSubmitted(false);
+          setPhotoUrl(null);
+          setEvidenceNotes("");
+          setSyncMessage("");
+          setActiveTab("tasks");
+        }, 2000);
+      } catch (e) {
+        console.error(e);
+        setSubmittingEvidence(false);
+        alert("Failed to write to local storage.");
+      }
+    } else {
+      try {
+        await api.updateEnforcementStatus(expandedId, "evidence_collected", {
+          notes: evidenceNotes,
+          photo_url: photoUrl || undefined,
+          severity: evidenceSeverity
+        });
+        
+        setTaskStates(prev => ({
+          ...prev,
+          [expandedId]: { ...prev[expandedId], status: "evidence_collected" }
+        }));
+        
+        setSubmittingEvidence(false);
+        setEvidenceSubmitted(true);
+        
+        setTimeout(() => {
+          setEvidenceSubmitted(false);
+          setPhotoUrl(null);
+          setEvidenceNotes("");
+          setActiveTab("tasks");
+          loadTasks();
+        }, 1500);
+      } catch (e) {
+        console.error(e);
+        setSubmittingEvidence(false);
+        alert("Failed to submit evidence package.");
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateOnline = () => {
+      const offline = !navigator.onLine;
+      setIsOffline(offline);
+    };
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    updateOnline();
+    return () => {
+      window.removeEventListener("online", updateOnline);
+      window.removeEventListener("offline", updateOnline);
+    };
+  }, []);
+
+  const syncOfflineEvidence = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator.onLine || syncingOffline) return;
+    const cached = localStorage.getItem("aether_offline_evidence");
+    if (!cached) return;
+    try {
+      const queue = JSON.parse(cached);
+      if (queue.length === 0) return;
+      
+      setSyncingOffline(true);
+      setSyncMessage(`📶 Syncing ${queue.length} cached evidence package(s)...`);
+      
+      for (const item of queue) {
+        await api.updateEnforcementStatus(item.actionId, "evidence_collected", {
+          notes: item.notes,
+          photo_url: item.photoUrl || undefined,
+          severity: item.severity
+        });
+      }
+      
+      localStorage.removeItem("aether_offline_evidence");
+      setSyncMessage(`✓ Synced ${queue.length} offline evidence packages successfully.`);
+      setTimeout(() => setSyncMessage(""), 3000);
+      loadTasks();
+    } catch (e) {
+      console.error("Failed to sync offline evidence:", e);
+      setSyncMessage("⚠️ Offline sync failed. Will retry later.");
+    } finally {
+      setSyncingOffline(false);
+    }
+  }, [loadTasks, syncingOffline]);
+
+  useEffect(() => {
+    if (!isOffline) {
+      syncOfflineEvidence();
+    }
+  }, [isOffline, syncOfflineEvidence]);
+
+  const handleReoptimizeRoute = async () => {
+    if (actions.length === 0 || reoptimizing) return;
+    setReoptimizing(true);
+    try {
+      let depotLat = 22.5428;
+      let depotLon = 88.3273;
+      if (navigator.geolocation) {
+        await new Promise<void>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              depotLat = pos.coords.latitude;
+              depotLon = pos.coords.longitude;
+              resolve();
+            },
+            () => resolve()
+          );
+        });
+      }
+
+      const locations = [
+        { id: 0, lat: depotLat, lon: depotLon, priority: 0.0 },
+        ...actions.slice(0, 8).map((a) => ({
+          id: a.id,
+          lat: a.ward_lat,
+          lon: a.ward_lon,
+          priority: a.priority_score
+        }))
+      ];
+
+      const result = await api.optimizeRoutes({
+        locations,
+        n_inspectors: 1,
+        time_budget_hours: 8.0
+      });
+
+      const routes = result.routes || [];
+      const inspectorRoute = routes.find((r) => r.inspector_id === 1);
+      if (inspectorRoute && inspectorRoute.stops.length > 0) {
+        const orderedActions: EnforcementAction[] = [];
+        inspectorRoute.stops.forEach((stop: any) => {
+          const matchAction = actions.find((a) => a.id === stop.site_id);
+          if (matchAction) {
+            orderedActions.push(matchAction);
+          }
+        });
+
+        actions.slice(0, 5).forEach((a) => {
+          if (!orderedActions.some((o) => o.id === a.id)) {
+            orderedActions.push(a);
+          }
+        });
+
+        setOptimizedRoute(orderedActions.slice(0, 5));
+        alert("📶 Route optimized using Google OR-Tools VRP Solver!");
+      } else {
+        alert("OR-Tools: All sites are within distance, keeping priority ordering.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to re-optimize route. Backend OR-Tools service is offline.");
+    } finally {
+      setReoptimizing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setGpsStamp(`${pos.coords.latitude.toFixed(4)}°N ${pos.coords.longitude.toFixed(4)}°E`),
+        () => setGpsStamp("22.5428°N 88.3273°E")
+      );
+    } else {
+      setGpsStamp("22.5428°N 88.3273°E");
+    }
+  }, []);
+
+
+
   const setStatus = (actionId: number, status: TaskStatus) => {
     setTaskStates(prev => ({ ...prev, [actionId]: { ...prev[actionId], status } }));
     if (status === "completed") {
       api.updateEnforcementStatus(actionId, "resolved").catch(() => {});
     } else if (status === "in_progress") {
       api.updateEnforcementStatus(actionId, "deployed").catch(() => {});
+    } else if (status === "evidence_collected") {
+      api.updateEnforcementStatus(actionId, "evidence_collected").catch(() => {});
     }
   };
+
 
   const generateNotice = async (action: EnforcementAction) => {
     setNoticeTarget(action);
@@ -227,7 +421,7 @@ export default function FieldOfficerPage() {
   const total = actions.length;
 
   // Build optimized route from top-priority pending tasks
-  const route = actions.slice(0, 5);
+  const route = optimizedRoute;
 
   return (
     <AppShell city={city}>
@@ -279,11 +473,25 @@ export default function FieldOfficerPage() {
           </button>
         </div>
 
-        {/* Offline indicator */}
-        <div className="flex items-center gap-2 bg-blue-950/30 border border-blue-800/30 rounded-lg px-3 py-2 text-xs text-blue-300">
-          <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-          PWA Mode: Tasks synced live · GPS active · Evidence cached offline
-        </div>
+        {/* Offline & Sync Banners */}
+        {isOffline ? (
+          <div className="flex items-center gap-2 bg-blue-950/40 border border-blue-700/50 rounded-lg px-3 py-2.5 text-xs text-blue-300">
+            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            📴 Offline Mode Active. Task lists and evidence updates will cache locally.
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 bg-emerald-950/30 border border-emerald-800/30 rounded-lg px-3 py-2 text-xs text-emerald-300">
+            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            📶 PWA Mode: Tasks synced live · GPS active · Offline cache ready
+          </div>
+        )}
+
+        {syncMessage && (
+          <div className="flex items-center gap-2 bg-indigo-950/40 border border-indigo-700/50 rounded-lg px-3 py-2.5 text-xs text-indigo-300 animate-pulse">
+            <span>⚙️</span>
+            {syncMessage}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex border-b border-slate-800">
@@ -335,6 +543,7 @@ export default function FieldOfficerPage() {
                       ts.status === "completed" ? "border-emerald-800/30 bg-emerald-950/10 opacity-60" :
                       ts.status === "escalated" ? "border-red-800/40 bg-red-950/10" :
                       ts.status === "in_progress" ? "border-indigo-600/50 bg-indigo-950/15 ring-1 ring-indigo-500/20" :
+                      ts.status === "evidence_collected" ? "border-amber-600/50 bg-amber-950/15 ring-1 ring-amber-500/20" :
                       "border-slate-700/40 bg-slate-900/40 hover:border-slate-600/60"
                     }`}
                   >
@@ -350,6 +559,7 @@ export default function FieldOfficerPage() {
                             <PriorityBadge score={action.priority_score} />
                             {ts.status === "completed" && <span className="text-[10px] text-emerald-400 flex items-center gap-1"><CheckCircle size={10} /> Done</span>}
                             {ts.status === "in_progress" && <span className="text-[10px] text-indigo-400 animate-pulse flex items-center gap-1"><Zap size={10} /> In Progress</span>}
+                            {ts.status === "evidence_collected" && <span className="text-[10px] text-amber-400 flex items-center gap-1">📜 Evidence Staged</span>}
                             {ts.status === "escalated" && <span className="text-[10px] text-red-400 flex items-center gap-1"><AlertTriangle size={10} /> Escalated</span>}
                           </div>
                           <div className="text-white font-semibold text-sm truncate">{action.ward_name}</div>
@@ -393,6 +603,23 @@ export default function FieldOfficerPage() {
                             <button onClick={() => setStatus(action.id, "escalated")} className="px-3 bg-red-800 hover:bg-red-700 text-white text-xs py-2 rounded-lg">🚨 Escalate</button>
                           </div>
                         )}
+                        {ts.status === "evidence_collected" && (
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              onClick={() => window.open(`/api/enforcement/${action.id}/notice/export`, "_blank")}
+                              className="flex-1 bg-amber-600 hover:bg-amber-500 text-white text-xs py-2 rounded-lg font-medium transition-colors"
+                            >
+                              🖨️ View Official Notice
+                            </button>
+                            <button
+                              onClick={() => setStatus(action.id, "completed")}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 rounded-lg font-medium transition-colors"
+                            >
+                              ✅ Resolve Action
+                            </button>
+                          </div>
+                        )}
+
                       </div>
                     )}
                   </div>
@@ -447,10 +674,30 @@ export default function FieldOfficerPage() {
             </div>
 
             <div className="glass-card p-4">
-              <h3 className="text-white font-semibold mb-1 flex items-center gap-2"><Map size={14} className="text-indigo-400" /> OR-Tools Optimized Route</h3>
-              <p className="text-slate-400 text-xs mb-4">
-                Priority-weighted vehicle routing. Top {Math.min(route.length, 5)} open actions.
-              </p>
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div>
+                  <h3 className="text-white font-semibold flex items-center gap-2">
+                    <Map size={14} className="text-indigo-400" /> OR-Tools Optimized Route
+                  </h3>
+                  <p className="text-slate-400 text-[10px] mt-0.5">
+                    Priority-weighted vehicle routing. Top {Math.min(route.length, 5)} open actions.
+                  </p>
+                </div>
+                <button
+                  onClick={handleReoptimizeRoute}
+                  disabled={reoptimizing || actions.length === 0 || isOffline}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold rounded-lg text-xs transition-colors flex items-center gap-1 hover:shadow-lg cursor-pointer"
+                >
+                  {reoptimizing ? (
+                    <>
+                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                      Optimizing...
+                    </>
+                  ) : (
+                    <>🔄 Re-Optimize (OR-Tools)</>
+                  )}
+                </button>
+              </div>
 
               <div className="space-y-3">
                 {[{ ward: "Base Station", action: "Depart 09:00", icon: "🏢", isBase: true },
@@ -523,8 +770,8 @@ export default function FieldOfficerPage() {
                   <Camera size={28} className="mx-auto text-slate-600 animate-pulse" />
                   <div className="text-slate-300 text-sm font-medium">Camera Evidence Capture</div>
                   <div className="text-slate-500 text-[11px]">Photo auto-stamped with GPS, timestamp, officer ID</div>
-                  <label className="mt-2 inline-block bg-indigo-600/60 hover:bg-indigo-600 text-white text-xs px-4 py-2 rounded-lg border border-indigo-500/40 cursor-pointer transition-colors">
-                    📷 Capture / Upload
+                  <label className="mt-2 inline-block bg-indigo-600/60 hover:bg-indigo-600 text-white text-xs px-4 py-2 rounded-lg border border-indigo-500/40 cursor-pointer transition-colors" title="Persists base64 image data to SQLite db">
+                    📷 Capture / Upload (staged in DB)
                     <input type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} className="hidden" />
                   </label>
                 </div>
@@ -593,8 +840,18 @@ export default function FieldOfficerPage() {
                 </div>
                 <div className="flex gap-2">
                   <button className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm py-2.5 rounded-xl font-medium">📲 Send via WhatsApp</button>
-                  <button className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm py-2.5 rounded-xl font-medium">🖨️ Print Copy</button>
+                  <button
+                    onClick={() => {
+                      if (noticeTarget) {
+                        window.open(`/api/enforcement/${noticeTarget.id}/notice/export`, '_blank');
+                      }
+                    }}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm py-2.5 rounded-xl font-medium"
+                  >
+                    🖨️ Print Official Notice
+                  </button>
                 </div>
+
               </>
             ) : (
               <div className="glass-card py-12 text-center text-slate-500">

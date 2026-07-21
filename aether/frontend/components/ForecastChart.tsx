@@ -21,31 +21,50 @@ interface ForecastChartProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const aqiPayload = payload.find((p: any) => p.dataKey === "aqi");
+    const simulatedPayload = payload.find((p: any) => p.dataKey === "simulated");
     const upperPayload = payload.find((p: any) => p.dataKey === "upper");
     const lowerPayload = payload.find((p: any) => p.dataKey === "lower");
     const tempPayload  = payload.find((p: any) => p.dataKey === "temp_c");
 
     const aqi = aqiPayload ? aqiPayload.value : null;
+    const simulated = simulatedPayload ? simulatedPayload.value : null;
     const upper = upperPayload ? upperPayload.value : null;
     const lower = lowerPayload ? lowerPayload.value : null;
 
     const level = getAQILevel(aqi);
+    const simLevel = simulated !== null ? getAQILevel(simulated) : null;
     return (
       <div className="bg-gray-900 border border-gray-700 rounded-xl p-3 shadow-2xl">
-        <p className="text-gray-400 text-xs mb-1">{label}</p>
-        <p className="font-bold text-lg" style={{ color: level.color }}>
-          AQI {aqi !== null ? Math.round(aqi) : "—"}
-        </p>
-        <p className="text-xs font-semibold" style={{ color: level.color }}>
-          {level.label}
-        </p>
+        <p className="text-gray-400 text-xs mb-1.5">{label}</p>
+        <div className="flex justify-between items-start gap-4">
+          <div>
+            <p className="text-[9px] text-gray-500 font-semibold uppercase tracking-wider mb-0.5">Predicted</p>
+            <p className="font-bold text-base" style={{ color: level.color }}>
+              AQI {aqi !== null ? Math.round(aqi) : "—"}
+            </p>
+            <p className="text-[10px] font-semibold" style={{ color: level.color }}>
+              {level.label}
+            </p>
+          </div>
+          {simulated !== null && simulated !== aqi && simLevel && (
+            <div className="border-l border-white/10 pl-4">
+              <p className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wider mb-0.5">Simulated</p>
+              <p className="font-bold text-base text-emerald-400">
+                AQI {Math.round(simulated)}
+              </p>
+              <p className="text-[10px] font-semibold text-emerald-400">
+                {simLevel.label}
+              </p>
+            </div>
+          )}
+        </div>
         {upper !== null && lower !== null && (
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 mt-2">
             ±1σ Range: {Math.round(lower)} – {Math.round(upper)}
           </p>
         )}
         {tempPayload && (
-          <p className="text-xs text-blue-400 mt-0.5">🌡 {tempPayload.value}°C</p>
+          <p className="text-xs text-blue-400 mt-1">🌡 {tempPayload.value}°C</p>
         )}
       </div>
     );
@@ -115,7 +134,9 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
 
   // Detect forecast method from first data point (all share same method)
   const method = (forecasts[0] as any)?.method || "Persistence+Weather";
-  const isXGB = method.startsWith("XGBoost");
+  const lowerMethod = method.toLowerCase();
+  const isXGB = lowerMethod.startsWith("xgboost") || lowerMethod.includes("xgboost");
+  const isSTGCN = lowerMethod.includes("st-gcn") || lowerMethod.includes("stgcn") || lowerMethod.includes("st_gcn") || lowerMethod.includes("st gcn");
 
   // Show every 6th tick label for 72-point datasets
   const tickInterval = forecasts.length > 10 ? 5 : 0;
@@ -123,11 +144,14 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
   const data = forecasts.map((f) => ({
     time: format(parseISO(f.forecast_for), forecasts.length > 10 ? "dd HH:mm" : "dd MMM HH:mm"),
     aqi: f.predicted_aqi,
+    simulated: (f as any).simulated_aqi !== undefined ? (f as any).simulated_aqi : null,
     lower: f.confidence_lower ?? Math.max(0, f.predicted_aqi * 0.85),
     upper: f.confidence_upper ?? f.predicted_aqi * 1.15,
     category: f.predicted_category,
     temp_c: (f as any).temp_c ?? null,
   }));
+
+  const hasSimulated = data.some((d) => d.simulated !== null && d.simulated !== d.aqi);
 
   const thresholds = [
     { value: 50,  color: "#00e400" },
@@ -146,11 +170,13 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
       {/* Method + source badge */}
       <div className="flex items-center gap-2 mb-2">
         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-          isXGB
+          isSTGCN
+            ? "bg-purple-600/15 text-purple-300 border border-purple-600/30"
+            : isXGB
             ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
             : "bg-gray-700/50 text-gray-400 border border-gray-600/30"
         }`}>
-          {isXGB ? "⚡ XGBoost+Weather" : "📊 Persistence+Weather"}
+          {isSTGCN ? "🧠 ST-GCN" : isXGB ? "⚡ XGBoost+Weather" : "📊 Persistence+Weather"}
         </span>
         <span className="text-[9px] text-gray-600">
           {forecasts.length}h · Open-Meteo
@@ -241,6 +267,20 @@ export function ForecastChart({ forecasts, currentAQI }: ForecastChartProps) {
               activeDot={{ r: 5, fill: "#f97316", strokeWidth: 2, stroke: "#fff" }}
               name="AQI"
             />
+
+            {/* Simulated AQI line */}
+            {hasSimulated && (
+              <Line
+                type="monotone"
+                dataKey="simulated"
+                stroke="#10b981"
+                strokeWidth={2.5}
+                strokeDasharray="5 5"
+                dot={false}
+                activeDot={{ r: 5, fill: "#10b981", strokeWidth: 2, stroke: "#fff" }}
+                name="Simulated AQI"
+              />
+            )}
 
             {/* Temperature overlay */}
             {hasTemp && (

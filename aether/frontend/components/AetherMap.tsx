@@ -25,7 +25,7 @@ interface AetherMapProps {
   windSpeed?: number;
   windDir?: number;
   showSatellite?: boolean;
-  satelliteGrid?: { lat: number; lon: number; value: number }[];
+  satelliteGrid?: { lat: number; lon: number; value: number; uncertainty_margin?: number }[];
   showRoute?: boolean;
   wardDetail?: WardDetail | null;
   citizenReports?: import("@/lib/api").CitizenReport[];
@@ -255,9 +255,29 @@ export function AetherMap({
               color: "transparent",
               weight: 0,
             }}
-          />
+          >
+            <Popup className="aether-popup">
+              <div className="text-gray-100 bg-gray-950 p-2.5 rounded-lg text-xs space-y-1">
+                <div className="font-bold border-b border-white/10 pb-1 text-orange-400">
+                  🛰️ Sentinel-5P TROPOMI NO₂
+                </div>
+                <div>
+                  <strong>Tropospheric Column:</strong> {gridPoint.value} × 10⁻⁴ mol/m²
+                </div>
+                {gridPoint.uncertainty_margin !== undefined && (
+                  <div>
+                    <strong>Precision Margin:</strong> ± {gridPoint.uncertainty_margin}
+                  </div>
+                )}
+                <div className="text-[10px] text-gray-500 pt-0.5">
+                  Lat: {gridPoint.lat.toFixed(3)} · Lon: {gridPoint.lon.toFixed(3)}
+                </div>
+              </div>
+            </Popup>
+          </CircleMarker>
         );
       })}
+
 
       {/* Citizen Incident Reports Layer */}
       {showCitizenReports && citizenReports.map((report) => (

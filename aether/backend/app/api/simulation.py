@@ -240,21 +240,31 @@ def get_satellite_calibration(
         )
         latest_readings = {r.station_id: r.aqi for r in latest_rows if r.aqi is not None}
 
+    from app.services.satellite import fetch_calibrated_satellite_grid
+    sat_grid_data = fetch_calibrated_satellite_grid(city)
+    grid_points = sat_grid_data.get("grid", [])
+
     points = []
     for w in wards:
         ground_aqi = get_current_aqi_for_ward(w, db, stations=stations, latest_readings=latest_readings)
-        # Sentinel column density is simulated based on ground AQI with deterministic relative noise
-        import random
-        rng = random.Random(w.id)
-        noise_pct = rng.uniform(-0.03, 0.03)
-        satellite_no2 = (ground_aqi * 0.02) * (1.0 + noise_pct)
-        # Ensure it maps reasonably
-        satellite_no2 = max(0.1, min(10.0, satellite_no2))
+        
+        # Find nearest satellite pixel
+        nearest_pixel = None
+        min_dist = float("inf")
+        for p in grid_points:
+            dist = math.sqrt((w.lat - p["lat"])**2 + (w.lon - p["lon"])**2)
+            if dist < min_dist:
+                min_dist = dist
+                nearest_pixel = p
+        
+        satellite_no2 = nearest_pixel["value"] if nearest_pixel else 1.0
+
         points.append(CalibrationPoint(
             ward_name=w.name,
             ground_aqi=ground_aqi,
             satellite_no2=round(satellite_no2, 2)
         ))
+
 
     # Calculate regression metrics
     n = len(points)

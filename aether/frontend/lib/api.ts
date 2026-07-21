@@ -98,6 +98,17 @@ export interface ForecastResponse {
   lon: number;
   current_aqi: number;
   forecasts: ForecastPoint[];
+  feature_attribution?: Record<string, number> | null;
+}
+
+export interface TrainingJobResponse {
+  city: string;
+  job_id: string;
+  status: string;
+  message: string;
+  created_at?: string;
+  updated_at?: string;
+  results?: Record<string, any> | null;
 }
 
 export interface AttributionResponse {
@@ -125,6 +136,9 @@ export interface EnforcementAction {
   detected_at?: string;
   acknowledged_at?: string;
   resolved_at?: string;
+  evidence_notes?: string;
+  evidence_photo_url?: string;
+  evidence_severity?: string;
 }
 
 export interface EnforcementStats {
@@ -162,6 +176,7 @@ export interface CitizenReport {
   lon: number;
   status: string;
   upvote_count: number;
+  photo_url?: string;
   created_at: string;
   ward_name?: string;
 }
@@ -175,6 +190,27 @@ export interface CitizenReportInput {
   severity?: string;
   lat: number;
   lon: number;
+  photo_url?: string;
+}
+
+export interface SubscriptionInput {
+  city: string;
+  ward_id: number;
+  phone_number?: string;
+  email?: string;
+  language?: string;
+  notify_level?: string;
+}
+
+export interface SubscriptionResponse {
+  id: number;
+  city: string;
+  ward_id: number;
+  phone_number?: string;
+  email?: string;
+  language: string;
+  notify_level: string;
+  created_at: string;
 }
 
 // ── Generic fetch helper ──────────────────────────────────────────────────────
@@ -224,6 +260,78 @@ export const api = {
       `/api/forecast?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}&hours=${hours}`
     ),
 
+  /** Prefer the advanced ST-GCN forecast when model weights are available. Falls back to `forecast`. */
+  getBestForecast: async (lat: number, lon: number, city = "Kolkata", hours = 72, forceFallback = false, forceAdvanced = false) => {
+    if (forceFallback) {
+      return apiFetch<ForecastResponse>(
+        `/api/forecast?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}&hours=${hours}`
+      );
+    }
+
+    // Check server-side models for ST-GCN weights (unless caller forces advanced)
+    try {
+      const modelsResp = await apiFetch<{ models: any[] }>("/api/models");
+      const hasStgcn = forceAdvanced || modelsResp.models.some((m) => (m.filename || "").toLowerCase().includes("st_gcn") || (m.filename || "").toLowerCase().endsWith(".pt") || (m.filename || "").toLowerCase().endsWith(".pth"));
+      if (!hasStgcn) {
+        return apiFetch<ForecastResponse>(
+          `/api/forecast?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}&hours=${hours}`
+        );
+      }
+
+      // We have ST-GCN weights — resolve nearest ward (use /api/forecast to get ward_id), then call advanced endpoint
+      const base = await apiFetch<ForecastResponse>(`/api/forecast?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}&hours=1`);
+      const wardId = base.ward_id;
+      try {
+        const adv = await apiFetch<any>(`/api/forecast-advanced/${wardId}?hours=${hours}`);
+        // Map advanced predictions to ForecastResponse format
+        const mapped: ForecastResponse & { rmse_24h?: number; rmse_72h?: number; graph_nodes?: number; graph_edges?: number } = {
+          ward_id: base.ward_id,
+          ward_name: base.ward_name,
+          ward_no: base.ward_no,
+          lat: base.lat,
+          lon: base.lon,
+          current_aqi: base.current_aqi,
+          forecasts: (adv.predictions || []).map((p: any) => ({
+            forecast_for: p.forecast_for,
+            horizon_hours: p.hour,
+            predicted_aqi: p.aqi_predicted,
+            predicted_category: (p.predicted_category as any) || "",
+            confidence_lower: p.confidence_interval?.lower ?? null,
+            confidence_upper: p.confidence_interval?.upper ?? null,
+            temp_c: (p as any).temp_c ?? null,
+            wind_speed: (p as any).wind_speed ?? null,
+            method: adv.model || "ST-GCN",
+          })),
+          feature_attribution: adv.feature_attribution || null,
+          rmse_24h: adv.rmse_24h,
+          rmse_72h: adv.rmse_72h,
+          graph_nodes: adv.graph_nodes,
+          graph_edges: adv.graph_edges,
+        };
+        return mapped;
+      } catch (e) {
+        // If advanced fails, fall back to standard forecast
+        console.warn("Advanced forecast failed, falling back:", e);
+        return apiFetch<ForecastResponse>(
+          `/api/forecast?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}&hours=${hours}`
+        );
+      }
+    } catch (e) {
+      // If models endpoint fails, fallback to default
+      return apiFetch<ForecastResponse>(
+        `/api/forecast?lat=${lat}&lon=${lon}&city=${encodeURIComponent(city)}&hours=${hours}`
+      );
+    }
+  },
+
+  // Model admin helpers
+  models: () => apiFetch<{ models: any[] }>("/api/models"),
+
+  trainModels: (city = "Kolkata") =>
+    apiFetch<TrainingJobResponse>(`/api/forecast/train?city=${encodeURIComponent(city)}`, { method: "POST" }),
+
+  trainingJob: (jobId: string) => apiFetch<TrainingJobResponse>(`/api/forecast/train/${jobId}`),
+
   attribution: (wardId: number) =>
     apiFetch<AttributionResponse>(`/api/attribution/${wardId}`),
 
@@ -232,10 +340,37 @@ export const api = {
       `/api/enforcement?city=${encodeURIComponent(city)}&limit=${limit}&status=${status}`
     ),
 
-  updateEnforcementStatus: (actionId: number, status: string) =>
+  updateEnforcementStatus: (actionId: number, status: string, evidence?: { notes?: string; photo_url?: string; severity?: string }) =>
     apiFetch(`/api/enforcement/${actionId}/action`, {
       method: "POST",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...evidence }),
+    }),
+
+  approveDecree: (data: { ward_id: number; city: string; action_text: string; target_type: string; priority_score: number }) =>
+    apiFetch<EnforcementAction>("/api/enforcement/approve-decree", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  optimizeRoutes: (data: { locations: { id: number; lat: number; lon: number; priority?: number }[]; n_inspectors?: number; time_budget_hours?: number }) =>
+    apiFetch<{
+      routes: {
+        inspector_id: number;
+        stops: {
+          node_index: number;
+          site_id: number;
+          name: string;
+          lat: number;
+          lon: number;
+          priority: number;
+        }[];
+        stop_count: number;
+        distance_km: number;
+        estimated_duration_mins: number;
+      }[];
+    }>("/api/reports/inspector-routes", {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 
   enforcementStats: (city = "Kolkata") =>
@@ -345,8 +480,21 @@ export const api = {
         issue: string | null;
         last_seen: string | null;
         diagnostics: Record<string, string>;
+        data_quality_score: number;
       }[];
     }>(`/api/aqi/diagnostics?city=${encodeURIComponent(city)}`),
+
+  recalibrateStation: (stationId: number) =>
+    apiFetch<{ status: string; message: string }>("/api/aqi/diagnostics/recalibrate", {
+      method: "POST",
+      body: JSON.stringify({ station_id: stationId }),
+    }),
+
+  dispatchTechCrew: (stationId: number) =>
+    apiFetch<{ status: string; message: string }>("/api/aqi/diagnostics/dispatch", {
+      method: "POST",
+      body: JSON.stringify({ station_id: stationId }),
+    }),
 
   citizenReports: (city = "Kolkata") =>
     apiFetch<CitizenReport[]>(`/api/reports?city=${encodeURIComponent(city)}`),
@@ -360,6 +508,15 @@ export const api = {
   upvoteCitizenReport: (reportId: number) =>
     apiFetch<CitizenReport>(`/api/reports/${reportId}/upvote`, {
       method: "POST",
+    }),
+
+  getReportDetails: (reportId: number) =>
+    apiFetch<CitizenReport>(`/api/reports/${reportId}`),
+
+  subscribeAlerts: (data: SubscriptionInput) =>
+    apiFetch<SubscriptionResponse>("/api/citizen/subscribe", {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 
   // ── Aliases for new role-specific pages ──────────────────────────────────
@@ -425,6 +582,29 @@ export const api = {
       method: string;
       primary_source: string;
     }>(`/api/attribution/${wardId}/pmf`),
+
+  /** Get historical agent deliberations for audit and learning */
+  getDeliberationHistory: (wardId: number, limit = 10) =>
+    apiFetch<{
+      ward_id: number;
+      ward_name: string;
+      deliberation_history: {
+        id?: number;
+        timestamp: string;
+        consensus_action: string;
+        expected_aqi_reduction: number;
+        health_impact: string;
+        economic_cost: string;
+        confidence: number;
+        dissenting_views: string;
+        evidence_citations: string[];
+        timeline: string;
+        agent_count: number;
+        avg_agent_confidence: number;
+      }[];
+      learning_insights: string[];
+    }>(`/api/agents-advanced/audit/${wardId}?limit=${limit}`),
+
 
   /** Ward knowledge graph (industries, violations, enforcement) */
   getWardKnowledgeGraph: (wardId: number) =>

@@ -110,9 +110,24 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ── Redis (Caching and task queue broker) ──────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   tsdb_data:
   neo4j_data:
   qdrant_data:
   kafka_data:
   sqlite_data:
+  redis_data:

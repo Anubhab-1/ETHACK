@@ -203,145 +203,24 @@ def get_ward_detail(ward_id: int, db: Session = Depends(get_db)):
 @router.get("/aqi/satellite")
 def get_satellite_grid(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     """
-    Get a spatial grid of real air quality data from Open-Meteo Air Quality API.
-    Returns PM2.5 and NO₂ surface concentrations on a ~15x15 grid covering the city.
-    Data source: Open-Meteo Air Quality API (free, no key, 1km resolution).
-    Results are cached for 1 hour to stay within rate limits.
+    Get a calibrated Sentinel-5P tropospheric column density grid for the city bounds.
     """
     import time as _time
 
-    import requests as _req
-
-    # City bounding boxes
-    BOUNDS = {
-        "Kolkata": (22.45, 88.25, 22.65, 88.48),
-        "Delhi":   (28.40, 76.84, 28.88, 77.35),
-        "Mumbai":  (18.89, 72.74, 19.30, 73.01),
-    }
-    bounds = BOUNDS.get(city, BOUNDS["Kolkata"])
-    lat_min, lon_min, lat_max, lon_max = bounds
-
-    # Simple in-memory cache (process-level, 1 hour TTL)
-    cache_key = f"satellite_{city}"
+    cache_key = f"satellite_calibrated_{city}"
     cached = _SATELLITE_CACHE.get(cache_key)
     if cached and (_time.time() - cached["ts"]) < 3600:
         return cached["data"]
 
-    # Sparse grid: 8x8 = 64 points (each is 1 API call to Open-Meteo batch)
-    n_lat, n_lon = 8, 8
-    lats = [round(lat_min + (lat_max - lat_min) * i / (n_lat - 1), 4) for i in range(n_lat)]
-    lons = [round(lon_min + (lon_max - lon_min) * j / (n_lon - 1), 4) for j in range(n_lon)]
+    from app.services.satellite import fetch_calibrated_satellite_grid
 
-    # Build comma-separated coordinate lists for Open-Meteo batch request
-    lat_str = ",".join(str(lat) for lat in lats for _ in lons)
-    lon_str = ",".join(str(lon) for _ in lats for lon in lons)
-
-    settings = get_settings()
-    aq_base = settings.open_meteo_airquality_base
-
-    try:
-        resp = _req.get(
-            aq_base,
-            params={
-                "latitude": lat_str,
-                "longitude": lon_str,
-                "current": "pm2_5,pm10,nitrogen_dioxide,carbon_monoxide,ozone",
-                "timezone": "Asia/Kolkata",
-            },
-            timeout=20,
-        )
-        resp.raise_for_status()
-        raw = resp.json()
-
-        # Open-Meteo returns a list when multiple locations are requested
-        if isinstance(raw, dict):
-            raw = [raw]  # single location (shouldn't happen with our batch)
-
-        grid = []
-        for entry in raw:
-            lat = entry.get("latitude")
-            lon = entry.get("longitude")
-            current = entry.get("current", {})
-            pm25 = current.get("pm2_5")
-            no2  = current.get("nitrogen_dioxide")
-
-            if lat is None or lon is None:
-                continue
-
-            # Use pm2.5 as primary value; fall back to NO₂ if pm2.5 unavailable
-            value = pm25 if pm25 is not None else (no2 * 0.5 if no2 else None)
-            if value is None:
-                continue
-
-            grid.append({
-                "lat": round(lat, 4),
-                "lon": round(lon, 4),
-                "value": round(value, 2),
-                "pm25": round(pm25, 2) if pm25 is not None else None,
-                "no2":  round(no2, 2) if no2 is not None else None,
-                "unit": "µg/m³",
-            })
-
-        if not grid:
-            raise ValueError("Empty grid from Open-Meteo")
-
-        result = {
-            "city": city,
-            "bounds": [[lat_min, lon_min], [lat_max, lon_max]],
-            "grid": grid,
-            "source": "Open-Meteo Air Quality API",
-            "fetched_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-            "real_data": True,
-        }
-
-        _SATELLITE_CACHE[cache_key] = {"ts": _time.time(), "data": result}
-        return result
-
-    except Exception as e:
-        import logging as _log
-        _log.getLogger(__name__).error(f"Open-Meteo Air Quality API failed for {city}: {e}")
-        # Honest fallback: return cached data if available, else a sparse heuristic grid
-        # labelled clearly as estimated
-        return _heuristic_satellite_fallback(city, lat_min, lon_min, lat_max, lon_max)
+    result = fetch_calibrated_satellite_grid(city)
+    _SATELLITE_CACHE[cache_key] = {"ts": _time.time(), "data": result}
+    return result
 
 
 # Module-level satellite data cache {city: {ts: float, data: dict}}
 _SATELLITE_CACHE: dict = {}
 
-
-def _heuristic_satellite_fallback(city: str, lat_min: float, lon_min: float, lat_max: float, lon_max: float) -> dict:
-    """
-    Fallback satellite grid when Open-Meteo is unavailable.
-    Based on known pollution hotspots per city (not random).
-    Clearly labelled as estimated data.
-    """
-    HOTSPOTS = {
-        "Kolkata": [(22.58, 88.30, 45.0), (22.62, 88.37, 38.0), (22.57, 88.43, 42.0)],
-        "Delhi":   [(28.64, 77.31, 68.0), (28.69, 77.16, 60.0), (28.53, 77.26, 55.0)],
-        "Mumbai":  [(19.00, 72.90, 40.0), (19.12, 72.85, 35.0), (19.03, 72.87, 38.0)],
-    }
-    hotspots = HOTSPOTS.get(city, [])
-    import math as _math
-
-    n = 8
-    lats = [lat_min + (lat_max - lat_min) * i / (n - 1) for i in range(n)]
-    lons = [lon_min + (lon_max - lon_min) * j / (n - 1) for j in range(n)]
-
-    grid = []
-    for lat in lats:
-        for lon in lons:
-            val = 15.0  # background PM2.5 µg/m³
-            for h_lat, h_lon, h_peak in hotspots:
-                dist = _math.sqrt((lat - h_lat) ** 2 + (lon - h_lon) ** 2)
-                val += h_peak * _math.exp(-dist / 0.04)
-            grid.append({"lat": round(lat, 4), "lon": round(lon, 4), "value": round(min(val, 200), 2), "unit": "µg/m³"})
-
-    return {
-        "city": city,
-        "bounds": [[lat_min, lon_min], [lat_max, lon_max]],
-        "grid": grid,
-        "source": "Estimated (Open-Meteo unavailable)",
-        "real_data": False,
-    }
 
 

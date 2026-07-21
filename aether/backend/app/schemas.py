@@ -146,12 +146,27 @@ class EnforcementActionOut(BaseModel):
     detected_at: Optional[datetime] = None
     acknowledged_at: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
+    evidence_notes: Optional[str] = None
+    evidence_photo_url: Optional[str] = None
+    evidence_severity: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
 
 class EnforcementStatusUpdate(BaseModel):
-    status: str  # 'deployed' or 'resolved'
+    status: str  # 'detected', 'open', 'dispatched', 'deployed', 'evidence_collected', 'resolved'
+    notes: Optional[str] = None
+    severity: Optional[str] = None
+    photo_url: Optional[str] = None
+
+
+class DecreeSignOffIn(BaseModel):
+    ward_id: int
+    city: str
+    action_text: str
+    target_type: str
+    priority_score: float = 75.0
+
 
 
 class EnforcementStats(BaseModel):
@@ -224,6 +239,7 @@ class CitizenReportIn(BaseModel):
     severity: str = "medium"
     lat: float
     lon: float
+    photo_url: Optional[str] = None
 
 
 class CitizenReportOut(BaseModel):
@@ -238,8 +254,33 @@ class CitizenReportOut(BaseModel):
     lon: float
     status: str
     upvote_count: int
+    photo_url: Optional[str] = None
     created_at: datetime
     ward_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+# ── Citizen Subscriptions ──────────────────────────────────────────────────────
+
+class CitizenSubscriptionIn(BaseModel):
+    city: str
+    ward_id: int
+    phone_number: Optional[str] = None
+    email: Optional[str] = None
+    language: str = "en"
+    notify_level: str = "poor"  # moderate, poor, very_poor, severe
+
+
+class CitizenSubscriptionOut(BaseModel):
+    id: int
+    city: str
+    ward_id: int
+    phone_number: Optional[str] = None
+    email: Optional[str] = None
+    language: str
+    notify_level: str
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 

@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aether-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aether-frontend
+  template:
+    metadata:
+      labels:
+        app: aether-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: aether-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://aether-backend:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aether-frontend
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: aether-frontend
+  type: LoadBalancer

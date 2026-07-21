@@ -75,11 +75,36 @@ export default function CommissionerPage() {
   const [loading, setLoading] = useState(true);
   const [crisisMode, setCrisisMode] = useState(false);
   const [causalHistory, setCausalHistory] = useState<any[]>([]);
-  const [avgResponseTime, setAvgResponseTime] = useState("9.2 min");
-  const [activeInterventions, setActiveInterventions] = useState(14);
-  const [healthSavings, setHealthSavings] = useState("₹82.6L");
+  const [avgResponseTime, setAvgResponseTime] = useState<string>("—");
+  const [activeInterventions, setActiveInterventions] = useState<number | null>(null);
+  const [healthSavings, setHealthSavings] = useState<string>("—");
   const [budgetLimit, setBudgetLimit] = useState<number>(10);
   const [isOptimizerActive, setIsOptimizerActive] = useState<boolean>(true);
+
+  // Pre-fetch all 3 cities on mount so multi-city bars are all populated
+  useEffect(() => {
+    const fetchAllCities = async () => {
+      const otherCities = CITIES.filter(c => c !== selectedCity);
+      await Promise.allSettled(
+        otherCities.map(async (c) => {
+          try {
+            const heatmap = await api.getHeatmap(c);
+            const pts = heatmap.points || [];
+            if (pts.length > 0) {
+              const avg_aqi = Math.round(pts.reduce((s: number, p: { aqi: number }) => s + p.aqi, 0) / pts.length);
+              const worst = [...pts].sort((a: { aqi: number }, b: { aqi: number }) => b.aqi - a.aqi)[0];
+              setCityStats(prev => ({
+                ...prev,
+                [c]: { avg_aqi, stations: heatmap.total_stations || pts.length, worst_ward: worst?.ward_name || "N/A" },
+              }));
+            }
+          } catch { /* non-critical */ }
+        })
+      );
+    };
+    fetchAllCities();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,7 +114,7 @@ export default function CommissionerPage() {
         const points = heatmap.points || [];
         if (points.length > 0) {
           const avg_aqi = Math.round(points.reduce((s: number, p: { aqi: number }) => s + p.aqi, 0) / points.length);
-          const worst = points.sort((a: { aqi: number }, b: { aqi: number }) => b.aqi - a.aqi)[0];
+          const worst = [...points].sort((a: { aqi: number }, b: { aqi: number }) => b.aqi - a.aqi)[0];
           setCityStats(prev => ({
             ...prev,
             [selectedCity]: { avg_aqi, stations: heatmap.total_stations || points.length, worst_ward: worst?.ward_name || "N/A" },
@@ -97,24 +122,27 @@ export default function CommissionerPage() {
           if (avg_aqi > 300) setCrisisMode(true);
           else setCrisisMode(false);
 
-          // Top 5 worst wards
-          const top5 = points.slice(0, 5).map((p: { ward_id: number; ward_name: string; aqi: number }) => ({
-            ward_id: p.ward_id,
-            ward_name: p.ward_name,
-            aqi: p.aqi,
-            city: selectedCity,
-          }));
+          // Top 5 worst wards (sorted descending)
+          const top5 = [...points]
+            .sort((a: { aqi: number }, b: { aqi: number }) => b.aqi - a.aqi)
+            .slice(0, 5)
+            .map((p: { ward_id: number; ward_name: string; aqi: number }) => ({
+              ward_id: p.ward_id,
+              ward_name: p.ward_name,
+              aqi: p.aqi,
+              city: selectedCity,
+            }));
           setTopWardsAQI(top5);
         }
-        
+
         const history = await api.getCityCausalHistory(selectedCity);
         setCausalHistory(history || []);
-        
-        // Sum health savings
-        const totalSavings = (history || []).reduce((acc, item) => acc + (item.health_savings || 0), 0);
-        setHealthSavings(totalSavings > 0 ? `₹${totalSavings.toFixed(1)}L` : "₹82.6L");
 
-        // Fetch enforcement queue statistics for average response time
+        // Sum real health savings from causal history
+        const totalSavings = (history || []).reduce((acc: number, item: { health_savings?: number }) => acc + (item.health_savings || 0), 0);
+        setHealthSavings(totalSavings > 0 ? `₹${totalSavings.toFixed(1)}L` : "—");
+
+        // Fetch enforcement queue statistics
         const [deployedActions, resolvedActions, openActions] = await Promise.all([
           api.enforcement(selectedCity, 50, "deployed"),
           api.enforcement(selectedCity, 50, "resolved"),
@@ -123,26 +151,23 @@ export default function CommissionerPage() {
 
         setActiveInterventions(openActions.length + deployedActions.length);
 
+        // Compute avg response time from real timestamps (detected → acknowledged, or created → acknowledged)
         const allCompleted = [...deployedActions, ...resolvedActions];
-        if (allCompleted.length > 0) {
-          let totalMinutes = 0;
-          let count = 0;
-          allCompleted.forEach(a => {
-            if (a.detected_at && a.acknowledged_at) {
-              const start = new Date(a.detected_at).getTime();
-              const end = new Date(a.acknowledged_at).getTime();
-              const diffMins = (end - start) / (1000 * 60);
-              if (diffMins > 0) {
-                totalMinutes += diffMins;
-                count++;
-              }
+        let totalMinutes = 0;
+        let count = 0;
+        allCompleted.forEach(a => {
+          const startStr = a.detected_at || a.created_at;
+          const endStr = a.acknowledged_at;
+          if (startStr && endStr) {
+            const diffMins = (new Date(endStr).getTime() - new Date(startStr).getTime()) / (1000 * 60);
+            if (diffMins > 0 && diffMins < 1440) { // cap at 24h to exclude outliers
+              totalMinutes += diffMins;
+              count++;
             }
-          });
-          const avg = count > 0 ? (totalMinutes / count).toFixed(1) : "9.2";
-          setAvgResponseTime(`${avg} min`);
-        } else {
-          setAvgResponseTime("9.2 min");
-        }
+          }
+        });
+        setAvgResponseTime(count > 0 ? `${(totalMinutes / count).toFixed(1)} min` : "—");
+
       } catch (e) {
         console.error(e);
       } finally {
@@ -174,7 +199,7 @@ export default function CommissionerPage() {
 
   const totalCo2Avoided = useMemo(() => {
     const scale = avgAQI ? avgAQI / 200 : 1.0;
-    const baseTons = activeInterventions * 8.5 * scale;
+    const baseTons = (activeInterventions ?? 0) * 8.5 * scale;
     return baseTons.toFixed(1);
   }, [activeInterventions, avgAQI]);
 
@@ -227,55 +252,47 @@ export default function CommissionerPage() {
   return (
     <AppShell city={selectedCity}>
     <div className={`min-h-full bg-gradient-to-br ${bgTheme} text-white`}>
-      {/* Crisis banner */}
+      {/* ── Crisis banner ── */}
       {crisisMode && (
-        <div className="bg-red-600 text-white text-center py-2 text-sm font-bold animate-pulse">
-          🚨 EMERGENCY AIR QUALITY CRISIS — AQI &gt;300 — ALL AGENCIES ON ALERT
+        <div className="bg-red-600/90 text-white text-center py-2 text-xs font-bold tracking-wide flex items-center justify-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          EMERGENCY AIR QUALITY CRISIS — AQI &gt;300 — ALL AGENCIES ON ALERT
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <Link href="/" className="text-slate-400 hover:text-white text-sm">← AETHER</Link>
-              <span className="text-slate-700">|</span>
-              <span className="text-xs text-indigo-400 font-semibold bg-indigo-950/50 px-2 py-0.5 rounded-full border border-indigo-800/40">Commissioner View</span>
-            </div>
-            <h1 className="text-2xl font-black text-white mt-2">Policy Intelligence Dashboard</h1>
-            <p className="text-slate-400 text-sm">Constitutional AI · Causal Impact · Evidence-Based Enforcement</p>
-          </div>
-          <div className="flex gap-2">
-            {CITIES.map(c => (
-              <button
-                key={c}
-                onClick={() => setSelectedCity(c)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  selectedCity === c
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-800/60 text-slate-400 hover:text-white border border-slate-700/50"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+      {/* ── Page Header ── */}
+      <header className="page-header">
+        <div className="flex items-center gap-2.5">
+          <h1 className="page-title">Policy Intelligence</h1>
+          <span className="page-badge" style={{ color: "#818cf8", borderColor: "rgba(129,140,248,0.3)" }}>Commissioner View</span>
         </div>
+        <div className="flex items-center gap-1.5">
+          {CITIES.map(c => (
+            <button
+              key={c}
+              onClick={() => setSelectedCity(c)}
+              className={selectedCity === c ? "btn-primary" : "btn-ghost"}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </header>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
+        {/* ── KPI Cards ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { label: "City-wide AQI", value: avgAQI ? `${avgAQI}` : "—", sub: avgAQI > 200 ? "⚠️ Action Required" : "✅ Monitoring", color: avgAQI > 300 ? "text-red-400" : avgAQI > 200 ? "text-orange-400" : "text-emerald-400" },
-            { label: "Active Interventions", value: `${activeInterventions}`, sub: "Open & Deployed tasks", color: "text-cyan-400" },
-            { label: "Signal → Response SLA", value: avgResponseTime, sub: "Detection to dispatch", color: "text-violet-400" },
-            { label: "Health Savings (Est.)", value: healthSavings, sub: "WHO dose-response model", color: "text-emerald-400" },
-            { label: "Carbon Offset (Est.)", value: `${totalCo2Avoided} t`, sub: "CO₂ emissions prevented", color: "text-emerald-400 font-mono" },
+            { label: "City-wide AQI", value: avgAQI ? `${avgAQI}` : "—", sub: avgAQI > 200 ? "Action Required" : "Monitoring", accent: avgAQI > 300 ? "#ef4444" : avgAQI > 200 ? "#f97316" : "#22c55e" },
+            { label: "Active Interventions", value: activeInterventions !== null ? `${activeInterventions}` : "—", sub: "Open & Deployed", accent: "#22d3ee" },
+            { label: "Signal → Response", value: avgResponseTime, sub: "Detection to dispatch", accent: "#a78bfa" },
+            { label: "Health Savings", value: healthSavings, sub: "WHO dose-response", accent: "#34d399" },
+            { label: "Carbon Offset", value: `${totalCo2Avoided} t`, sub: "CO₂ emissions prevented", accent: "#34d399" },
           ].map((kpi, i) => (
-            <div key={i} className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-4">
-              <div className="text-slate-400 text-xs mb-1">{kpi.label}</div>
-              <div className={`text-2xl sm:text-3xl font-black ${kpi.color}`}>{kpi.value}</div>
-              <div className="text-slate-500 text-xs mt-1">{kpi.sub}</div>
+            <div key={i} className="stat-card" style={{ "--stat-accent": kpi.accent } as React.CSSProperties}>
+              <p className="text-[11px] text-slate-500 mb-1">{kpi.label}</p>
+              <p className="text-xl sm:text-2xl font-black font-mono" style={{ color: kpi.accent }}>{kpi.value}</p>
+              <p className="text-[11px] text-slate-600 mt-1">{kpi.sub}</p>
             </div>
           ))}
         </div>
@@ -338,7 +355,7 @@ export default function CommissionerPage() {
               <h3 className="text-white font-semibold mb-3">⚡ Quick Actions</h3>
               {[
                 { href: "/dashboard", label: "🗺️ Live AQI Heatmap", sub: "Real-time ward monitoring" },
-                { href: "/enforcement", label: "⚖️ Enforcement Queue", sub: `${stats?.stations || 0} actions pending` },
+                { href: "/enforcement", label: "⚖️ Enforcement Queue", sub: activeInterventions !== null ? `${activeInterventions} actions pending` : "Open & Deployed actions" },
                 { href: "/forecast", label: "📈 72h Forecast", sub: "AI prediction with CI" },
                 { href: "/compare", label: "🏙️ Multi-City Compare", sub: "Kolkata vs Delhi vs Mumbai" },
               ].map(l => (
@@ -356,9 +373,10 @@ export default function CommissionerPage() {
           {/* Policy ROI Table */}
           <div className="col-span-2 space-y-4">
             <div className="bg-slate-800/40 border border-slate-700/40 rounded-xl p-5">
-              <h3 className="text-white font-semibold mb-1">💰 Policy ROI Calculator</h3>
+              <h3 className="text-white font-semibold mb-1">💰 Policy ROI Calculator <span className="text-[10px] font-normal text-amber-400/80 border border-amber-500/30 bg-amber-950/30 px-2 py-0.5 rounded-full ml-1">Modelled Estimates</span></h3>
               <p className="text-slate-400 text-xs mb-4">
-                WHO dose-response curves + synthetic control causal analysis. For every Rs 1 spent on enforcement, Rs <span className="text-emerald-400 font-bold">9–32</span> saved in health costs.
+                WHO dose-response curves + synthetic control causal analysis. Values scaled dynamically to live city AQI.
+                For every ₹1 spent on enforcement, ₹<span className="text-emerald-400 font-bold">9–32</span> saved in health costs.
               </p>
 
               {/* AI Budget Optimizer Dashboard Controls */}
@@ -474,8 +492,8 @@ export default function CommissionerPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="text-slate-500 text-xs mt-2">
-                * ROI = Health savings / Intervention cost. Health savings via WHO DALY model (Rs 1.2L per admission prevented).
+              <p className="text-slate-500 text-[10px] mt-2">
+                * Modelled estimates using WHO DALY dose-response methodology (₹1.2L/admission) + synthetic control causal coefficients. Scaled live to {selectedCity} avg AQI.
               </p>
             </div>
 
@@ -486,28 +504,38 @@ export default function CommissionerPage() {
                 Synthetic Control Method (Abadie &amp; Gardeazabal, 2003) — <span className="text-emerald-400">not correlation, actual causal proof.</span>
               </p>
               <div className="space-y-2">
-                {causalHistory.map((rec, i) => (
-                  <div key={i} className="flex items-center gap-4 p-3 bg-slate-900/40 rounded-lg border border-slate-700/30">
-                    <div className="flex-1">
-                      <div className="text-slate-200 text-sm font-medium">{rec.intervention}</div>
-                      <div className="text-slate-500 text-xs">{rec.ward} · {rec.date}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-emerald-400 font-bold text-lg">↓{Math.abs(rec.ate_ugm3)}</div>
-                      <div className="text-slate-500 text-xs">μg/m³ ATE</div>
-                    </div>
-                    <div className="text-center">
-                      <div className={`font-bold text-sm ${rec.p_value < 0.01 ? "text-emerald-300" : "text-yellow-300"}`}>
-                        p={rec.p_value.toFixed(4)}
-                      </div>
-                      <div className="text-slate-500 text-xs">{rec.p_value < 0.05 ? "✅ Significant" : "⚠️ Marginal"}</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-emerald-400 font-bold text-sm">₹{rec.health_savings.toFixed(1)}L</div>
-                      <div className="text-slate-500 text-xs">Saved</div>
-                    </div>
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-16 bg-slate-900/40 border border-slate-700/30 rounded-lg animate-pulse" />
+                  ))
+                ) : causalHistory.length === 0 ? (
+                  <div className="text-center py-8 text-slate-500 text-xs border border-dashed border-slate-800 rounded-lg">
+                    ⚠️ No significant causal history records retrieved for {selectedCity}.
                   </div>
-                ))}
+                ) : (
+                  causalHistory.map((rec, i) => (
+                    <div key={i} className="flex items-center gap-4 p-3 bg-slate-900/40 rounded-lg border border-slate-700/30">
+                      <div className="flex-1">
+                        <div className="text-slate-200 text-sm font-medium">{rec.intervention}</div>
+                        <div className="text-slate-500 text-xs">{rec.ward} · {rec.date}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-emerald-400 font-bold text-lg">↓{Math.abs(rec.ate_ugm3)}</div>
+                        <div className="text-slate-500 text-xs">μg/m³ ATE</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`font-bold text-sm ${rec.p_value < 0.01 ? "text-emerald-300" : "text-yellow-300"}`}>
+                          p={rec.p_value.toFixed(4)}
+                        </div>
+                        <div className="text-slate-500 text-xs">{rec.p_value < 0.05 ? "✅ Significant" : "⚠️ Marginal"}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-emerald-400 font-bold text-sm">₹{rec.health_savings.toFixed(1)}L</div>
+                        <div className="text-slate-500 text-xs">Saved</div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>

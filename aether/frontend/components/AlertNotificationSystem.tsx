@@ -24,6 +24,8 @@ interface AlertNotificationSystemProps {
   liveAQI?: Array<{ station_id: number; name: string; aqi: number | null; city: string; category: string | null }>;
   /** City name for contextual messages */
   city?: string;
+  /** Live alerts streamed from backend via WebSocket connection */
+  wsAlerts?: AQIAlert[];
 }
 
 const LEVEL_CONFIG = {
@@ -99,6 +101,7 @@ function AlertToast({
 export function AlertNotificationSystem({
   liveAQI,
   city,
+  wsAlerts,
 }: AlertNotificationSystemProps) {
   const [alerts, setAlerts] = useState<AQIAlert[]>([]);
   const [toasts, setToasts] = useState<AQIAlert[]>([]);
@@ -149,6 +152,26 @@ export function AlertNotificationSystem({
     }
   }, [liveAQI, city]);
 
+  // Monitor wsAlerts from WebSocket stream
+  useEffect(() => {
+    if (!wsAlerts || wsAlerts.length === 0) return;
+
+    const newWsAlerts: AQIAlert[] = [];
+
+    wsAlerts.forEach((alert) => {
+      // Avoid duplicate alerts in state
+      if (prevAlertedIds.current.has(alert.id)) return;
+
+      newWsAlerts.push(alert);
+      prevAlertedIds.current.add(alert.id);
+    });
+
+    if (newWsAlerts.length > 0) {
+      setAlerts((prev) => [...newWsAlerts, ...prev].slice(0, 50));
+      setToasts((prev) => [...prev, ...newWsAlerts.slice(0, 3)]);
+    }
+  }, [wsAlerts]);
+
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
@@ -163,11 +186,24 @@ export function AlertNotificationSystem({
   }, []);
 
   const unreadCount = alerts.filter((a) => !a.read).length;
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Close panel when clicking outside
+  useEffect(() => {
+    if (!panelOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setPanelOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [panelOpen]);
 
   return (
     <>
-      {/* Bell Icon Button (meant to be placed in the nav) */}
-      <div className="relative">
+      {/* Bell Icon Button */}
+      <div className="relative" ref={panelRef}>
         <button
           onClick={() => {
             setPanelOpen((o) => !o);
@@ -190,10 +226,10 @@ export function AlertNotificationSystem({
           )}
         </button>
 
-        {/* Notification Panel */}
+        {/* Notification Panel — fixed so it is never clipped by overflow-hidden parents */}
         {panelOpen && (
           <div
-            className="absolute top-10 right-0 z-[600] w-80 max-h-[70vh] overflow-y-auto glass-card border border-white/10 shadow-2xl rounded-2xl animate-slide-up"
+            className="fixed top-[52px] right-4 z-[1200] w-80 max-h-[70vh] overflow-y-auto glass-card border border-white/10 shadow-2xl rounded-2xl animate-slide-up"
             style={{ background: "rgba(5,5,12,0.97)" }}
           >
             {/* Panel Header */}
@@ -305,7 +341,7 @@ export function AlertNotificationSystem({
 
       {/* Toast stack (bottom-right of screen) */}
       {toasts.length > 0 && (
-        <div className="fixed bottom-6 right-4 z-[700] flex flex-col gap-2 pointer-events-auto">
+        <div className="fixed bottom-6 right-4 z-[1200] flex flex-col gap-2 pointer-events-auto">
           {toasts.map((toast) => (
             <AlertToast key={toast.id} alert={toast} onDismiss={dismissToast} />
           ))}

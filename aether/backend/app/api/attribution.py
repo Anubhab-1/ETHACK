@@ -17,6 +17,8 @@ from app.schemas import (
     AttributionResponse,
     EnforcementStats,
     EnforcementStatusUpdate,
+    DecreeSignOffIn,
+    EnforcementActionOut,
 )
 from app.services.attributor import (
     run_attribution_for_ward,
@@ -177,32 +179,107 @@ def get_enforcement_queue(
     return result
 
 
+@router.post("/enforcement/approve-decree", response_model=EnforcementActionOut)
+def approve_decree(payload: DecreeSignOffIn, db: Session = Depends(get_db)):
+    """Approve a consensus committee decree and deploy it as a live enforcement task."""
+    ward = db.query(Ward).filter(Ward.id == payload.ward_id).first()
+    if not ward:
+        raise HTTPException(status_code=404, detail="Ward not found")
+
+    new_action = EnforcementAction(
+        ward_id=payload.ward_id,
+        city=payload.city,
+        priority_score=payload.priority_score,
+        action_text=payload.action_text,
+        target_type=payload.target_type,
+        status="open",
+        alerts_sent=0,
+        alerts_confirmed=0,
+        created_at=datetime.utcnow(),
+        detected_at=datetime.utcnow()
+    )
+    db.add(new_action)
+    db.commit()
+    db.refresh(new_action)
+    
+    # Formulate output with ward metadata
+    out = EnforcementActionOut.model_validate(new_action)
+    out.ward_name = ward.name
+    out.ward_no = ward.ward_no
+    out.ward_lat = ward.lat
+    out.ward_lon = ward.lon
+    return out
+
+
 @router.post("/enforcement/{action_id}/action")
 def update_enforcement_status(
     action_id: int,
     update: EnforcementStatusUpdate,
     db: Session = Depends(get_db),
 ):
-    """Mark an enforcement action as deployed or resolved."""
+    """Mark an enforcement action as deployed or resolved, enforcing a state-machine."""
     action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
 
-    valid_statuses = ["open", "deployed", "resolved"]
+    valid_statuses = ["open", "detected", "dispatched", "deployed", "evidence_collected", "resolved"]
     if update.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Status must be one of {valid_statuses}")
 
+    # Map legacy states to canonical states for transition checks
+    current_canonical = action.status
+    target_canonical = update.status
+
+    # Define transition rules (key can transition to any value in the list)
+    valid_transitions = {
+        "open": ["dispatched", "deployed", "resolved"],
+        "detected": ["dispatched", "deployed", "resolved"],
+        "dispatched": ["evidence_collected", "resolved"],
+        "deployed": ["evidence_collected", "resolved"],
+        "evidence_collected": ["resolved"],
+        "resolved": []  # terminal state
+    }
+
+    allowed_targets = valid_transitions.get(current_canonical, [])
+    # Allow self-transitions or transitions to legacy aliases
+    is_self_or_alias = (
+        current_canonical == target_canonical or
+        (current_canonical == "open" and target_canonical == "detected") or
+        (current_canonical == "detected" and target_canonical == "open") or
+        (current_canonical == "deployed" and target_canonical == "dispatched") or
+        (current_canonical == "dispatched" and target_canonical == "deployed")
+    )
+    
+    if not is_self_or_alias and target_canonical not in allowed_targets:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid state transition from '{current_canonical}' to '{target_canonical}'"
+        )
+
+    # Apply updates
     action.status = update.status
-    if update.status == "deployed":
+    if update.status in ["deployed", "dispatched"]:
         action.acknowledged_at = datetime.utcnow()
+    elif update.status == "evidence_collected":
+        # We can record the acknowledgement status timestamp
+        if not action.acknowledged_at:
+            action.acknowledged_at = datetime.utcnow()
+        # Save evidence details
+        if update.notes:
+            action.evidence_notes = update.notes
+        if update.photo_url:
+            action.evidence_photo_url = update.photo_url
+        if update.severity:
+            action.evidence_severity = update.severity
     elif update.status == "resolved":
         action.resolved_at = datetime.utcnow()
         if not action.acknowledged_at:
-            action.acknowledged_at = datetime.utcnow() # safe fallback
+            action.acknowledged_at = datetime.utcnow()
 
     db.commit()
     db.refresh(action)
     return {"id": action.id, "status": action.status, "updated": True}
+
 
 
 @router.post("/enforcement/{action_id}/broadcast")
@@ -310,19 +387,25 @@ def get_enforcement_stats(city: str = Query("Kolkata"), db: Session = Depends(ge
     """Get enforcement action counts by status."""
 
     counts = {}
-    for status in ["open", "deployed", "resolved"]:
+    for status in ["open", "detected", "dispatched", "deployed", "evidence_collected", "resolved"]:
         count = db.query(EnforcementAction).filter(
             EnforcementAction.city == city,
             EnforcementAction.status == status,
         ).count()
         counts[status] = count
 
+    # Combine aliases for counts to keep the UI stats clean and fully compatible
+    open_count = counts.get("open", 0) + counts.get("detected", 0)
+    deployed_count = counts.get("deployed", 0) + counts.get("dispatched", 0) + counts.get("evidence_collected", 0)
+    resolved_count = counts.get("resolved", 0)
+
     return EnforcementStats(
-        open=counts["open"],
-        deployed=counts["deployed"],
-        resolved=counts["resolved"],
-        total=sum(counts.values()),
+        open=open_count,
+        deployed=deployed_count,
+        resolved=resolved_count,
+        total=open_count + deployed_count + resolved_count,
     )
+
 
 
 @router.post("/enforcement/recompute", status_code=202)
@@ -355,3 +438,197 @@ def recompute_queue(
         "city": city,
         "message": f"Recompute started for {city} wards. Check /api/enforcement/stats for progress.",
     }
+
+
+@router.get("/enforcement/{action_id}/notice/export")
+def export_enforcement_notice(
+    action_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate and export a beautifully formatted HTML Show-Cause Notice
+    under Section 31A of the Air (Prevention and Control of Pollution) Act, 1981.
+    """
+    from fastapi.responses import HTMLResponse
+    from app.models import EnforcementAction, Ward
+    
+    action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+        
+    ward = db.query(Ward).filter(Ward.id == action.ward_id).first()
+    ward_name = ward.name if ward else f"Ward #{action.ward_id}"
+    ward_no = ward.ward_no if ward else action.ward_id
+    
+    # Select appropriate legal act sections
+    legal_provisions = "Section 21 of the Air Act, 1981 and CPCB Emission Standards 2009."
+    
+    notice_date = action.created_at.strftime("%d %B %Y")
+    ref_no = f"MNC/ENF/{action.created_at.strftime('%Y%m')}/{action.id:04d}"
+    
+    # Check if there is high correlation (downwind) based on wind bearing (using weather details if available)
+    from app.models import Weather
+    weather = db.query(Weather).filter(Weather.city == action.city).order_by(Weather.recorded_at.desc()).first()
+    wind_speed = weather.wind_speed if weather and weather.wind_speed else 8.5
+    wind_dir = weather.wind_dir if weather and weather.wind_dir else 210.0
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>SHOW-CAUSE NOTICE - Ref {ref_no}</title>
+        <style>
+            body {{
+                font-family: 'Times New Roman', Times, serif;
+                background-color: #ffffff;
+                color: #000000;
+                margin: 0;
+                padding: 45px;
+                line-height: 1.6;
+            }}
+            .letterhead {{
+                text-align: center;
+                border-bottom: 3px double #000000;
+                padding-bottom: 12px;
+                margin-bottom: 25px;
+            }}
+            .logo-seal {{
+                font-size: 32px;
+                margin-bottom: 5px;
+            }}
+            .dept-title {{
+                font-size: 20px;
+                font-weight: bold;
+                letter-spacing: 0.8px;
+                text-transform: uppercase;
+                margin: 2px 0;
+            }}
+            .dept-sub {{
+                font-size: 13px;
+                color: #333333;
+                margin: 1px 0;
+            }}
+            .meta-info {{
+                display: flex;
+                justify-content: space-between;
+                font-size: 13px;
+                margin-bottom: 25px;
+                border-bottom: 1px solid #eeeeee;
+                padding-bottom: 8px;
+            }}
+            .notice-title {{
+                text-align: center;
+                font-size: 15px;
+                font-weight: bold;
+                text-decoration: underline;
+                text-transform: uppercase;
+                margin-bottom: 25px;
+                letter-spacing: 0.5px;
+            }}
+            .notice-body {{
+                font-size: 13.5px;
+                text-align: justify;
+            }}
+            .section-label {{
+                font-weight: bold;
+            }}
+            .signature-block {{
+                margin-top: 45px;
+                text-align: right;
+                font-size: 13px;
+            }}
+            .footer-notes {{
+                margin-top: 55px;
+                border-top: 1px solid #dddddd;
+                padding-top: 10px;
+                font-size: 10px;
+                color: #666666;
+                text-align: center;
+            }}
+            @media print {{
+                body {{
+                    padding: 0;
+                }}
+                .print-btn {{
+                    display: none;
+                }}
+            }}
+            .print-btn {{
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #4f46e5;
+                color: #ffffff;
+                border: none;
+                padding: 8px 16px;
+                font-size: 13px;
+                font-weight: 600;
+                border-radius: 6px;
+                cursor: pointer;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+                transition: opacity 0.2s;
+            }}
+            .print-btn:hover {{
+                opacity: 0.9;
+            }}
+        </style>
+    </head>
+    <body>
+        <button class="print-btn" onclick="window.print()">🖨️ Print Notice</button>
+        
+        <div class="letterhead">
+            <div class="logo-seal">🏛️</div>
+            <div class="dept-title">Municipal Air Quality Enforcement Commission</div>
+            <div class="dept-sub">Environment & Public Health Directorate, City of {action.city}</div>
+            <div class="dept-sub">Statutory Order Issued under Environmental Protection Mandate</div>
+        </div>
+        
+        <div class="meta-info">
+            <div>
+                <strong>Ref No:</strong> {ref_no}<br>
+                <strong>Ward Jurisdiction:</strong> {ward_name} (Ward #{ward_no})
+            </div>
+            <div>
+                <strong>Date:</strong> {notice_date}<br>
+                <strong>Target Coordinates:</strong> {ward.lat if ward else 22.57}°N, {ward.lon if ward else 88.36}°E
+            </div>
+        </div>
+        
+        <div class="notice-title">
+            Show-Cause Notice under Section 31A of the Air (Prevention and Control of Pollution) Act, 1981
+        </div>
+        
+        <div class="notice-body">
+            <p>To,<br>
+            <strong>The Occupier / Proprietor / Person-in-Charge</strong><br>
+            Commercial / Industrial Operations under: {action.target_type}<br>
+            {ward_name}, {action.city}</p>
+            
+            <p><strong>WHEREAS</strong> the AETHER Municipal Air Quality forecasting models and spatial sensors have continuously registered elevated particulate levels and gaseous concentrations matching emissions emanating from your geographical area: <span class="section-label">"{action.action_text}"</span>.</p>
+            
+            <p><strong>AND WHEREAS</strong> meteorological downlink data reports prevailing local winds at {wind_speed:.1f} km/h from {wind_dir:.1f} degrees, establishing a direct downwind trajectory and causation mapping to the surrounding public receptor zones.</p>
+            
+            <p><strong>AND WHEREAS</strong> the failure to observe statutory emission limits or permit guidelines violates the mandates specified under <span class="section-label">{legal_provisions}</span>.</p>
+            
+            <p><strong>NOW THEREFORE</strong>, you are hereby directed to <strong>SHOW CAUSE</strong> in writing within seven (7) days of the receipt of this notice why appropriate actions including immediate shutdown of utilities, suspension of consent, or prosecution under Section 37 of the Air Act, 1981, should not be directed by this Commission.</p>
+            
+            <p>Take notice that in the event of failure to reply or execute immediate mitigation controls (sweeping, water sprinkling, stack monitoring) within the stipulated period, this Commission will proceed unilaterally under statutory rules.</p>
+        </div>
+        
+        <div class="signature-block">
+            <br>
+            <strong>Member Secretary</strong><br>
+            Municipal Air Quality Enforcement Commission<br>
+            <em>State Environmental Protection Administration Division</em>
+        </div>
+        
+        <div class="footer-notes">
+            This is a computer-generated statutory instrument issued via the AETHER Municipal Control Center.<br>
+            To verify the authenticity of this order, reference Case ID: SCN-{action_id:04d}-{action.ward_id:02d}.
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+

@@ -40,6 +40,8 @@ class Station(Base):
     city: Mapped[str] = mapped_column(String(100), default="Kolkata", index=True)
     ward_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("wards.id"), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_calibrated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_maintenance_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self):
         return f"<Station {self.name} ({self.city})>"
@@ -153,6 +155,9 @@ class EnforcementAction(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     detected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    evidence_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    evidence_photo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    evidence_severity: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Compound index: accelerates city+status filter (most common query pattern)
     __table_args__ = (
@@ -200,8 +205,62 @@ class CitizenReport(Base):
     lon: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # "pending", "verified", "dispatched", "resolved"
     upvote_count: Mapped[int] = mapped_column(Integer, default=0)
+    photo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Optional relationship mapping back to Ward
     ward = relationship("Ward")
+
+
+class DeliberationLog(Base):
+    __tablename__ = "deliberation_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ward_id: Mapped[int] = mapped_column(Integer, ForeignKey("wards.id"), index=True)
+    consensus_action: Mapped[str] = mapped_column(Text)
+    expected_aqi_reduction: Mapped[float] = mapped_column(Float)
+    health_impact: Mapped[str] = mapped_column(Text)
+    economic_cost: Mapped[str] = mapped_column(Text)
+    confidence: Mapped[float] = mapped_column(Float)
+    dissenting_views: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    evidence_citations: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Store JSON serialized list
+    timeline: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    agent_count: Mapped[int] = mapped_column(Integer, default=5)
+    avg_agent_confidence: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Optional relationship mapping back to Ward
+    ward = relationship("Ward")
+
+
+class VerificationReading(Base):
+    __tablename__ = "verification_readings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    station_id: Mapped[int] = mapped_column(Integer, ForeignKey("stations.id"), index=True)
+    measured_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    source_name: Mapped[str] = mapped_column(String(100), default="OpenAQ Public Network")
+    aqi: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    pm25: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    pm10: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    station = relationship("Station")
+
+
+class CitizenAlertSubscription(Base):
+    __tablename__ = "citizen_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    city: Mapped[str] = mapped_column(String(100), default="Kolkata", index=True)
+    ward_id: Mapped[int] = mapped_column(Integer, ForeignKey("wards.id"), index=True)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    language: Mapped[str] = mapped_column(String(10), default="en")
+    notify_level: Mapped[str] = mapped_column(String(20), default="poor")  # "moderate", "poor", "very_poor", "severe"
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    ward = relationship("Ward")
+
+
+
 

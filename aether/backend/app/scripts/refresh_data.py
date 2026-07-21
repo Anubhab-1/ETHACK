@@ -44,6 +44,13 @@ def refresh_all(db: Session):
                     records = fetch_live_cpcb(city=city, db=db)
                     upsert_readings(records, station_map, db)
 
+            # ── Verification: OpenAQ/Municipal verification baseline ───────
+            try:
+                from app.services.fetch_verification import fetch_and_store_verification
+                fetch_and_store_verification(city, db)
+            except Exception as ev:
+                logger.error(f"Failed to ingest verification baseline for {city}: {ev}")
+
             # ── Weather: Open-Meteo (no key, always real) ──────────────────
             weather_records = fetch_weather(city=city, db=db)
             upsert_weather(weather_records, city, db)
@@ -53,6 +60,13 @@ def refresh_all(db: Session):
             anomalies = detect_spikes_and_auto_escalate(db, city)
             if anomalies > 0:
                 logger.info(f"🚨 Spike detection: {anomalies} enforcement actions created for {city}")
+
+            # ── Citizen Alerts: evaluate subscription thresholds ───────────
+            try:
+                from app.services.citizen_notifier import evaluate_citizen_alerts
+                evaluate_citizen_alerts(db, city)
+            except Exception as ec:
+                logger.error(f"Failed to evaluate citizen alerts for {city}: {ec}")
 
             logger.info(f"✅ Refreshed data for {city} (WAQI: {waqi_result['status']})")
 

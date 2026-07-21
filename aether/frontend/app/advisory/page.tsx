@@ -179,12 +179,24 @@ function getRiskProfile(aqi: number | null, sensitivity: number): {
 
 // ─── Personal Risk Calculator Component ────────────────────────────────────
 
-function PersonalRiskCalculator({ cityAQI }: { cityAQI: number | null }) {
+function PersonalRiskCalculator({ 
+  cityAQI, 
+  wardAQI = null, 
+  wardName = null,
+  hospitalCount = 0 
+}: { 
+  cityAQI: number | null; 
+  wardAQI?: number | null; 
+  wardName?: string | null;
+  hospitalCount?: number;
+}) {
   const [selectedProfile, setSelectedProfile] = useState<HealthProfile>(HEALTH_PROFILES[0]);
 
+  const activeAQI = wardAQI !== null ? wardAQI : cityAQI;
+
   const risk = useMemo(
-    () => getRiskProfile(cityAQI, selectedProfile.sensitivity),
-    [cityAQI, selectedProfile.sensitivity]
+    () => getRiskProfile(activeAQI, selectedProfile.sensitivity),
+    [activeAQI, selectedProfile.sensitivity]
   );
 
   const STATUS_COLORS = {
@@ -202,8 +214,23 @@ function PersonalRiskCalculator({ cityAQI }: { cityAQI: number | null }) {
           <h3 className="text-xs font-bold text-orange-400 uppercase tracking-wider">Personal Risk Calculator</h3>
           <p className="text-[10px] text-gray-500 mt-0.5">Select your health profile to get tailored advice</p>
         </div>
-        {cityAQI !== null && <AQIBadge aqi={cityAQI} size="sm" />}
+        {activeAQI !== null && <AQIBadge aqi={activeAQI} size="sm" />}
       </div>
+
+      {wardName ? (
+        <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 text-[10px] text-orange-400 space-y-1">
+          <div>📍 <strong>Pinned Ward: {wardName}</strong> (Ward AQI: {wardAQI})</div>
+          {hospitalCount > 0 && (
+            <div className="text-[9px] text-gray-400">
+              🏥 Healthcare: {hospitalCount} hospital(s) nearby in this ward.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-slate-900 border border-white/5 rounded-xl p-3 text-[10px] text-gray-400">
+          🌍 <strong>City-Wide Avg Mode</strong> (City Avg AQI: {cityAQI})
+        </div>
+      )}
 
       {/* Profile Grid */}
       <div className="grid grid-cols-3 gap-1.5">
@@ -475,18 +502,26 @@ export default function AdvisoryPage() {
   return (
     <AppShell city={city} liveAQI={cityAvgAQI}>
     <div className="min-h-full bg-gray-950 text-gray-100 flex flex-col h-screen overflow-hidden">
-      {/* ── Header ── */}
-      <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100]">
-        <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
-            <span className="text-gray-700">·</span>
-            <h1 className="font-bold text-sm text-gray-200">Citizen Advisory</h1>
-          </div>
+      {/* ── Page Header ── */}
+      <header className="page-header">
+        <div className="flex items-center gap-2.5">
+          <h1 className="page-title">Citizen Advisory</h1>
+          <span className="page-badge" style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)" }}>NLP · Multilingual</span>
         </div>
-
-
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {/* Language selector */}
+          <div className="flex gap-1">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                onClick={() => setLanguage(l.code)}
+                className={language === l.code ? "btn-primary" : "btn-ghost"}
+                style={{ padding: "0.3125rem 0.625rem" }}
+              >
+                {l.flag} {l.label}
+              </button>
+            ))}
+          </div>
           {/* City selector */}
           <select
             value={city}
@@ -507,29 +542,13 @@ export default function AdvisoryPage() {
                 }
               ]);
             }}
-            className="text-xs bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-orange-500"
+            className="input-field"
+            style={{ width: "auto" }}
           >
             {["Kolkata", "Delhi", "Mumbai"].map((c) => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-
-          {/* Language selector */}
-          <div className="flex gap-1">
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => setLanguage(l.code)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  language === l.code
-                    ? "bg-orange-500/20 border border-orange-500/50 text-orange-400"
-                    : "text-gray-500 hover:text-gray-300"
-                }`}
-              >
-                {l.flag} {l.label}
-              </button>
-            ))}
-          </div>
         </div>
       </header>
 
@@ -781,8 +800,38 @@ export default function AdvisoryPage() {
 
           {/* ── RISK CALCULATOR TAB ── */}
           {rightTab === "risk" && (
-            <div className="flex-1 overflow-y-auto">
-              <PersonalRiskCalculator cityAQI={cityAvgAQI} />
+            <div className="flex-1 overflow-y-auto space-y-3">
+              {/* Ward Dropdown Selector */}
+              <div className="px-4 pt-4">
+                <label className="text-[10px] text-gray-500 block mb-1">Select Ward for Hyperlocal Advice</label>
+                <select
+                  value={selectedWardId || ""}
+                  onChange={(e) => {
+                    const wId = e.target.value ? parseInt(e.target.value) : null;
+                    if (wId) {
+                      handleMapWardClick(wId);
+                    } else {
+                      setSelectedWardId(null);
+                      setSelectedWardDetail(null);
+                    }
+                  }}
+                  className="w-full text-xs bg-gray-900 border border-gray-800 text-gray-200 rounded-lg px-2.5 py-2.5 focus:outline-none focus:border-orange-500 cursor-pointer"
+                >
+                  <option value="">-- Select Ward (Default City-Wide) --</option>
+                  {heatmapData.map((pt) => (
+                    <option key={pt.ward_id} value={pt.ward_id}>
+                      {pt.ward_name} (AQI: {pt.aqi})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <PersonalRiskCalculator 
+                cityAQI={cityAvgAQI} 
+                wardAQI={selectedWardDetail?.aqi} 
+                wardName={selectedWardDetail?.name}
+                hospitalCount={selectedWardDetail?.hospital_count || 0}
+              />
               
               {/* Link to chat */}
               <div className="px-4 pb-4">

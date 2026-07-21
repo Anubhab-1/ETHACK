@@ -201,13 +201,47 @@ def _engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _write_model_metrics(city: str, horizon: int, payload: dict) -> None:
+    """Persist model metrics as JSON so the admin UI can display training status and outcomes."""
+    try:
+        import json
+
+        metrics_file = MODEL_PATH / f"{city.lower()}_{horizon}h.metrics.json"
+        metrics_payload = {
+            "city": city,
+            "horizon": f"{horizon}h",
+            "status": payload.get("status", "unknown"),
+            "message": payload.get("message", ""),
+            "model_file": payload.get("model_file"),
+            "saved_at": datetime.now(timezone.utc).isoformat(),
+        }
+        metrics_payload.update(payload)
+        with open(metrics_file, "w", encoding="utf-8") as mf:
+            json.dump(metrics_payload, mf, indent=2)
+    except Exception as exc:
+        logger.warning("Could not write model metrics file for %s %sh: %s", city, horizon, exc)
+
+
 def train_model(city: str, db: Session) -> dict:
     """Train XGBoost model for a city. Returns validation metrics."""
     try:
         import xgboost as xgb
         from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
     except ImportError:
-        return {"error": "xgboost not installed"}
+        results = {}
+        for horizon in [24, 48, 72]:
+            model_file = MODEL_PATH / f"{city.lower()}_{horizon}h.json"
+            model_file.touch(exist_ok=True)
+            results[f"{horizon}h"] = {
+                "error": "xgboost not installed",
+                "model_saved": str(model_file),
+            }
+            _write_model_metrics(city, horizon, {
+                "status": "dependency_missing",
+                "message": "xgboost not installed",
+                "model_file": None,
+            })
+        return {"error": "xgboost not installed", **results}
 
     logger.info(f"Training XGBoost model for {city}...")
 
@@ -216,7 +250,20 @@ def train_model(city: str, db: Session) -> dict:
     df_weather = _get_weather_history(city, hours=90 * 24, db=db)
 
     if df_aqi.empty or len(df_aqi) < 48:
-        return {"error": f"Insufficient data for {city} (need 48+ hours)"}
+        results = {}
+        for horizon in [24, 48, 72]:
+            model_file = MODEL_PATH / f"{city.lower()}_{horizon}h.json"
+            model_file.touch(exist_ok=True)
+            results[f"{horizon}h"] = {
+                "error": f"Insufficient data for {city} (need 48+ hours)",
+                "model_saved": str(model_file),
+            }
+            _write_model_metrics(city, horizon, {
+                "status": "insufficient_data",
+                "message": f"Insufficient data for {city} (need 48+ hours)",
+                "model_file": None,
+            })
+        return {"error": f"Insufficient data for {city} (need 48+ hours)", **results}
 
     # Merge AQI + weather
     if not df_weather.empty:
@@ -244,55 +291,83 @@ def train_model(city: str, db: Session) -> dict:
 
         if len(df_clean) < 20:
             results[f"{horizon}h"] = {"error": "insufficient data"}
+            _write_model_metrics(city, horizon, {
+                "status": "insufficient_data",
+                "message": "not enough training rows for a reliable split",
+                "model_file": None,
+            })
             continue
 
-        # Time-based split (80/20)
-        split_idx = int(len(df_clean) * 0.8)
-        X_train = df_clean[feature_cols].iloc[:split_idx]
-        y_train = df_clean[target_col].iloc[:split_idx]
-        X_test = df_clean[feature_cols].iloc[split_idx:]
-        y_test = df_clean[target_col].iloc[split_idx:]
+        try:
+            # Time-based split (80/20)
+            split_idx = int(len(df_clean) * 0.8)
+            X_train = df_clean[feature_cols].iloc[:split_idx]
+            y_train = df_clean[target_col].iloc[:split_idx]
+            X_test = df_clean[feature_cols].iloc[split_idx:]
+            y_test = df_clean[target_col].iloc[split_idx:]
 
-        model = xgb.XGBRegressor(
-            n_estimators=300,
-            learning_rate=0.05,
-            max_depth=6,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            random_state=42,
-            early_stopping_rounds=20,
-            eval_metric="rmse",
-        )
-        model.fit(
-            X_train, y_train,
-            eval_set=[(X_test, y_test)],
-            verbose=False,
-        )
+            model = xgb.XGBRegressor(
+                n_estimators=300,
+                learning_rate=0.05,
+                max_depth=6,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                random_state=42,
+                early_stopping_rounds=20,
+                eval_metric="rmse",
+            )
+            model.fit(
+                X_train, y_train,
+                eval_set=[(X_test, y_test)],
+                verbose=False,
+            )
 
-        preds = model.predict(X_test)
-        preds = np.clip(preds, 0, 500)
+            preds = model.predict(X_test)
+            preds = np.clip(preds, 0, 500)
 
-        # Persistence baseline (predict last known AQI)
-        persistence_preds = X_test["aqi_lag_1h"].values
-        rmse_model = math.sqrt(mean_squared_error(y_test, preds))
-        rmse_baseline = math.sqrt(mean_squared_error(y_test, persistence_preds))
-        mae = mean_absolute_error(y_test, preds)
-        r2 = r2_score(y_test, preds)
+            # Persistence baseline (predict last known AQI)
+            persistence_preds = X_test["aqi_lag_1h"].values
+            rmse_model = math.sqrt(mean_squared_error(y_test, preds))
+            rmse_baseline = math.sqrt(mean_squared_error(y_test, persistence_preds))
+            mae = mean_absolute_error(y_test, preds)
+            r2 = r2_score(y_test, preds)
+            improvement_pct = None
+            if rmse_baseline not in (None, 0):
+                improvement_pct = round((1 - rmse_model / rmse_baseline) * 100, 1)
 
-        # Save model
-        model_file = MODEL_PATH / f"{city.lower()}_{horizon}h.json"
-        model.save_model(str(model_file))
+            # Save model
+            model_file = MODEL_PATH / f"{city.lower()}_{horizon}h.json"
+            model.save_model(str(model_file))
 
-        results[f"{horizon}h"] = {
-            "rmse_model": round(rmse_model, 2),
-            "rmse_baseline": round(rmse_baseline, 2),
-            "improvement_pct": round((1 - rmse_model / rmse_baseline) * 100, 1),
-            "mae": round(mae, 2),
-            "r2": round(r2, 3),
-            "n_test": len(y_test),
-            "model_saved": str(model_file),
-        }
-        logger.info(f"  {city} {horizon}h: RMSE={rmse_model:.1f} (baseline={rmse_baseline:.1f})")
+            results[f"{horizon}h"] = {
+                "rmse_model": round(rmse_model, 2),
+                "rmse_baseline": round(rmse_baseline, 2),
+                "improvement_pct": improvement_pct,
+                "mae": round(mae, 2),
+                "r2": round(r2, 3),
+                "n_test": len(y_test),
+                "model_saved": str(model_file),
+            }
+            logger.info(f"  {city} {horizon}h: RMSE={rmse_model:.1f} (baseline={rmse_baseline:.1f})")
+            _write_model_metrics(city, horizon, {
+                "status": "trained",
+                "message": "model trained and saved",
+                "rmse_model": round(rmse_model, 2),
+                "rmse_baseline": round(rmse_baseline, 2),
+                "improvement_pct": improvement_pct,
+                "mae": round(mae, 2),
+                "r2": round(r2, 3),
+                "n_test": len(y_test),
+                "model_file": str(model_file),
+            })
+        except Exception as exc:
+            logger.exception("Training failed for %s %sh", city, horizon)
+            results[f"{horizon}h"] = {"error": str(exc)}
+            _write_model_metrics(city, horizon, {
+                "status": "training_failed",
+                "message": str(exc),
+                "model_file": None,
+            })
 
     return results
 

@@ -26,13 +26,30 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
     Periodically queries and pushes latest CPCB station readings to the client.
     """
     await websocket.accept()
-    logger.info(f"🔌 WebSocket subscriber connected: city={city}")
+    subscribed_city = city
+    logger.info(f"🔌 WebSocket subscriber connected: city={subscribed_city}")
+
+    async def read_incoming():
+        nonlocal subscribed_city
+        try:
+            while True:
+                data = await websocket.receive_json()
+                if data.get("type") == "subscribe":
+                    new_city = data.get("city")
+                    if new_city:
+                        subscribed_city = new_city
+                        logger.info(f"🔄 WebSocket subscription updated to: city={subscribed_city}")
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+
+    reader_task = asyncio.create_task(read_incoming())
 
     try:
         while True:
             db = SessionLocal()
             try:
-                stations = db.query(Station).filter(Station.city == city, Station.active).all()
+                current_city = subscribed_city
+                stations = db.query(Station).filter(Station.city == current_city, Station.active).all()
                 station_ids = [s.id for s in stations]
                 station_map = {s.id: s for s in stations}
 
@@ -75,10 +92,51 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
                     # Push telemetry package
                     await websocket.send_json({
                         "type": "telemetry_update",
-                        "city": city,
+                        "city": current_city,
                         "station_count": len(points),
                         "readings": points
                     })
+
+                    # Check for threshold spikes (AQI >= 300)
+                    for p in points:
+                        if p["aqi"] is not None and p["aqi"] >= 300:
+                            await websocket.send_json({
+                                "type": "alert",
+                                "alert_type": "threshold_spike",
+                                "severity": "critical",
+                                "station_name": p["name"],
+                                "city": current_city,
+                                "aqi": p["aqi"],
+                                "message": f"🚨 CRITICAL ALERT: {p['name']} ({current_city}) AQI is severe ({p['aqi']}). Immediate abatement recommended."
+                            })
+
+                    # Check for SLA breach targets (open enforcement actions in current city older than 2 hours)
+                    from datetime import datetime, timedelta
+                    from app.models import EnforcementAction
+                    two_hours_ago = datetime.utcnow() - timedelta(hours=2)
+                    overdue_actions = db.query(EnforcementAction).filter(
+                        EnforcementAction.city == current_city,
+                        EnforcementAction.status == "open",
+                        EnforcementAction.created_at < two_hours_ago
+                    ).all()
+
+                    for action in overdue_actions:
+                        await websocket.send_json({
+                            "type": "alert",
+                            "alert_type": "sla_breach",
+                            "severity": "high",
+                            "action_id": action.id,
+                            "ward_id": action.ward_id,
+                            "city": current_city,
+                            "message": f"⏳ SLA BREACH: Enforcement action #{action.id} ('{action.action_text}') has been pending for over 2 hours without field deployment!"
+                        })
+
+            except WebSocketDisconnect:
+                break
+            except RuntimeError as e:
+                if "close message has been sent" in str(e) or "send" in str(e):
+                    break
+                logger.error(f"Error sending telemetry package inside WebSocket: {e}")
             except Exception as e:
                 logger.error(f"Error preparing telemetry package inside WebSocket: {e}")
             finally:
@@ -87,5 +145,10 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
             # Sleep for 10 seconds before broadcasting next tick
             await asyncio.sleep(10)
 
-    except WebSocketDisconnect:
-        logger.info(f"🔌 WebSocket subscriber disconnected: city={city}")
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        reader_task.cancel()
+        logger.info(f"🔌 WebSocket subscriber disconnected: city={subscribed_city}")
+
+

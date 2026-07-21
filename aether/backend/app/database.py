@@ -40,13 +40,51 @@ def get_db():
         db.close()
 
 
+def _run_migrations():
+    """Add columns dynamically if they do not exist."""
+    from sqlalchemy import inspect, text
+    try:
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        with engine.begin() as conn:
+            if "stations" in table_names:
+                columns = [col["name"] for col in inspector.get_columns("stations")]
+                if "last_calibrated_at" not in columns:
+                    conn.execute(text("ALTER TABLE stations ADD COLUMN last_calibrated_at DATETIME"))
+                    logger.info("Database Migration: Added 'last_calibrated_at' column to 'stations' table.")
+                if "last_maintenance_at" not in columns:
+                    conn.execute(text("ALTER TABLE stations ADD COLUMN last_maintenance_at DATETIME"))
+                    logger.info("Database Migration: Added 'last_maintenance_at' column to 'stations' table.")
+            
+            if "citizen_reports" in table_names:
+                columns = [col["name"] for col in inspector.get_columns("citizen_reports")]
+                if "photo_url" not in columns:
+                    conn.execute(text("ALTER TABLE citizen_reports ADD COLUMN photo_url TEXT"))
+                    logger.info("Database Migration: Added 'photo_url' column to 'citizen_reports' table.")
+
+            if "enforcement_queue" in table_names:
+                columns = [col["name"] for col in inspector.get_columns("enforcement_queue")]
+                if "evidence_notes" not in columns:
+                    conn.execute(text("ALTER TABLE enforcement_queue ADD COLUMN evidence_notes TEXT"))
+                    logger.info("Database Migration: Added 'evidence_notes' column to 'enforcement_queue' table.")
+                if "evidence_photo_url" not in columns:
+                    conn.execute(text("ALTER TABLE enforcement_queue ADD COLUMN evidence_photo_url TEXT"))
+                    logger.info("Database Migration: Added 'evidence_photo_url' column to 'enforcement_queue' table.")
+                if "evidence_severity" not in columns:
+                    conn.execute(text("ALTER TABLE enforcement_queue ADD COLUMN evidence_severity VARCHAR(20)"))
+                    logger.info("Database Migration: Added 'evidence_severity' column to 'enforcement_queue' table.")
+    except Exception as e:
+        logger.warning(f"Dynamic database migration skipped or failed: {e}")
+
+
 def create_tables():
     """Create all tables in the database. Enable extensions and hypertables if PostgreSQL."""
     from sqlalchemy import text
 
     from app import models  # noqa: F401
 
-    "postgresql" in str(engine.url)
+    # Run migration checks
+    _run_migrations()
 
     Base.metadata.create_all(bind=engine)
 

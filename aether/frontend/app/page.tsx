@@ -70,7 +70,7 @@ const FEATURES = [
 
 const TECH_STACK = [
   { label: "Gaussian Plume Model", sub: "Atmospheric dispersion" },
-  { label: "LSTM Neural Network", sub: "72h AQI forecasting" },
+  { label: "XGBoost + ST-GCN", sub: "72h hyperlocal AQI forecasting" },
   { label: "Sentinel-5P / TROPOMI", sub: "Satellite NO₂ calibration" },
   { label: "Multi-Agent Consensus", sub: "AI policy deliberation" },
   { label: "CPCB Live API", sub: "Real-time station feed" },

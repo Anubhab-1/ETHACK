@@ -29,6 +29,7 @@ export default function ForecastPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastMode, setForecastMode] = useState<"auto" | "advanced" | "fallback">("auto");
 
   // Intervention simulation states (Digital Twin)
   const [trafficReduction, setTrafficReduction] = useState(0); // 0% to 100%
@@ -78,7 +79,14 @@ export default function ForecastPage() {
       wardDetail.attribution = attr.breakdown;
       setSelectedWard(wardDetail);
 
-      const fcRes = await api.forecast(wardDetail.lat, wardDetail.lon, city);
+      const fcRes = await api.getBestForecast(
+        wardDetail.lat,
+        wardDetail.lon,
+        city,
+        72,
+        forecastMode === "fallback",
+        forecastMode === "advanced"
+      );
       setForecast(fcRes.forecasts);
     } catch (e) {
       console.error("Failed to load forecast:", e);
@@ -86,7 +94,7 @@ export default function ForecastPage() {
     } finally {
       setForecastLoading(false);
     }
-  }, [selectedWardId, city]);
+  }, [selectedWardId, city, forecastMode]);
 
   useEffect(() => {
     loadForecast();
@@ -176,62 +184,43 @@ export default function ForecastPage() {
   return (
     <AppShell city={city}>
     <div className="min-h-full bg-gray-950 text-gray-100 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100] sticky top-0 shadow-md">
-        <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
-            <span className="text-gray-700">·</span>
-            <h1 className="font-bold text-sm text-gray-200">Predictive Intelligence</h1>
-          </div>
+      {/* ── Page Header ── */}
+      <header className="page-header">
+        <div className="flex items-center gap-2.5">
+          <h1 className="page-title">72-Hour Forecast</h1>
+          <span className="page-badge" style={{ color: "#60a5fa", borderColor: "rgba(96,165,250,0.3)" }}>AI · XGBoost / ST-GCN</span>
         </div>
-
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-xs text-orange-400 hover:underline hidden sm:block">
-            ← Situation Room
-          </Link>
+        <div className="flex items-center gap-2">
+          <select value={city} onChange={(e) => setCity(e.target.value)} className="input-field" style={{ width: "auto" }}>
+            {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
       </header>
 
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
-        {/* Left Control Column (3 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="glass-card p-4 space-y-4">
-            <h2 className="text-sm font-semibold text-orange-400 uppercase tracking-wider">
-              Location Selector
-            </h2>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">City</label>
-                <select
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="w-full text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500"
-                >
-                  {CITIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
+        {/* ── Left Control Column ── */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="glass-card p-4 space-y-3">
+            <p className="section-label">Location</p>
+            <div>
+              <label className="input-label">Forecast Mode</label>
+              <select value={forecastMode} onChange={(e) => setForecastMode(e.target.value as any)} className="input-field select">
+                <option value="auto">Auto (Prefer Advanced)</option>
+                <option value="advanced">Force Advanced (ST-GCN)</option>
+                <option value="fallback">Force Fallback (XGBoost)</option>
+              </select>
+            </div>
+            <div>
+              <label className="input-label">Ward</label>
+              {loading ? (
+                <div className="h-9 skeleton rounded-xl" />
+              ) : (
+                <select value={selectedWardId} onChange={(e) => setSelectedWardId(Number(e.target.value))} className="input-field select">
+                  {wards.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name} (Ward #{w.ward_no})</option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Ward</label>
-                {loading ? (
-                  <div className="h-9 bg-gray-800 animate-pulse rounded-lg border border-gray-700" />
-                ) : (
-                  <select
-                    value={selectedWardId}
-                    onChange={(e) => setSelectedWardId(Number(e.target.value))}
-                    className="w-full text-sm bg-gray-800 border border-gray-700 text-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-orange-500"
-                  >
-                    {wards.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} (Ward #{w.ward_no})
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+              )}
             </div>
           </div>
 
@@ -310,17 +299,12 @@ export default function ForecastPage() {
                 </div>
               </div>
 
-              {/* Reset simulator */}
               {(trafficReduction > 0 || constructionHalt || industrialRestriction > 0) && (
                 <button
-                  onClick={() => {
-                    setTrafficReduction(0);
-                    setConstructionHalt(false);
-                    setIndustrialRestriction(0);
-                  }}
-                  className="w-full py-1.5 text-xs rounded border border-gray-700 hover:bg-gray-800 text-gray-400 transition-colors"
+                  onClick={() => { setTrafficReduction(0); setConstructionHalt(false); setIndustrialRestriction(0); }}
+                  className="btn-ghost w-full"
                 >
-                  Clear Policy Modifiers
+                  Reset Policy Modifiers
                 </button>
               )}
             </div>
@@ -381,15 +365,13 @@ export default function ForecastPage() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <div>
                     <h3 className="font-bold text-gray-200">72-Hour AQI Forecast Curve</h3>
-                    <p className="text-xs text-gray-500">Includes 95% confidence intervals based on weather parameters</p>
+                    <p className="text-xs text-gray-500">
+                      95% confidence intervals · XGBoost trained on live WAQI/CPCB readings + OpenWeatherMap parameters
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleExportCSV}
-                      disabled={simulatedForecasts.length === 0}
-                      className="px-3 py-1.5 text-xs rounded bg-gray-800 border border-gray-700 hover:text-orange-400 hover:border-orange-500 transition-colors flex items-center gap-1.5"
-                    >
-                      📥 Export CSV
+                    <button onClick={handleExportCSV} disabled={simulatedForecasts.length === 0} className="btn-ghost">
+                      ↓ Export CSV
                     </button>
                   </div>
                 </div>
@@ -421,17 +403,17 @@ export default function ForecastPage() {
               {/* Hour by Hour table breakdown */}
               <div className="glass-card p-5 space-y-4">
                 <h3 className="font-bold text-gray-200">Chronological Hourly Forecast Logs</h3>
-                <div className="overflow-x-auto border border-white/5 rounded-xl">
+                <div className="overflow-auto border border-white/5 rounded-xl max-h-[360px]">
                   <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-900 border-b border-white/5 text-xs text-gray-400 font-semibold uppercase tracking-wider">
-                        <th className="p-3">Horizon</th>
-                        <th className="p-3">Target Time</th>
-                        <th className="p-3">Forecast AQI</th>
-                        <th className="p-3">Category</th>
-                        <th className="p-3">Confidence Range</th>
+                    <thead className="sticky top-0 bg-gray-900 z-10 shadow-[0_1px_0_rgba(255,255,255,0.05)]">
+                      <tr className="text-xs text-gray-400 font-semibold uppercase tracking-wider">
+                        <th className="p-3 bg-gray-900">Horizon</th>
+                        <th className="p-3 bg-gray-900">Target Time</th>
+                        <th className="p-3 bg-gray-900">Forecast AQI</th>
+                        <th className="p-3 bg-gray-900">Category</th>
+                        <th className="p-3 bg-gray-900">Confidence Range</th>
                         {(trafficReduction > 0 || constructionHalt || industrialRestriction > 0) && (
-                          <th className="p-3 text-orange-400">Simulated AQI</th>
+                          <th className="p-3 text-orange-400 bg-gray-900">Simulated AQI</th>
                         )}
                       </tr>
                     </thead>

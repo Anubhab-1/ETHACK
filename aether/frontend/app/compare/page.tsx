@@ -217,23 +217,21 @@ export default function ComparePage() {
   return (
     <AppShell>
     <div className="min-h-full bg-gray-950 text-gray-100 flex flex-col">
-      {/* Header */}
-      <header className="border-b border-white/8 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-0 bg-gray-950/95 backdrop-blur-md flex-none z-[1100] sticky top-0 shadow-md">
-        <div className="flex items-center gap-4 justify-between w-full sm:w-auto">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-orange-500 font-black text-lg hover:text-orange-400 transition-colors">⬡ AETHER</Link>
-            <span className="text-gray-700">·</span>
-            <h1 className="font-bold text-sm text-gray-200">Multi-City Intelligence</h1>
-          </div>
+      {/* ── Page Header ── */}
+      <header className="page-header">
+        <div className="flex items-center gap-2.5">
+          <h1 className="page-title">Multi-City Compare</h1>
+          <span className="page-badge" style={{ color: "#38bdf8", borderColor: "rgba(56,189,248,0.3)" }}>National Census</span>
         </div>
-
-        <button
-          onClick={loadCityData}
-          disabled={loading}
-          className="px-3 py-1.5 text-xs rounded bg-gray-800 border border-gray-700 hover:text-orange-400 hover:border-orange-500 transition-colors disabled:opacity-50 font-semibold cursor-pointer w-full sm:w-auto mt-1 sm:mt-0"
-        >
-          {loading ? "Refreshing..." : "⟳ Refresh All"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadCityData}
+            disabled={loading}
+            className="btn-ghost"
+          >
+            {loading ? "Refreshing..." : "↻ Refresh All"}
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 space-y-6 overflow-y-auto">

@@ -104,8 +104,10 @@ export function AgentCommitteeModal({
   const [visibleTurns, setVisibleTurns] = useState<(AgentTurn | DialogueTurn)[]>([]);
   const [typingIndex, setTypingIndex] = useState(-1);
   const [typingAgent, setTypingAgent] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"deliberation" | "constitutional" | "causal" | "decree" | "graph">("deliberation");
+  const [activeTab, setActiveTab] = useState<"deliberation" | "constitutional" | "causal" | "decree" | "graph" | "history">("deliberation");
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const [historyLogs, setHistoryLogs] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -118,7 +120,45 @@ export function AgentCommitteeModal({
     setLoading(false);
     setActiveTab("deliberation");
     setExpandedTool(null);
-  }, [isOpen]);
+
+    // Fetch deliberation history logs
+    setHistoryLoading(true);
+    api.getDeliberationHistory(wardId)
+      .then((data) => {
+        setHistoryLogs(data.deliberation_history || []);
+      })
+      .catch((err) => console.error("Failed to load deliberation history:", err))
+      .finally(() => setHistoryLoading(false));
+
+    setSignature("");
+    setApprovedAction(null);
+    setSignOffTargetType("Industrial Restriction");
+  }, [isOpen, wardId]);
+
+  const [signature, setSignature] = useState("");
+  const [signOffTargetType, setSignOffTargetType] = useState("Industrial Restriction");
+  const [approvedAction, setApprovedAction] = useState<any>(null);
+  const [approving, setApproving] = useState(false);
+
+  const handleApprove = async () => {
+    if (!signature.trim() || !response) return;
+    setApproving(true);
+    try {
+      const res = await api.approveDecree({
+        ward_id: wardId,
+        city: city,
+        action_text: `Signed-off Decree: ${response.decree.split('\n')[0] || response.decree.slice(0, 100)}`,
+        target_type: signOffTargetType,
+        priority_score: response.current_aqi ? Math.min(100, Math.max(30, response.current_aqi / 4)) : 75.0
+      });
+      setApprovedAction(res);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to deploy enforcement action.");
+    } finally {
+      setApproving(false);
+    }
+  };
 
   const handleStartSimulation = async () => {
     setHasStarted(true);
@@ -166,10 +206,24 @@ export function AgentCommitteeModal({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [visibleTurns, typingAgent]);
 
-  if (!isOpen) return null;
-
   const isV2 = !!response?.agent_turns;
   const allDone = typingIndex >= allTurns.length && allTurns.length > 0;
+
+  // Refresh history logs when deliberation completes
+  useEffect(() => {
+    if (!isOpen) return;
+    if (allDone && response) {
+      api.getDeliberationHistory(wardId)
+        .then((data) => {
+          setHistoryLogs(data.deliberation_history || []);
+        })
+        .catch((err) => console.error("Failed to refresh history logs:", err));
+    }
+  }, [allDone, response, wardId, isOpen]);
+
+  if (!isOpen) return null;
+
+
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -262,36 +316,38 @@ export function AgentCommitteeModal({
           )}
         </div>
 
-        {/* Tab bar (only visible after simulation runs) */}
-        {response && (
-          <div className="flex border-b border-slate-800 bg-slate-900/30 text-xs">
-            {[
-              { id: "deliberation", label: "🤖 Deliberation" },
+        {/* Tab bar */}
+        <div className="flex border-b border-slate-800 bg-slate-900/30 text-xs">
+          {[
+            { id: "deliberation", label: "🤖 Deliberation" },
+            ...(response ? [
               { id: "constitutional", label: "⚖️ Constitution" },
               { id: "causal", label: "📊 Causal Proof" },
               { id: "decree", label: "📜 Decree" },
               { id: "graph", label: "🕸️ Knowledge Graph" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`px-4 py-2.5 font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? "text-indigo-400 border-b-2 border-indigo-500 bg-indigo-950/20"
-                    : "text-slate-500 hover:text-slate-300"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        )}
+            ] : []),
+            { id: "history", label: "⏳ Audit Logs" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`px-4 py-2.5 font-medium transition-colors ${
+                activeTab === tab.id
+                  ? "text-indigo-400 border-b-2 border-indigo-500 bg-indigo-950/20"
+                  : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
 
           {/* Start screen */}
-          {!hasStarted && (
+          {activeTab === "deliberation" && !hasStarted && (
             <div className="flex flex-col items-center justify-center h-full p-8 gap-6">
               <div className="text-center">
                 <div className="text-5xl mb-4">🏛️</div>
@@ -340,8 +396,9 @@ export function AgentCommitteeModal({
           )}
 
           {/* Loading */}
-          {loading && (
+          {activeTab === "deliberation" && loading && (
             <div className="flex flex-col items-center justify-center h-64 gap-4">
+
               <div className="flex gap-2">
                 {["🌬️", "🚗", "🏭", "👩‍⚕️", "⚖️"].map((a, i) => (
                   <span
@@ -569,6 +626,70 @@ export function AgentCommitteeModal({
                   {response.decree}
                 </pre>
               </div>
+
+              {/* Digital Sign-off Panel */}
+              {approvedAction ? (
+                <div className="bg-emerald-950/20 border border-emerald-800/40 rounded-xl p-4 text-xs space-y-2">
+                  <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                    ✓ Decree Approved & Live Enforcement Action Dispatched
+                  </div>
+                  <p className="text-slate-300">
+                    The consensus decree has been digitally signed by <strong>{signature}</strong> and registered as a priority dispatch order.
+                  </p>
+                  <div className="text-slate-400 font-mono text-[10px] space-y-0.5">
+                    <div>Task ID: #{approvedAction.id}</div>
+                    <div>Target Type: {approvedAction.target_type}</div>
+                    <div>City: {approvedAction.city}</div>
+                    <div>Priority Score: {approvedAction.priority_score.toFixed(0)}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-card p-4 space-y-3 bg-slate-900/40 border border-white/5 rounded-xl">
+                  <div className="text-xs text-orange-400 font-bold uppercase tracking-wider">
+                    Digital Sign-off & Task Deployment
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-500 block mb-1">Target Type</label>
+                      <select
+                        value={signOffTargetType}
+                        onChange={(e) => setSignOffTargetType(e.target.value)}
+                        className="w-full text-xs bg-slate-950 border border-slate-800 text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-orange-500"
+                      >
+                        <option value="Industrial Restriction">Industrial Restriction</option>
+                        <option value="Construction Halt">Construction Halt</option>
+                        <option value="Heavy Vehicle Ban">Heavy Vehicle Ban</option>
+                        <option value="General Clean Air Mandate">General Clean Air Mandate</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-500 block mb-1">Digital Signature</label>
+                      <input
+                        type="text"
+                        value={signature}
+                        onChange={(e) => setSignature(e.target.value)}
+                        placeholder="Commissioner's Name / ID"
+                        className="w-full text-xs bg-slate-950 border border-slate-800 text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleApprove}
+                    disabled={approving || !signature.trim()}
+                    className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 disabled:opacity-50 text-white font-bold py-2 rounded-xl transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {approving ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border border-white border-t-transparent rounded-full animate-spin" />
+                        Signing & Deploying...
+                      </>
+                    ) : (
+                      <>✍️ Digitally Sign-off & Deploy Action</>
+                    )}
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={handlePrint}
                 className="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
@@ -584,7 +705,101 @@ export function AgentCommitteeModal({
               <InteractiveKnowledgeGraph wardId={wardId} />
             </div>
           )}
+
+          {/* Audit Logs Tab */}
+          {activeTab === "history" && (
+            <div className="p-6 space-y-4">
+              <div className="text-center mb-4">
+                <h3 className="text-white font-bold text-base">Municipal Deliberation Audit Trail</h3>
+                <p className="text-slate-400 text-xs mt-1">
+                  Historical log of past 5-agent constitutional decisions for {wardName}.
+                </p>
+              </div>
+
+              {historyLoading ? (
+                <div className="text-center text-slate-400 py-12">
+                  <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-sm">Loading audit trail...</p>
+                </div>
+              ) : historyLogs.length === 0 ? (
+                <div className="text-center text-slate-500 py-12">
+                  <p>No historical deliberations recorded for this ward.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {historyLogs.map((log, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3 hover:border-slate-700 transition-colors"
+                    >
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2.5 border-b border-slate-800">
+                        <div>
+                          <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider bg-indigo-950/60 border border-indigo-900/50 px-2 py-0.5 rounded">
+                            Decree #{log.id || `Past-${idx + 1}`}
+                          </span>
+                          <span className="text-slate-500 text-xs ml-2">
+                            {new Date(log.timestamp).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 text-xs">Confidence:</span>
+                          <span className="text-emerald-400 font-bold font-mono text-sm">
+                            {log.confidence > 1 ? log.confidence : Math.round(log.confidence * 100)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <strong className="text-slate-400 text-xs block uppercase">Consensus Action</strong>
+                          <span className="text-slate-200 font-medium">{log.consensus_action}</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-1">
+                          <div>
+                            <strong className="text-slate-400 text-xs block uppercase">Proj. AQI Reduction</strong>
+                            <span className="text-emerald-400 font-bold font-mono">
+                              ↓{log.expected_aqi_reduction} μg/m³
+                            </span>
+                          </div>
+                          <div>
+                            <strong className="text-slate-400 text-xs block uppercase">Execution Timeline</strong>
+                            <span className="text-slate-300 font-medium">{log.timeline || "N/A"}</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                          <div>
+                            <strong className="text-slate-400 text-xs block uppercase">Health Benefit</strong>
+                            <span className="text-slate-300 leading-normal">{log.health_impact}</span>
+                          </div>
+                          <div>
+                            <strong className="text-slate-400 text-xs block uppercase">Economic Cost</strong>
+                            <span className="text-slate-300 leading-normal">{log.economic_cost}</span>
+                          </div>
+                        </div>
+
+                        {log.evidence_citations && log.evidence_citations.length > 0 && (
+                          <div className="pt-1.5">
+                            <strong className="text-slate-400 text-xs block uppercase mb-1">Evidence Cites</strong>
+                            <div className="flex flex-wrap gap-1.5">
+                              {log.evidence_citations.map((cite: string, cIdx: number) => (
+                                <span key={cIdx} className="text-[10px] text-cyan-300 bg-cyan-950/30 border border-cyan-900/50 px-2 py-0.5 rounded">
+                                  📂 {cite}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
 
         {/* Footer actions */}
         {allDone && (

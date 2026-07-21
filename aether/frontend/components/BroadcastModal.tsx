@@ -254,7 +254,7 @@ export function BroadcastModal({
         </button>
 
         <h2 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">
-          Alert Outreach Simulator
+          Alert Outreach Simulator <span className="text-[9px] text-amber-400/70 border border-amber-500/30 bg-amber-950/30 px-1.5 py-0.5 rounded-full ml-1 normal-case">Demo Mode</span>
         </h2>
 
         {/* Tab Controls */}
@@ -494,12 +494,12 @@ export function BroadcastModal({
         <div className="w-full mt-4 bg-gray-900/60 border border-white/5 rounded-2xl p-3.5 space-y-2.5 text-xs text-gray-300">
           <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold uppercase tracking-wider">
             <span>📡 Broadcast Telemetry</span>
-            <span className="text-emerald-400">Live Status</span>
+            <span className="text-amber-400/80">Simulated · Twilio not configured</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-center">
             <div className="bg-gray-950 p-2 rounded-xl border border-white/5">
-              <span className="text-[9px] text-gray-500 block">Notifications Dispatched</span>
+              <span className="text-[9px] text-gray-500 block">Subscribers Notified (sim.)</span>
               <span className="text-sm font-black text-orange-400 font-mono">{alertsSent}</span>
             </div>
             <div className="bg-gray-950 p-2 rounded-xl border border-white/5">

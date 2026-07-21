@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aether-backend-config
+data:
+  APP_ENV: "production"
+  DATABASE_URL: "postgresql://aether:aether_secure_pass@timescaledb:5432/aether_national"
+  ALLOWED_ORIGINS: "http://localhost:3000"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aether-backend-secrets
+type: Opaque
+data:
+  OPENAI_API_KEY: "c29tZV9rZXk="
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aether-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aether-backend
+  template:
+    metadata:
+      labels:
+        app: aether-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/api/metrics"
+    spec:
+      containers:
+        - name: backend
+          image: aether-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: aether-backend-config
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aether-backend-secrets
+                  key: OPENAI_API_KEY
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aether-backend
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+  selector:
+    app: aether-backend
