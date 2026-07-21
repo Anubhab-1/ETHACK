@@ -393,7 +393,38 @@ function getMockFallbackData<T>(path: string, options?: RequestInit): T | undefi
     return wards as T;
   }
 
-  // Forecast
+  // Forecast Advanced ST-GCN AI Compute
+  if (url.includes("/api/forecast-advanced") || url.includes("/api/forecast/st-gcn")) {
+    const points: ForecastPoint[] = Array.from({ length: 72 }).map((_, i) => {
+      const date = new Date();
+      date.setHours(date.getHours() + i + 1);
+      const baseAqi = 150 + Math.sin(i / 5) * 30 + (i * 0.4);
+      const aqi = Math.round(Math.max(40, Math.min(450, baseAqi)));
+      return {
+        forecast_for: date.toISOString(),
+        horizon_hours: i + 1,
+        predicted_aqi: aqi,
+        predicted_category: aqi > 200 ? "Poor" : "Moderate",
+        confidence_lower: Math.round(aqi * 0.88),
+        confidence_upper: Math.round(aqi * 1.12),
+        temp_c: Math.round(27 + Math.sin(i / 4) * 3),
+        wind_speed: parseFloat((9 + Math.cos(i / 5) * 3).toFixed(1)),
+        method: "Spatio-Temporal Graph Neural Net (ST-GCN)"
+      };
+    });
+    return {
+      ward_id: 1,
+      ward_name: "Park Street Ward 1",
+      ward_no: 1,
+      lat: 22.55,
+      lon: 88.35,
+      current_aqi: 168,
+      forecasts: points,
+      feature_attribution: { "Traffic Density": 0.42, "Humidity": 0.21, "Wind Speed": 0.18, "Industrial Stack Emission": 0.19 }
+    } as T;
+  }
+
+  // Forecast standard
   if (url.includes("/api/forecast")) {
     const points: ForecastPoint[] = Array.from({ length: 72 }).map((_, i) => {
       const date = new Date();
@@ -428,13 +459,46 @@ function getMockFallbackData<T>(path: string, options?: RequestInit): T | undefi
     } as T;
   }
 
-  // Models
+  // Model Training / Retraining Jobs (Check BEFORE general /api/models)
+  if (url.includes("/api/models/train") || url.includes("/api/models/job") || url.includes("/api/forecast-models/train") || url.includes("/training-job")) {
+    return {
+      city: "Kolkata",
+      job_id: "mock-job-101",
+      status: "completed",
+      message: "XGBoost & ST-GCN AI Retraining job completed. Model RMSE improved to 9.8.",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      results: { rmse: 9.8, mae: 6.4, r2: 0.94 }
+    } as T;
+  }
+
+  // Models Artifacts List
   if (url.includes("/api/models")) {
     return {
       models: [
-        { filename: "xgboost_kolkata.json", city: "Kolkata", type: "XGBoost", rmse: 11.2, trained_at: "2026-07-20" },
-        { filename: "st_gcn_v2.pt", city: "National", type: "ST-GCN Graph Neural Net", rmse: 9.8, trained_at: "2026-07-21" }
+        { filename: "xgboost_kolkata.json", city: "Kolkata", type: "XGBoost", rmse: 11.2, trained_at: "2026-07-20", size_bytes: 482000, modified_at: new Date().toISOString(), metrics: { status: "trained", rmse: 11.2 } },
+        { filename: "st_gcn_v2.pt", city: "National", type: "ST-GCN Graph Neural Net", rmse: 9.8, trained_at: "2026-07-21", size_bytes: 1420000, modified_at: new Date().toISOString(), metrics: { status: "trained", rmse: 9.8 } }
       ]
+    } as T;
+  }
+
+  // Enforcement Recompute & Decree Signoff (Check BEFORE general /api/enforcement)
+  if (url.includes("/api/enforcement/recompute")) {
+    return { status: "ok", count: 8, message: "AI recompute completed successfully" } as T;
+  }
+  if (url.includes("/api/enforcement/approve-decree")) {
+    return {
+      id: Math.floor(1000 + Math.random() * 9000),
+      ward_id: 1,
+      city: "Kolkata",
+      ward_name: "Park Street",
+      ward_lat: 22.57,
+      ward_lon: 88.36,
+      action_text: "Signed-off Statutory Decree",
+      target_type: "Industrial Restriction",
+      priority_score: 88.0,
+      status: "deployed",
+      created_at: new Date().toISOString()
     } as T;
   }
 
