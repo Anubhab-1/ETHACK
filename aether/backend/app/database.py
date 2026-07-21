@@ -47,71 +47,101 @@ def _run_migrations():
     try:
         inspector = inspect(engine)
         table_names = inspector.get_table_names()
-        with engine.begin() as conn:
-            if "stations" in table_names:
-                columns = [col["name"] for col in inspector.get_columns("stations")]
-                if "last_calibrated_at" not in columns:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE stations ADD COLUMN last_calibrated_at DATETIME"
+
+        # Use TIMESTAMP instead of DATETIME (TIMESTAMP is valid in both SQLite and PostgreSQL)
+        timestamp_type = "TIMESTAMP"
+
+        if "stations" in table_names:
+            columns = [col["name"] for col in inspector.get_columns("stations")]
+            if "last_calibrated_at" not in columns:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE stations ADD COLUMN last_calibrated_at {timestamp_type}"
+                            )
                         )
-                    )
                     logger.info(
                         "Database Migration: Added 'last_calibrated_at' column to 'stations' table."
                     )
-                if "last_maintenance_at" not in columns:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE stations ADD COLUMN last_maintenance_at DATETIME"
+                except Exception as e:
+                    logger.warning(f"Failed to add 'last_calibrated_at' column: {e}")
+
+            if "last_maintenance_at" not in columns:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE stations ADD COLUMN last_maintenance_at {timestamp_type}"
+                            )
                         )
-                    )
                     logger.info(
                         "Database Migration: Added 'last_maintenance_at' column to 'stations' table."
                     )
+                except Exception as e:
+                    logger.warning(f"Failed to add 'last_maintenance_at' column: {e}")
 
-            if "citizen_reports" in table_names:
-                columns = [
-                    col["name"] for col in inspector.get_columns("citizen_reports")
-                ]
-                if "photo_url" not in columns:
-                    conn.execute(
-                        text("ALTER TABLE citizen_reports ADD COLUMN photo_url TEXT")
-                    )
+        if "citizen_reports" in table_names:
+            columns = [
+                col["name"] for col in inspector.get_columns("citizen_reports")
+            ]
+            if "photo_url" not in columns:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text("ALTER TABLE citizen_reports ADD COLUMN photo_url TEXT")
+                        )
                     logger.info(
                         "Database Migration: Added 'photo_url' column to 'citizen_reports' table."
                     )
+                except Exception as e:
+                    logger.warning(f"Failed to add 'photo_url' column: {e}")
 
-            if "enforcement_queue" in table_names:
-                columns = [
-                    col["name"] for col in inspector.get_columns("enforcement_queue")
-                ]
-                if "evidence_notes" not in columns:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE enforcement_queue ADD COLUMN evidence_notes TEXT"
+        if "enforcement_queue" in table_names:
+            columns = [
+                col["name"] for col in inspector.get_columns("enforcement_queue")
+            ]
+            if "evidence_notes" not in columns:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE enforcement_queue ADD COLUMN evidence_notes TEXT"
+                            )
                         )
-                    )
                     logger.info(
                         "Database Migration: Added 'evidence_notes' column to 'enforcement_queue' table."
                     )
-                if "evidence_photo_url" not in columns:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE enforcement_queue ADD COLUMN evidence_photo_url TEXT"
+                except Exception as e:
+                    logger.warning(f"Failed to add 'evidence_notes' column: {e}")
+
+            if "evidence_photo_url" not in columns:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE enforcement_queue ADD COLUMN evidence_photo_url TEXT"
+                            )
                         )
-                    )
                     logger.info(
                         "Database Migration: Added 'evidence_photo_url' column to 'enforcement_queue' table."
                     )
-                if "evidence_severity" not in columns:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE enforcement_queue ADD COLUMN evidence_severity VARCHAR(20)"
+                except Exception as e:
+                    logger.warning(f"Failed to add 'evidence_photo_url' column: {e}")
+
+            if "evidence_severity" not in columns:
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE enforcement_queue ADD COLUMN evidence_severity VARCHAR(20)"
+                            )
                         )
-                    )
                     logger.info(
                         "Database Migration: Added 'evidence_severity' column to 'enforcement_queue' table."
                     )
+                except Exception as e:
+                    logger.warning(f"Failed to add 'evidence_severity' column: {e}")
     except Exception as e:
         logger.warning(f"Dynamic database migration skipped or failed: {e}")
 
