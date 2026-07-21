@@ -300,9 +300,9 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
       </aside>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-[240px] app-sidebar flex flex-col">
+        <div className="fixed inset-0 z-[10000] md:hidden">
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-[260px] app-sidebar flex flex-col shadow-2xl z-[10001] bg-gray-950 border-r border-white/10">
             <SidebarContent
               collapsed={false}
               pathname={pathname}
@@ -314,24 +314,33 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
               dateStr={dateStr}
               online={online}
             />
-            <button onClick={() => setMobileOpen(false)} className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/5 text-slate-400 hover:text-white">
-              <X size={14} />
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="absolute top-3 right-3 p-2 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
+              title="Close menu"
+            >
+              <X size={16} strokeWidth={2.5} />
             </button>
           </aside>
         </div>
       )}
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <div className="flex md:hidden items-center gap-3 px-4 py-3 border-b border-white/6 bg-gray-950/80 backdrop-blur-md flex-none">
-          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-white">
-            <Menu size={16} />
+        <div className="flex md:hidden items-center gap-3 px-4 py-3 border-b border-white/10 bg-gray-950/95 backdrop-blur-xl flex-none z-[1100]">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2 rounded-xl bg-orange-500/20 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-white transition-all shadow-md flex items-center justify-center cursor-pointer active:scale-95"
+            title="Open menu"
+            aria-label="Open menu"
+          >
+            <Menu size={20} strokeWidth={2.5} />
           </button>
           <div className="flex items-center gap-2 flex-1">
-            <Hexagon size={18} className="text-orange-500" strokeWidth={1.5} fill="rgba(249,115,22,0.1)" />
-            <span className="font-black text-white text-sm">AETHER</span>
+            <Hexagon size={20} className="text-orange-500" strokeWidth={2} fill="rgba(249,115,22,0.15)" />
+            <span className="font-black text-white text-base tracking-tight">AETHER</span>
           </div>
           {liveAQI !== null && liveAQI !== undefined && (
-            <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{ color: aqiColor, background: `${aqiColor}22` }}>
+            <span className="text-xs font-black px-2.5 py-1 rounded-lg border font-mono shadow-sm" style={{ color: aqiColor, background: `${aqiColor}18`, borderColor: `${aqiColor}44` }}>
               AQI {liveAQI}
             </span>
           )}
