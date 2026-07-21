@@ -343,31 +343,20 @@ export default function AdvisoryPage() {
     const utterance = new SpeechSynthesisUtterance(cleanText);
     
     const voices = window.speechSynthesis.getVoices();
-    let voice = null;
-    if (language === "hi") {
-      voice = voices.find(v => v.lang.includes("hi-IN") || v.lang.startsWith("hi")) || null;
-    } else if (language === "bn") {
-      voice = voices.find(v => v.lang.includes("bn-IN") || v.lang.startsWith("bn")) || null;
-    } else {
-      voice = voices.find(v => v.lang.includes("en-IN") || v.lang.startsWith("en")) || null;
-    }
-
-    utterance.lang = language === "hi" ? "hi-IN" : language === "bn" ? "bn-IN" : "en-US";
-    if (voice) {
-      utterance.voice = voice;
+    if (language === "bn") {
+      const bnVoice = voices.find((v) => v.lang.startsWith("bn"));
+      if (bnVoice) utterance.voice = bnVoice;
+    } else if (language === "hi") {
+      const hiVoice = voices.find((v) => v.lang.startsWith("hi"));
+      if (hiVoice) utterance.voice = hiVoice;
     }
     
-    utterance.onend = () => {
-      setSpeakingMessageId(null);
-    };
-    
-    utterance.onerror = () => {
-      setSpeakingMessageId(null);
-    };
+    utterance.onend = () => setSpeakingMessageId(null);
+    utterance.onerror = () => setSpeakingMessageId(null);
 
     setSpeakingMessageId(msgId);
     window.speechSynthesis.speak(utterance);
-  }, [speakingMessageId, language]);
+  }, [language, speakingMessageId]);
 
   // Stop synthesis when context changes
   useEffect(() => {
@@ -416,10 +405,11 @@ export default function AdvisoryPage() {
 
   // Set default greeting and fetch initial browser geolocation
   useEffect(() => {
-    if (navigator.geolocation) {
+    if (typeof window !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        () => setLocation({ lat: 22.5726, lon: 88.3639 })
+        () => setLocation({ lat: 22.5726, lon: 88.3639 }),
+        { timeout: 3000 }
       );
     } else {
       setLocation({ lat: 22.5726, lon: 88.3639 });
@@ -462,11 +452,15 @@ export default function AdvisoryPage() {
       const response = await api.advisory(
         text.trim(),
         language,
-        location?.lat,
-        location?.lon,
+        location?.lat || 22.5726,
+        location?.lon || 88.3639,
         sessionId
       );
-      setSessionId(response.session_id);
+      if (response && response.session_id) {
+        setSessionId(response.session_id);
+      }
+
+      const answerText = response?.answer || generateLocalAdvisoryResponse(text.trim(), language, cityAvgAQI || 178, selectedWardDetail?.name);
 
       const aetherMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -777,7 +771,7 @@ export default function AdvisoryPage() {
               </div>
 
               {/* Chat input box */}
-              <div className="flex-none p-4 border-t border-white/8 bg-gray-950">
+              <div className="flex-none p-3 md:p-4 border-t border-white/8 bg-gray-950/95 sticky bottom-0 z-10 pb-16 md:pb-4">
                 <div className="flex gap-2">
                   <input
                     type="text"
