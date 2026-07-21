@@ -52,10 +52,13 @@ router = APIRouter()
 
 # ─── Main Endpoint ────────────────────────────────────────────────────────────
 
+
 @router.post("/agents/simulation", response_model=AgentSimulationResponse)
 def run_agent_consensus(
     ward_id: int = Query(..., description="ID of the target ward"),
-    custom_objective: Optional[str] = Query(None, description="Custom policy objective to debate"),
+    custom_objective: Optional[str] = Query(
+        None, description="Custom policy objective to debate"
+    ),
     db: Session = Depends(get_db),
 ):
     """
@@ -232,9 +235,15 @@ def get_causal_impact(
 def invoke_agent_tool(
     tool_name: str = Query(..., description="Tool name to invoke"),
     ward_id: int = Query(..., description="Target ward ID"),
-    action_type: Optional[str] = Query(None, description="Action type (for simulate_intervention)"),
-    industry_id: Optional[str] = Query(None, description="Industry ID (for show-cause)"),
-    violation_type: Optional[str] = Query(None, description="Violation type (for show-cause)"),
+    action_type: Optional[str] = Query(
+        None, description="Action type (for simulate_intervention)"
+    ),
+    industry_id: Optional[str] = Query(
+        None, description="Industry ID (for show-cause)"
+    ),
+    violation_type: Optional[str] = Query(
+        None, description="Violation type (for show-cause)"
+    ),
     db: Session = Depends(get_db),
 ):
     """Directly invoke any agent tool — useful for debugging and frontend exploration."""
@@ -247,7 +256,10 @@ def invoke_agent_tool(
         params["violation_type"] = violation_type
 
     if tool_name not in TOOL_REGISTRY:
-        raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}. Available: {list(TOOL_REGISTRY.keys())}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown tool: {tool_name}. Available: {list(TOOL_REGISTRY.keys())}",
+        )
 
     return invoke_tool(tool_name, params, db)
 
@@ -275,7 +287,7 @@ def process_voice_command(
         res = {
             "action": "unrecognized",
             "parameters": {},
-            "speech_response": "Command not understood."
+            "speech_response": "Command not understood.",
         }
 
         # City switch
@@ -307,7 +319,12 @@ def process_voice_command(
             return res
 
         # Action triggers
-        if "committee" in text or "simulation" in text or "run" in text or "convene" in text:
+        if (
+            "committee" in text
+            or "simulation" in text
+            or "run" in text
+            or "convene" in text
+        ):
             res["action"] = "run_simulation"
             res["speech_response"] = "Convening constitutional chamber deliberation."
             return res
@@ -334,11 +351,12 @@ def process_voice_command(
 
     try:
         from openai import OpenAI
+
         client = OpenAI(
             api_key=settings.openai_api_key,
             base_url=settings.openai_api_base or None,
             timeout=5.0,
-            max_retries=0
+            max_retries=0,
         )
 
         system_prompt = f"""You are AETHER Jarvis, a smart city voice interface router.
@@ -370,10 +388,10 @@ Response must contain ONLY the valid JSON, no markdown code block tags, no comme
             model=settings.llm_model or "meta/llama-3.1-70b-instruct",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Spoken command: '{command_text}'"}
+                {"role": "user", "content": f"Spoken command: '{command_text}'"},
             ],
             temperature=0.0,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
         )
 
         content = resp.choices[0].message.content.strip()

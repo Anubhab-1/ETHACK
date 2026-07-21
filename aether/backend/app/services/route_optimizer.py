@@ -14,15 +14,21 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 logger = logging.getLogger(__name__)
 
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate the great-circle distance between two points in kilometers."""
     R = 6371.0  # Earth's radius in km
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlon / 2) ** 2
+    )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
+
 
 def calculate_distance_matrix(locations: List[Dict[str, Any]]) -> List[List[int]]:
     """
@@ -37,25 +43,32 @@ def calculate_distance_matrix(locations: List[Dict[str, Any]]) -> List[List[int]
                 matrix[i][j] = 0
             else:
                 dist_km = haversine_distance(
-                    locations[i]["lat"], locations[i]["lon"],
-                    locations[j]["lat"], locations[j]["lon"]
+                    locations[i]["lat"],
+                    locations[i]["lon"],
+                    locations[j]["lat"],
+                    locations[j]["lon"],
                 )
                 # Convert to meters and apply road circuity factor
                 matrix[i][j] = int(dist_km * 1.3 * 1000)
     return matrix
 
+
 def optimize_inspector_routes(
     locations: List[Dict[str, Any]],
     n_inspectors: int = 3,
     time_budget_hours: float = 8.0,
-    average_speed_kmh: float = 30.0
+    average_speed_kmh: float = 30.0,
 ) -> Dict[str, Any]:
     """
     Optimizes inspector routes from a central depot (assumed to be index 0).
     Uses OR-Tools routing engine.
     """
     if not locations:
-        return {"routes": [], "total_distance_meters": 0, "status": "No locations provided"}
+        return {
+            "routes": [],
+            "total_distance_meters": 0,
+            "status": "No locations provided",
+        }
 
     # Central office / Depot is always locations[0]
     depot_index = 0
@@ -65,7 +78,7 @@ def optimize_inspector_routes(
         return {
             "routes": [{"inspector_id": i, "route": []} for i in range(n_inspectors)],
             "total_distance_meters": 0,
-            "status": "No sites to visit"
+            "status": "No sites to visit",
         }
 
     # Prepare distance matrix
@@ -107,7 +120,7 @@ def optimize_inspector_routes(
         0,  # no slack
         time_budget_mins,  # max time per vehicle
         True,  # start cumul to zero
-        "Time"
+        "Time",
     )
 
     # 3. Formulate search parameters
@@ -136,17 +149,23 @@ def optimize_inspector_routes(
             while not routing.IsEnd(index):
                 node_idx = manager.IndexToNode(index)
                 if node_idx != depot_index:
-                    route.append({
-                        "node_index": node_idx,
-                        "site_id": locations[node_idx].get("id"),
-                        "name": locations[node_idx].get("name", f"Site #{node_idx}"),
-                        "lat": locations[node_idx]["lat"],
-                        "lon": locations[node_idx]["lon"],
-                        "priority": locations[node_idx].get("priority", 0)
-                    })
+                    route.append(
+                        {
+                            "node_index": node_idx,
+                            "site_id": locations[node_idx].get("id"),
+                            "name": locations[node_idx].get(
+                                "name", f"Site #{node_idx}"
+                            ),
+                            "lat": locations[node_idx]["lat"],
+                            "lon": locations[node_idx]["lon"],
+                            "priority": locations[node_idx].get("priority", 0),
+                        }
+                    )
                 previous_index = index
                 index = solution.Value(routing.NextVar(index))
-                vehicle_dist += routing.GetArcCostForVehicle(previous_index, index, vehicle_id)
+                vehicle_dist += routing.GetArcCostForVehicle(
+                    previous_index, index, vehicle_id
+                )
 
             total_dist += vehicle_dist
             # Travel time + service time
@@ -155,13 +174,15 @@ def optimize_inspector_routes(
             route_duration_mins = travel_time_mins + service_time_mins
             total_time += route_duration_mins
 
-            routes_out.append({
-                "inspector_id": vehicle_id + 1,
-                "stops": route,
-                "stop_count": len(route),
-                "distance_km": round(vehicle_dist / 1000.0, 2),
-                "estimated_duration_mins": route_duration_mins
-            })
+            routes_out.append(
+                {
+                    "inspector_id": vehicle_id + 1,
+                    "stops": route,
+                    "stop_count": len(route),
+                    "distance_km": round(vehicle_dist / 1000.0, 2),
+                    "estimated_duration_mins": route_duration_mins,
+                }
+            )
 
         status = "SUCCESS"
     else:
@@ -172,5 +193,5 @@ def optimize_inspector_routes(
         "total_distance_km": round(total_dist / 1000.0, 2),
         "total_duration_mins": total_time,
         "inspector_count": n_inspectors,
-        "status": status
+        "status": status,
     }

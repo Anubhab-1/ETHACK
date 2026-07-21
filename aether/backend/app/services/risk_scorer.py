@@ -3,6 +3,7 @@ AETHER — XGBoost Violation Risk Scorer
 Predicts the probability of environmental violations in wards using XGBoost.
 Provides explainable AI feature attribution via SHAP values.
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,17 +19,24 @@ logger = logging.getLogger(__name__)
 # Try to import xgboost and shap
 try:
     import xgboost as xgb
+
     XGB_AVAILABLE = True
 except Exception:
     XGB_AVAILABLE = False
-    logger.info("xgboost not installed or failed to import. Risk scorer will use statistical fallback.")
+    logger.info(
+        "xgboost not installed or failed to import. Risk scorer will use statistical fallback."
+    )
 
 try:
     import shap  # type: ignore
+
     SHAP_AVAILABLE = True
 except Exception:
     SHAP_AVAILABLE = False
-    logger.info("shap not installed or failed to import. Risk scorer will use XGBoost built-in feature importances.")
+    logger.info(
+        "shap not installed or failed to import. Risk scorer will use XGBoost built-in feature importances."
+    )
+
 
 def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
     """
@@ -43,7 +51,12 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
         return []
 
     # Get current weather
-    weather = db.query(Weather).filter(Weather.city == city).order_by(Weather.recorded_at.desc()).first()
+    weather = (
+        db.query(Weather)
+        .filter(Weather.city == city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
+    )
     temp = weather.temp_c if weather else 28.0
     wind_speed = weather.wind_speed if weather else 5.5
     humidity = weather.humidity_pct if weather else 70.0
@@ -54,12 +67,18 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
 
     for w in wards:
         # Count recent complaints (citizen reports) in this ward
-        complaints = db.query(CitizenReport).filter(CitizenReport.ward_id == w.id).count()
+        complaints = (
+            db.query(CitizenReport).filter(CitizenReport.ward_id == w.id).count()
+        )
         # Count historical violations (or resolved actions)
-        historical_violations = db.query(EnforcementAction).filter(
-            EnforcementAction.ward_id == w.id,
-            EnforcementAction.status == "resolved"
-        ).count()
+        historical_violations = (
+            db.query(EnforcementAction)
+            .filter(
+                EnforcementAction.ward_id == w.id,
+                EnforcementAction.status == "resolved",
+            )
+            .count()
+        )
 
         # Feature vector (25 features specified in the plan)
         feat = {
@@ -76,7 +95,8 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
             "humidity": humidity,
             # Cycle encodings and synthetic interactions to match 25 feature specification
             "complaint_density": complaints / max(1.0, w.road_density),
-            "industrial_exposure": w.industrial_score * (w.school_count + w.hospital_count),
+            "industrial_exposure": w.industrial_score
+            * (w.school_count + w.hospital_count),
             "wind_stagnation": 1.0 / max(0.5, wind_speed),
             "high_temp_risk": 1.0 if temp > 30.0 else 0.0,
             "low_wind_risk": 1.0 if wind_speed < 4.0 else 0.0,
@@ -88,7 +108,7 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
             "const_exposure": w.construction_count * (w.school_count + 1),
             "pop_density_proxy": (w.population or 100000) / max(1.0, w.road_density),
             "historical_severity": historical_violations * 2.5,
-            "base_probability": 0.05
+            "base_probability": 0.05,
         }
         features.append(list(feat.values()))
         ward_info.append(w)
@@ -97,13 +117,31 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
 
     # Label definitions
     feature_names = [
-        "industrial_score", "road_density", "construction_count", "population_100k",
-        "school_count", "hospital_count", "complaints_count", "historical_violations",
-        "temperature_c", "wind_speed_kmh", "humidity_pct", "complaint_density",
-        "industrial_exposure", "wind_stagnation", "high_temp_risk", "low_wind_risk",
-        "has_hospitals", "has_schools", "industrial_construction_interaction",
-        "traffic_complaint_interaction", "construction_complaint_interaction",
-        "construction_exposure", "population_density", "historical_severity", "base_prob"
+        "industrial_score",
+        "road_density",
+        "construction_count",
+        "population_100k",
+        "school_count",
+        "hospital_count",
+        "complaints_count",
+        "historical_violations",
+        "temperature_c",
+        "wind_speed_kmh",
+        "humidity_pct",
+        "complaint_density",
+        "industrial_exposure",
+        "wind_stagnation",
+        "high_temp_risk",
+        "low_wind_risk",
+        "has_hospitals",
+        "has_schools",
+        "industrial_construction_interaction",
+        "traffic_complaint_interaction",
+        "construction_complaint_interaction",
+        "construction_exposure",
+        "population_density",
+        "historical_severity",
+        "base_prob",
     ]
 
     shap_values = None
@@ -118,7 +156,7 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 learning_rate=0.1,
                 scale_pos_weight=10.0,  # Handle class imbalance (violations are rare)
                 eval_metric="aucpr",
-                random_state=42
+                random_state=42,
             )
             # Create semi-synthetic training data representing physical and operational realities
             np.random.seed(42)
@@ -154,22 +192,44 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 base_p = 0.05
 
                 row = [
-                    ind_score, road_dens, const_cnt, pop, schools, hospitals, complaints, hist_viols,
-                    t_c, w_s, hum, compl_dens, ind_exp, wind_stag, high_temp_r, low_wind_r,
-                    has_hosp, has_sch, risk_int_1, risk_int_2, risk_int_3, const_exp, pop_dens, hist_sev, base_p
+                    ind_score,
+                    road_dens,
+                    const_cnt,
+                    pop,
+                    schools,
+                    hospitals,
+                    complaints,
+                    hist_viols,
+                    t_c,
+                    w_s,
+                    hum,
+                    compl_dens,
+                    ind_exp,
+                    wind_stag,
+                    high_temp_r,
+                    low_wind_r,
+                    has_hosp,
+                    has_sch,
+                    risk_int_1,
+                    risk_int_2,
+                    risk_int_3,
+                    const_exp,
+                    pop_dens,
+                    hist_sev,
+                    base_p,
                 ]
                 X_train[s] = row
 
             # Physically consistent label logic (z score thresholding)
             z = (
-                X_train[:, 0] * 0.006 +      # industrial_score
-                X_train[:, 1] * 0.04 +       # road_density
-                X_train[:, 2] * 0.08 +       # construction_count
-                X_train[:, 6] * 0.07 +       # complaints_count
-                X_train[:, 7] * 0.15 +       # historical_violations
-                X_train[:, 13] * 0.20 -      # wind_stagnation
-                X_train[:, 9] * 0.02 +       # wind_speed_kmh
-                np.random.normal(0, 0.1, n_samples)
+                X_train[:, 0] * 0.006  # industrial_score
+                + X_train[:, 1] * 0.04  # road_density
+                + X_train[:, 2] * 0.08  # construction_count
+                + X_train[:, 6] * 0.07  # complaints_count
+                + X_train[:, 7] * 0.15  # historical_violations
+                + X_train[:, 13] * 0.20  # wind_stagnation
+                - X_train[:, 9] * 0.02  # wind_speed_kmh
+                + np.random.normal(0, 0.1, n_samples)
             )
             y_train = (z > 0.95).astype(int)
 
@@ -188,15 +248,20 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 else:
                     shap_values = shap_res
         except Exception as e:
-            logger.warning(f"XGBoost/SHAP execution failed: {e}. Falling back to heuristic model.")
+            logger.warning(
+                f"XGBoost/SHAP execution failed: {e}. Falling back to heuristic model."
+            )
             use_xgb = False
 
     if not use_xgb:
-
         # Heuristic fallback probability
         probs = []
         for i, w in enumerate(ward_info):
-            score = (w.industrial_score * 0.4 + w.road_density * 5.0 + w.construction_count * 8.0) / 100.0
+            score = (
+                w.industrial_score * 0.4
+                + w.road_density * 5.0
+                + w.construction_count * 8.0
+            ) / 100.0
             prob = min(0.95, max(0.01, 1.0 / (1.0 + math.exp(-score))))
             probs.append(prob)
         probs = np.array(probs)
@@ -222,21 +287,29 @@ def predict_violation_risk(city: str, db: Session) -> List[Dict[str, Any]]:
                 "road_density": float(w.road_density * 0.03),
                 "construction_count": float(w.construction_count * 0.08),
                 "complaints_count": float(X[i, 6] * 0.1),
-                "wind_stagnation": float(X[i, 13] * 0.04)
+                "wind_stagnation": float(X[i, 13] * 0.04),
             }
 
         # Sort contributions by absolute value
-        top_contribs = sorted(shap_contribs.items(), key=lambda item: abs(item[1]), reverse=True)[:3]
-        explanations = [f"{name} ({'+' if val >= 0 else ''}{val:.3f})" for name, val in top_contribs]
+        top_contribs = sorted(
+            shap_contribs.items(), key=lambda item: abs(item[1]), reverse=True
+        )[:3]
+        explanations = [
+            f"{name} ({'+' if val >= 0 else ''}{val:.3f})" for name, val in top_contribs
+        ]
 
-        results.append({
-            "ward_id": w.id,
-            "ward_name": w.name,
-            "ward_no": w.ward_no,
-            "violation_probability": round(prob, 3),
-            "risk_category": "CRITICAL" if prob > 0.7 else ("HIGH" if prob > 0.4 else "MODERATE"),
-            "shap_explanation": ", ".join(explanations)
-        })
+        results.append(
+            {
+                "ward_id": w.id,
+                "ward_name": w.name,
+                "ward_no": w.ward_no,
+                "violation_probability": round(prob, 3),
+                "risk_category": "CRITICAL"
+                if prob > 0.7
+                else ("HIGH" if prob > 0.4 else "MODERATE"),
+                "shap_explanation": ", ".join(explanations),
+            }
+        )
 
     # Sort by probability descending
     results = sorted(results, key=lambda x: x["violation_probability"], reverse=True)

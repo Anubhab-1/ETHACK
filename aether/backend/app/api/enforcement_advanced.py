@@ -1,6 +1,7 @@
 """
 AETHER — Proactive Enforcement & Risk Scoring API Router
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/enforcement-advanced", tags=["enforcement"])
 
 risk_scorer = PredictiveRiskScorer()
 
+
 @router.get("/risk-score/{source_id}")
 async def get_risk_score(source_id: str, db: Session = Depends(get_db)):
     """
@@ -33,14 +35,13 @@ async def get_risk_score(source_id: str, db: Session = Depends(get_db)):
     # Get prediction
     result = risk_scorer.predict(features)
 
-    return {
-        "source_id": source_id,
-        **result,
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"source_id": source_id, **result, "timestamp": datetime.now().isoformat()}
+
 
 @router.get("/priority-list/{ward_id}")
-async def get_priority_list(ward_id: str, top_k: int = 10, db: Session = Depends(get_db)):
+async def get_priority_list(
+    ward_id: str, top_k: int = 10, db: Session = Depends(get_db)
+):
     """
     Get top-K highest risk sources in a ward for proactive inspection.
     """
@@ -60,22 +61,21 @@ async def get_priority_list(ward_id: str, top_k: int = 10, db: Session = Depends
     # 3. Score each source
     scored_sources = []
     for source in sources:
-        features = generate_source_features(source['id'], db)
+        features = generate_source_features(source["id"], db)
         risk = risk_scorer.predict(features)
-        scored_sources.append({
-            **source,
-            **risk
-        })
+        scored_sources.append({**source, **risk})
 
     # Sort by risk score descending
-    scored_sources.sort(key=lambda x: x['risk_score'], reverse=True)
+    scored_sources.sort(key=lambda x: x["risk_score"], reverse=True)
 
     return {
         "ward_id": ward.id,
         "ward_name": ward.name,
         "total_sources": len(sources),
         "priority_inspections": scored_sources[:top_k],
-        "critical_count": sum(1 for s in scored_sources if s['risk_tier'] == 'CRITICAL'),
-        "high_count": sum(1 for s in scored_sources if s['risk_tier'] == 'HIGH'),
-        "generated_at": datetime.now().isoformat()
+        "critical_count": sum(
+            1 for s in scored_sources if s["risk_tier"] == "CRITICAL"
+        ),
+        "high_count": sum(1 for s in scored_sources if s["risk_tier"] == "HIGH"),
+        "generated_at": datetime.now().isoformat(),
     }

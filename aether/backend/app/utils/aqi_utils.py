@@ -1,9 +1,10 @@
-﻿"""
+"""
 AETHER -- AQI Utility Functions
 Single source of truth for AQI constants and interpolation helpers.
 
 Replaces duplicate definitions in api/aqi.py and api/advisory.py.
 """
+
 from __future__ import annotations
 
 import math
@@ -11,8 +12,8 @@ from typing import Optional
 
 # India CPCB AQI category breakpoints
 AQI_CATEGORIES: list = [
-    (0,   50,  "Good"),
-    (51,  100, "Satisfactory"),
+    (0, 50, "Good"),
+    (51, 100, "Satisfactory"),
     (101, 200, "Moderate"),
     (201, 300, "Poor"),
     (301, 400, "Very Poor"),
@@ -24,8 +25,22 @@ DEFAULT_AQI: float = 150.0
 
 # Compass bearings for wind direction labels
 _COMPASS = [
-    "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-    "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
 ]
 
 
@@ -63,7 +78,7 @@ def idw_interpolate(
 
     for lat, lon, value in points:
         dist = math.sqrt((lat - target_lat) ** 2 + (lon - target_lon) ** 2)
-        w = 1.0 / max(dist ** power, min_dist ** power)
+        w = 1.0 / max(dist**power, min_dist**power)
         total_weight += w
         weighted_sum += w * value
 
@@ -85,5 +100,8 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    a = (
+        math.sin(dphi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    )
     return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))

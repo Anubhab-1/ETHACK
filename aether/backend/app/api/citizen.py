@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -27,11 +28,19 @@ def subscribe_citizen(payload: CitizenSubscriptionIn, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Ward not found")
 
     # Check if subscription already exists for this number/email and ward
-    existing = db.query(CitizenAlertSubscription).filter(
-        CitizenAlertSubscription.ward_id == payload.ward_id,
-        (CitizenAlertSubscription.phone_number == payload.phone_number) if payload.phone_number else False,
-        (CitizenAlertSubscription.email == payload.email) if payload.email else False
-    ).first()
+    existing = (
+        db.query(CitizenAlertSubscription)
+        .filter(
+            CitizenAlertSubscription.ward_id == payload.ward_id,
+            (CitizenAlertSubscription.phone_number == payload.phone_number)
+            if payload.phone_number
+            else False,
+            (CitizenAlertSubscription.email == payload.email)
+            if payload.email
+            else False,
+        )
+        .first()
+    )
 
     if existing:
         # Update existing subscription properties
@@ -49,9 +58,9 @@ def subscribe_citizen(payload: CitizenSubscriptionIn, db: Session = Depends(get_
         phone_number=payload.phone_number,
         email=payload.email,
         language=payload.language,
-        notify_level=payload.notify_level
+        notify_level=payload.notify_level,
     )
-    
+
     db.add(new_sub)
     try:
         db.commit()
@@ -66,4 +75,8 @@ def subscribe_citizen(payload: CitizenSubscriptionIn, db: Session = Depends(get_
 @router.get("/citizen/subscriptions", response_model=List[CitizenSubscriptionOut])
 def get_subscriptions(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     """Retrieve all alert subscriptions in a city."""
-    return db.query(CitizenAlertSubscription).filter(CitizenAlertSubscription.city == city).all()
+    return (
+        db.query(CitizenAlertSubscription)
+        .filter(CitizenAlertSubscription.city == city)
+        .all()
+    )

@@ -1,6 +1,7 @@
 """
 AETHER — ST-GCN Spatio-Temporal Forecasting API Router
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,16 +25,24 @@ if TORCH_AVAILABLE:
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/forecast-advanced", tags=["forecast"])
 
+
 async def get_stations_for_ward(ward: Ward, db: Session) -> List[Station]:
     """Get active monitoring stations in the same city as the ward."""
     # First try stations explicitly mapped to this ward
-    stations = db.query(Station).filter(Station.ward_id == ward.id, Station.active).all()
+    stations = (
+        db.query(Station).filter(Station.ward_id == ward.id, Station.active).all()
+    )
     if not stations:
         # Fall back to all active stations in the city
-        stations = db.query(Station).filter(Station.city == ward.city, Station.active).all()
+        stations = (
+            db.query(Station).filter(Station.city == ward.city, Station.active).all()
+        )
     return stations
 
-async def get_historical_aqi(stations: List[Station], db: Session, hours: int = 168) -> np.ndarray:
+
+async def get_historical_aqi(
+    stations: List[Station], db: Session, hours: int = 168
+) -> np.ndarray:
     """Fetch historical hourly AQI readings for the given stations as a (n_stations, n_timesteps) matrix."""
     n_stations = len(stations)
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -42,12 +51,15 @@ async def get_historical_aqi(stations: List[Station], db: Session, hours: int = 
     aqi_matrix = np.zeros((n_stations, hours))
 
     station_ids = [s.id for s in stations]
-    all_readings = db.query(Reading).filter(
-        Reading.station_id.in_(station_ids),
-        Reading.measured_at >= since
-    ).order_by(Reading.measured_at.asc()).all()
+    all_readings = (
+        db.query(Reading)
+        .filter(Reading.station_id.in_(station_ids), Reading.measured_at >= since)
+        .order_by(Reading.measured_at.asc())
+        .all()
+    )
 
     from collections import defaultdict
+
     station_to_readings = defaultdict(list)
     for r in all_readings:
         station_to_readings[r.station_id].append(r)
@@ -69,12 +81,21 @@ async def get_historical_aqi(stations: List[Station], db: Session, hours: int = 
 
     return aqi_matrix
 
+
 async def get_current_wind_direction(city: str, db: Session) -> float:
     """Fetch current wind direction from weather logs."""
-    weather = db.query(Weather).filter(Weather.city == city).order_by(Weather.recorded_at.desc()).first()
+    weather = (
+        db.query(Weather)
+        .filter(Weather.city == city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
+    )
     return weather.wind_dir if weather and weather.wind_dir is not None else 180.0
 
-def prepare_input_tensor(stations: List[Station], aqi_history: np.ndarray, n_timesteps: int = 24):
+
+def prepare_input_tensor(
+    stations: List[Station], aqi_history: np.ndarray, n_timesteps: int = 24
+):
     """
     Prepare input features per node.
     Features: [AQI, PM2.5, PM10, NO2, SO2, O3, CO, temp, humidity, wind_speed, wind_dir, BLH, day_of_week, hour, holiday]
@@ -105,7 +126,11 @@ def prepare_input_tensor(stations: List[Station], aqi_history: np.ndarray, n_tim
 
         for n in range(n_nodes):
             # Extract AQI at time t
-            aqi = aqi_history[n, -n_timesteps + t] if aqi_history.shape[1] >= n_timesteps else 110.0
+            aqi = (
+                aqi_history[n, -n_timesteps + t]
+                if aqi_history.shape[1] >= n_timesteps
+                else 110.0
+            )
 
             # Estimate other species from AQI
             pm25 = aqi * 0.6
@@ -116,33 +141,54 @@ def prepare_input_tensor(stations: List[Station], aqi_history: np.ndarray, n_tim
             co = aqi * 0.005
 
             features = [
-                aqi, pm25, pm10, no2, so2, o3, co,
-                temp, humidity, wind_speed, wind_dir, blh,
-                float(day_of_week), float(hour), holiday_flag
+                aqi,
+                pm25,
+                pm10,
+                no2,
+                so2,
+                o3,
+                co,
+                temp,
+                humidity,
+                wind_speed,
+                wind_dir,
+                blh,
+                float(day_of_week),
+                float(hour),
+                holiday_flag,
             ]
             x_arr[0, :, n, t] = features
 
     return torch.tensor(x_arr, dtype=torch.float32)
 
-def get_forecast_feature_attribution(ward: Ward, db: Session, model_name: str) -> Dict[str, float]:
+
+def get_forecast_feature_attribution(
+    ward: Ward, db: Session, model_name: str
+) -> Dict[str, float]:
     """
     Computes explainable AI feature attribution percentages for the forecasting model.
     Accounts for spatio-temporal graph weights (wind alignment) and boundary layer dispersion metrics.
     """
     # Fetch current weather to calibrate attribution weights dynamically
     from app.models import Weather
-    latest_weather = db.query(Weather).filter(Weather.city == ward.city).order_by(Weather.measured_at.desc()).first()
-    
+
+    latest_weather = (
+        db.query(Weather)
+        .filter(Weather.city == ward.city)
+        .order_by(Weather.measured_at.desc())
+        .first()
+    )
+
     wind_spd = latest_weather.wind_speed if latest_weather else 5.0
     temp = latest_weather.temp_c if latest_weather else 25.0
-    
+
     # Base weightings
     hist_aqi = 48.2
     wind_align = 18.5
     blh = 14.8
     temperature = 11.0
     humidity = 7.5
-    
+
     # Adjust weights dynamically based on physical situation
     if wind_spd > 12.0:
         # High wind advection dominates dispersion
@@ -154,7 +200,7 @@ def get_forecast_feature_attribution(ward: Ward, db: Session, model_name: str) -
         blh += 5.0
         wind_align -= 4.0
         hist_aqi -= 1.0
-        
+
     if temp < 15.0:
         # Winter temperature inversion increases thermal trapping factor
         temperature += 4.5
@@ -168,17 +214,20 @@ def get_forecast_feature_attribution(ward: Ward, db: Session, model_name: str) -
         "Wind Speed & Path Alignment": round((wind_align / total) * 100.0, 1),
         "Boundary Layer Height (Dispersion)": round((blh / total) * 100.0, 1),
         "Ambient Temperature": round((temperature / total) * 100.0, 1),
-        "Relative Humidity": round((humidity / total) * 100.0, 1)
+        "Relative Humidity": round((humidity / total) * 100.0, 1),
     }
 
-def generate_mock_forecast_with_ci(ward: Ward, hours: int, current_aqi: float) -> Dict[str, Any]:
+
+def generate_mock_forecast_with_ci(
+    ward: Ward, hours: int, current_aqi: float
+) -> Dict[str, Any]:
     """Generates a realistic forecast with statistical variance for the demo."""
     rng = random.Random(ward.id + hours)
     predictions = []
 
     now = datetime.now(timezone.utc)
     for i in range(hours):
-        forecast_time = now + timedelta(hours=i+1)
+        forecast_time = now + timedelta(hours=i + 1)
         hour_of_day = forecast_time.hour
         diurnal = 1.0 + 0.15 * math.sin((hour_of_day - 6) * math.pi / 12)
         decay = 1.0 - (i / 144)
@@ -188,15 +237,17 @@ def generate_mock_forecast_with_ci(ward: Ward, hours: int, current_aqi: float) -
         # Confidence interval widens over the forecast horizon
         ci_width = 10.0 + (i * 0.8)
 
-        predictions.append({
-            "hour": i+1,
-            "forecast_for": forecast_time.isoformat(),
-            "aqi_predicted": round(aqi_pred, 1),
-            "confidence_interval": {
-                "lower": round(max(0.0, aqi_pred - ci_width), 1),
-                "upper": round(min(500.0, aqi_pred + ci_width), 1)
+        predictions.append(
+            {
+                "hour": i + 1,
+                "forecast_for": forecast_time.isoformat(),
+                "aqi_predicted": round(aqi_pred, 1),
+                "confidence_interval": {
+                    "lower": round(max(0.0, aqi_pred - ci_width), 1),
+                    "upper": round(min(500.0, aqi_pred + ci_width), 1),
+                },
             }
-        })
+        )
 
     return {
         "ward_id": ward.id,
@@ -207,26 +258,32 @@ def generate_mock_forecast_with_ci(ward: Ward, hours: int, current_aqi: float) -
         "rmse_24h": 10.5,
         "rmse_72h": 18.3,
         "graph_nodes": 6,
-        "graph_edges": 12
+        "graph_edges": 12,
     }
 
-async def fallback_xgboost_forecast(ward: Ward, db: Session, hours: int) -> Dict[str, Any]:
+
+async def fallback_xgboost_forecast(
+    ward: Ward, db: Session, hours: int
+) -> Dict[str, Any]:
     """Fallback to XGBoost if ST-GCN is not viable or stations are sparse."""
     from app.services.forecaster import get_current_aqi_for_ward, predict_aqi
+
     get_current_aqi_for_ward(ward, db)
     forecasts = predict_aqi(ward, db)
 
     predictions = []
     for i, f in enumerate(forecasts[:hours]):
-        predictions.append({
-            "hour": f["horizon_hours"],
-            "forecast_for": f["forecast_for"],
-            "aqi_predicted": f["predicted_aqi"],
-            "confidence_interval": {
-                "lower": f["confidence_lower"],
-                "upper": f["confidence_upper"]
+        predictions.append(
+            {
+                "hour": f["horizon_hours"],
+                "forecast_for": f["forecast_for"],
+                "aqi_predicted": f["predicted_aqi"],
+                "confidence_interval": {
+                    "lower": f["confidence_lower"],
+                    "upper": f["confidence_upper"],
+                },
             }
-        })
+        )
 
     return {
         "ward_id": ward.id,
@@ -238,11 +295,14 @@ async def fallback_xgboost_forecast(ward: Ward, db: Session, hours: int) -> Dict
         "rmse_72h": 22.1,
         "graph_nodes": 1,
         "graph_edges": 0,
-        "feature_attribution": get_forecast_feature_attribution(ward, db, "XGBoost")
+        "feature_attribution": get_forecast_feature_attribution(ward, db, "XGBoost"),
     }
 
+
 @router.get("/{ward_id}")
-async def get_advanced_forecast(ward_id: str, hours: int = Query(72, ge=24, le=72), db: Session = Depends(get_db)):
+async def get_advanced_forecast(
+    ward_id: str, hours: int = Query(72, ge=24, le=72), db: Session = Depends(get_db)
+):
     """
     Return ST-GCN forecast with confidence intervals.
     Falls back to XGBoost if ST-GCN model or geometric libraries are missing.
@@ -270,14 +330,12 @@ async def get_advanced_forecast(ward_id: str, hours: int = Query(72, ge=24, le=7
 
     # Transform stations list to pandas DataFrame for build_wind_aligned_graph compatibility
     import pandas as pd
+
     stations_data = []
     for s in stations:
-        stations_data.append({
-            "station_id": s.id,
-            "lat": s.lat,
-            "lon": s.lon,
-            "ward_id": s.ward_id
-        })
+        stations_data.append(
+            {"station_id": s.id, "lat": s.lat, "lon": s.lon, "ward_id": s.ward_id}
+        )
     stations_df = pd.DataFrame(stations_data)
 
     # 4. Build graph edges
@@ -287,6 +345,7 @@ async def get_advanced_forecast(ward_id: str, hours: int = Query(72, ge=24, le=7
 
     # Calculate current AQI
     from app.services.attributor import get_current_aqi_for_ward
+
     current_aqi = get_current_aqi_for_ward(ward, db)
 
     # 5. Run ST-GCN if PyTorch is available
@@ -297,11 +356,13 @@ async def get_advanced_forecast(ward_id: str, hours: int = Query(72, ge=24, le=7
                 num_nodes=len(stations),
                 num_features=15,
                 num_timesteps_input=24,
-                num_timesteps_output=hours
+                num_timesteps_output=hours,
             )
 
             # Load pretrained weights if available
-            weights_file = Path(__file__).parent.parent.parent / "models" / "st_gcn_weights.pt"
+            weights_file = (
+                Path(__file__).parent.parent.parent / "models" / "st_gcn_weights.pt"
+            )
             if weights_file.exists():
                 model.load_state_dict(torch.load(str(weights_file), map_location="cpu"))
 
@@ -314,7 +375,11 @@ async def get_advanced_forecast(ward_id: str, hours: int = Query(72, ge=24, le=7
                     mean_pred = np.asarray(output)[0]
 
             # If the model has no uncertainty estimate, use fixed CI
-            std_pred = np.clip(np.std(mean_pred) * 0.1, 5.0, 20.0) if isinstance(mean_pred, np.ndarray) else 8.0
+            std_pred = (
+                np.clip(np.std(mean_pred) * 0.1, 5.0, 20.0)
+                if isinstance(mean_pred, np.ndarray)
+                else 8.0
+            )
             if isinstance(std_pred, np.ndarray):
                 std_pred = np.mean(std_pred)
 
@@ -327,18 +392,20 @@ async def get_advanced_forecast(ward_id: str, hours: int = Query(72, ge=24, le=7
                 aqi_pred = max(20.0, min(500.0, pred_val * scale_factor))
 
                 std_val = float(std_pred[i]) if float(std_pred[i]) > 1.0 else 5.0
-                predictions_list.append({
-                    "hour": i+1,
-                    "forecast_for": (now + timedelta(hours=i+1)).isoformat(),
-                    "aqi_predicted": round(aqi_pred, 1),
-                    "confidence_interval": {
-                        "lower": round(max(0.0, aqi_pred - 1.96 * std_val), 1),
-                        "upper": round(min(500.0, aqi_pred + 1.96 * std_val), 1)
+                predictions_list.append(
+                    {
+                        "hour": i + 1,
+                        "forecast_for": (now + timedelta(hours=i + 1)).isoformat(),
+                        "aqi_predicted": round(aqi_pred, 1),
+                        "confidence_interval": {
+                            "lower": round(max(0.0, aqi_pred - 1.96 * std_val), 1),
+                            "upper": round(min(500.0, aqi_pred + 1.96 * std_val), 1),
+                        },
                     }
-                })
+                )
 
             # Calculate graph parameters
-            if hasattr(edge_index, 'shape'):
+            if hasattr(edge_index, "shape"):
                 edges_count = edge_index.shape[1] // 2
             else:
                 edges_count = len(edge_index[0]) // 2
@@ -353,12 +420,16 @@ async def get_advanced_forecast(ward_id: str, hours: int = Query(72, ge=24, le=7
                 "rmse_72h": 18.3,
                 "graph_nodes": len(stations),
                 "graph_edges": edges_count,
-                "feature_attribution": get_forecast_feature_attribution(ward, db, "ST-GCN")
+                "feature_attribution": get_forecast_feature_attribution(
+                    ward, db, "ST-GCN"
+                ),
             }
         except Exception as e:
             logger.warning(f"Failed to execute torch ST-GCN model: {e}")
 
     # 6. Fallback if torch fails or not available
     res = generate_mock_forecast_with_ci(ward, hours, current_aqi)
-    res["feature_attribution"] = get_forecast_feature_attribution(ward, db, "ST-GCN (Fallback)")
+    res["feature_attribution"] = get_forecast_feature_attribution(
+        ward, db, "ST-GCN (Fallback)"
+    )
     return res

@@ -4,6 +4,7 @@ Real tool functions called by agents during ReAct deliberation loops.
 Each tool returns structured data that agents use to reason and make decisions.
 Fully functional in offline mode — no external API keys required.
 """
+
 from __future__ import annotations
 
 import logging
@@ -59,6 +60,7 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
 
 # ─── Tool: Weather Forecast ────────────────────────────────────────────────────
 
+
 def get_weather_forecast(ward_id: int, db: Session) -> Dict[str, Any]:
     """Get weather conditions relevant to pollution dispersion."""
     ward = db.query(Ward).filter(Ward.id == ward_id).first()
@@ -84,13 +86,23 @@ def get_weather_forecast(ward_id: int, db: Session) -> Dict[str, Any]:
 
     # Ventilation coefficient = wind_speed * BLH (low = trapped pollution)
     ventilation = round(wind_speed * blh, 0)
-    dispersion_risk = "HIGH" if ventilation < 3000 else ("MEDIUM" if ventilation < 7000 else "LOW")
+    dispersion_risk = (
+        "HIGH" if ventilation < 3000 else ("MEDIUM" if ventilation < 7000 else "LOW")
+    )
 
     wind_directions = {
-        (0, 45): "N", (45, 90): "NE", (90, 135): "E", (135, 180): "SE",
-        (180, 225): "S", (225, 270): "SW", (270, 315): "W", (315, 360): "NW"
+        (0, 45): "N",
+        (45, 90): "NE",
+        (90, 135): "E",
+        (135, 180): "SE",
+        (180, 225): "S",
+        (225, 270): "SW",
+        (270, 315): "W",
+        (315, 360): "NW",
     }
-    cardinal = next((v for (lo, hi), v in wind_directions.items() if lo <= wind_dir < hi), "N")
+    cardinal = next(
+        (v for (lo, hi), v in wind_directions.items() if lo <= wind_dir < hi), "N"
+    )
 
     return {
         "ward_id": ward_id,
@@ -113,6 +125,7 @@ def get_weather_forecast(ward_id: int, db: Session) -> Dict[str, Any]:
 
 
 # ─── Tool: Traffic Congestion ─────────────────────────────────────────────────
+
 
 def get_traffic_congestion(ward_id: int, db: Session) -> Dict[str, Any]:
     """Get traffic conditions and estimated vehicular emission contribution."""
@@ -144,15 +157,21 @@ def get_traffic_congestion(ward_id: int, db: Session) -> Dict[str, Any]:
     no2_total = round(heavy_count * 2.8 * ward.road_density * 0.001, 2)
 
     congestion_level = (
-        "SEVERE" if congestion_index > 0.8 else
-        "HIGH" if congestion_index > 0.6 else
-        "MODERATE" if congestion_index > 0.4 else "LOW"
+        "SEVERE"
+        if congestion_index > 0.8
+        else "HIGH"
+        if congestion_index > 0.6
+        else "MODERATE"
+        if congestion_index > 0.4
+        else "LOW"
     )
 
     recommended_action = (
-        "IMMEDIATE HEAVY VEHICLE BAN recommended" if congestion_index > 0.7 and is_rush else
-        "Odd-even scheme advisable" if congestion_index > 0.5 else
-        "Traffic management sufficient"
+        "IMMEDIATE HEAVY VEHICLE BAN recommended"
+        if congestion_index > 0.7 and is_rush
+        else "Odd-even scheme advisable"
+        if congestion_index > 0.5
+        else "Traffic management sufficient"
     )
 
     return {
@@ -179,6 +198,7 @@ def get_traffic_congestion(ward_id: int, db: Session) -> Dict[str, Any]:
 
 # ─── Tool: Industrial CEMS ────────────────────────────────────────────────────
 
+
 def get_industrial_cems(ward_id: int, db: Session) -> Dict[str, Any]:
     """Get Continuous Emission Monitoring data for industrial stacks."""
     ward = db.query(Ward).filter(Ward.id == ward_id).first()
@@ -204,25 +224,41 @@ def get_industrial_cems(ward_id: int, db: Session) -> Dict[str, Any]:
         trend_24h = random.choice(["RISING", "STABLE", "FALLING"])
         days_since_inspection = random.randint(5, 180)
 
-        stacks.append({
-            "stack_id": f"STACK-{ward.ward_no:03d}-{i+1:02d}",
-            "industry_type": random.choice(["Foundry", "Textile", "Chemical", "Brick_Kiln", "Power_Plant"]),
-            "latitude": ward.lat + (i * 0.002),
-            "longitude": ward.lon + (i * 0.002),
-            "pm25_mg_nm3": current_pm,
-            "pm10_mg_nm3": round(current_pm * 1.6, 1),
-            "so2_mg_nm3": round(ward.industrial_score * 0.5 + random.uniform(0, 20), 1),
-            "nox_mg_nm3": round(ward.industrial_score * 0.3 + random.uniform(0, 15), 1),
-            "norm_limit_pm_mg_nm3": norm_limit,
-            "compliance_status": status,
-            "exceedance_factor": round(current_pm / norm_limit, 2) if status == "NON_COMPLIANT" else None,
-            "emission_trend_24h": trend_24h,
-            "days_since_inspection": days_since_inspection,
-            "last_inspection_date": (now - timedelta(days=days_since_inspection)).strftime("%Y-%m-%d"),
-            "permit_valid_until": (now + timedelta(days=random.randint(-30, 365))).strftime("%Y-%m-%d"),
-        })
+        stacks.append(
+            {
+                "stack_id": f"STACK-{ward.ward_no:03d}-{i + 1:02d}",
+                "industry_type": random.choice(
+                    ["Foundry", "Textile", "Chemical", "Brick_Kiln", "Power_Plant"]
+                ),
+                "latitude": ward.lat + (i * 0.002),
+                "longitude": ward.lon + (i * 0.002),
+                "pm25_mg_nm3": current_pm,
+                "pm10_mg_nm3": round(current_pm * 1.6, 1),
+                "so2_mg_nm3": round(
+                    ward.industrial_score * 0.5 + random.uniform(0, 20), 1
+                ),
+                "nox_mg_nm3": round(
+                    ward.industrial_score * 0.3 + random.uniform(0, 15), 1
+                ),
+                "norm_limit_pm_mg_nm3": norm_limit,
+                "compliance_status": status,
+                "exceedance_factor": round(current_pm / norm_limit, 2)
+                if status == "NON_COMPLIANT"
+                else None,
+                "emission_trend_24h": trend_24h,
+                "days_since_inspection": days_since_inspection,
+                "last_inspection_date": (
+                    now - timedelta(days=days_since_inspection)
+                ).strftime("%Y-%m-%d"),
+                "permit_valid_until": (
+                    now + timedelta(days=random.randint(-30, 365))
+                ).strftime("%Y-%m-%d"),
+            }
+        )
 
-    total_pm25_contribution = round(sum(s["pm25_mg_nm3"] * 0.3 for s in stacks) / max(1, n_stacks), 1)
+    total_pm25_contribution = round(
+        sum(s["pm25_mg_nm3"] * 0.3 for s in stacks) / max(1, n_stacks), 1
+    )
 
     return {
         "ward_id": ward_id,
@@ -233,33 +269,75 @@ def get_industrial_cems(ward_id: int, db: Session) -> Dict[str, Any]:
         "compliance_rate_pct": round((n_stacks - violations) / n_stacks * 100, 1),
         "estimated_pm25_contribution_ugm3": total_pm25_contribution,
         "stacks": stacks,
-        "enforcement_priority": "IMMEDIATE" if violations > 0 else ("MONITOR" if ward.industrial_score > 40 else "ROUTINE"),
+        "enforcement_priority": "IMMEDIATE"
+        if violations > 0
+        else ("MONITOR" if ward.industrial_score > 40 else "ROUTINE"),
     }
 
 
 # ─── Tool: Simulate Intervention ─────────────────────────────────────────────
 
-def simulate_intervention(ward_id: int, action_type: str, db: Session) -> Dict[str, Any]:
+
+def simulate_intervention(
+    ward_id: int, action_type: str, db: Session
+) -> Dict[str, Any]:
     """Use physics-based dispersion model to simulate AQI impact of an intervention."""
     ward = db.query(Ward).filter(Ward.id == ward_id).first()
     if not ward:
         return {"error": "Ward not found"}
 
     weather = (
-        db.query(Weather).filter(Weather.city == ward.city)
-        .order_by(Weather.recorded_at.desc()).first()
+        db.query(Weather)
+        .filter(Weather.city == ward.city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
     )
     wind_speed = weather.wind_speed if weather and weather.wind_speed else 5.5
 
     # Efficacy factors by intervention type (validated from literature)
     action_efficacy = {
-        "heavy_vehicle_ban": {"traffic": 0.60, "industrial": 0.05, "construction": 0.0, "biomass": 0.0},
-        "odd_even_scheme": {"traffic": 0.35, "industrial": 0.0, "construction": 0.0, "biomass": 0.0},
-        "construction_halt": {"traffic": 0.0, "industrial": 0.0, "construction": 0.85, "biomass": 0.0},
-        "industrial_curtailment_50": {"traffic": 0.0, "industrial": 0.50, "construction": 0.0, "biomass": 0.0},
-        "show_cause_notice": {"traffic": 0.0, "industrial": 0.25, "construction": 0.15, "biomass": 0.0},
-        "water_sprinkling": {"traffic": 0.0, "industrial": 0.0, "construction": 0.40, "biomass": 0.0},
-        "combined_emergency": {"traffic": 0.55, "industrial": 0.45, "construction": 0.80, "biomass": 0.10},
+        "heavy_vehicle_ban": {
+            "traffic": 0.60,
+            "industrial": 0.05,
+            "construction": 0.0,
+            "biomass": 0.0,
+        },
+        "odd_even_scheme": {
+            "traffic": 0.35,
+            "industrial": 0.0,
+            "construction": 0.0,
+            "biomass": 0.0,
+        },
+        "construction_halt": {
+            "traffic": 0.0,
+            "industrial": 0.0,
+            "construction": 0.85,
+            "biomass": 0.0,
+        },
+        "industrial_curtailment_50": {
+            "traffic": 0.0,
+            "industrial": 0.50,
+            "construction": 0.0,
+            "biomass": 0.0,
+        },
+        "show_cause_notice": {
+            "traffic": 0.0,
+            "industrial": 0.25,
+            "construction": 0.15,
+            "biomass": 0.0,
+        },
+        "water_sprinkling": {
+            "traffic": 0.0,
+            "industrial": 0.0,
+            "construction": 0.40,
+            "biomass": 0.0,
+        },
+        "combined_emergency": {
+            "traffic": 0.55,
+            "industrial": 0.45,
+            "construction": 0.80,
+            "biomass": 0.10,
+        },
     }
 
     if action_type not in action_efficacy:
@@ -281,27 +359,38 @@ def simulate_intervention(ward_id: int, action_type: str, db: Session) -> Dict[s
     latest_readings = {}
     if station_ids:
         from sqlalchemy import func
+
         subq = (
-            db.query(Reading.station_id, func.max(Reading.measured_at).label("max_measured"))
+            db.query(
+                Reading.station_id, func.max(Reading.measured_at).label("max_measured")
+            )
             .filter(Reading.station_id.in_(station_ids))
             .group_by(Reading.station_id)
             .subquery()
         )
         latest_rows = (
             db.query(Reading)
-            .join(subq, (Reading.station_id == subq.c.station_id) & (Reading.measured_at == subq.c.max_measured))
+            .join(
+                subq,
+                (Reading.station_id == subq.c.station_id)
+                & (Reading.measured_at == subq.c.max_measured),
+            )
             .all()
         )
-        latest_readings = {r.station_id: r.aqi for r in latest_rows if r.aqi is not None}
+        latest_readings = {
+            r.station_id: r.aqi for r in latest_rows if r.aqi is not None
+        }
 
-    current_aqi = get_current_aqi_for_ward(ward, db, stations=stations, latest_readings=latest_readings)
+    current_aqi = get_current_aqi_for_ward(
+        ward, db, stations=stations, latest_readings=latest_readings
+    )
 
     # AQI reduction from intervention
     reduction = (
-        (traffic_w / total_w) * efficacy["traffic"] * current_aqi * 0.8 +
-        (industrial_w / total_w) * efficacy["industrial"] * current_aqi * 0.8 +
-        (construction_w / total_w) * efficacy["construction"] * current_aqi * 0.8 +
-        (biomass_w / total_w) * efficacy["biomass"] * current_aqi * 0.8
+        (traffic_w / total_w) * efficacy["traffic"] * current_aqi * 0.8
+        + (industrial_w / total_w) * efficacy["industrial"] * current_aqi * 0.8
+        + (construction_w / total_w) * efficacy["construction"] * current_aqi * 0.8
+        + (biomass_w / total_w) * efficacy["biomass"] * current_aqi * 0.8
     )
 
     predicted_aqi = round(max(30, current_aqi - reduction), 1)
@@ -326,7 +415,9 @@ def simulate_intervention(ward_id: int, action_type: str, db: Session) -> Dict[s
     pop = ward.population or 50000
     pm25_reduction = reduction * 0.55  # PM2.5 ≈ 55% of AQI
     hospital_admissions_prevented = round(pm25_reduction * pop * 0.0001, 1)
-    health_cost_saved_lakhs = round(hospital_admissions_prevented * 1.2, 1)  # ~Rs 1.2 lakh per admission
+    health_cost_saved_lakhs = round(
+        hospital_admissions_prevented * 1.2, 1
+    )  # ~Rs 1.2 lakh per admission
 
     return {
         "ward_id": ward_id,
@@ -353,7 +444,10 @@ def simulate_intervention(ward_id: int, action_type: str, db: Session) -> Dict[s
 
 # ─── Tool: Historical Outcomes ────────────────────────────────────────────────
 
-def get_historical_outcomes(ward_id: int, action_type: str, db: Session) -> Dict[str, Any]:
+
+def get_historical_outcomes(
+    ward_id: int, action_type: str, db: Session
+) -> Dict[str, Any]:
     """Query knowledge graph for past interventions and their measured outcomes."""
     ward = db.query(Ward).filter(Ward.id == ward_id).first()
     if not ward:
@@ -372,28 +466,96 @@ def get_historical_outcomes(ward_id: int, action_type: str, db: Session) -> Dict
     # Seed realistic historical outcomes based on action_type
     historical_precedents = {
         "heavy_vehicle_ban": [
-            {"date": "2026-01-15", "ward": "Belgachia", "aqi_before": 287, "aqi_after": 198, "ate_ugm3": -89, "p_value": 0.003, "duration_hours": 72},
-            {"date": "2025-11-23", "ward": "Shyambazar", "aqi_before": 312, "aqi_after": 241, "ate_ugm3": -71, "p_value": 0.011, "duration_hours": 48},
+            {
+                "date": "2026-01-15",
+                "ward": "Belgachia",
+                "aqi_before": 287,
+                "aqi_after": 198,
+                "ate_ugm3": -89,
+                "p_value": 0.003,
+                "duration_hours": 72,
+            },
+            {
+                "date": "2025-11-23",
+                "ward": "Shyambazar",
+                "aqi_before": 312,
+                "aqi_after": 241,
+                "ate_ugm3": -71,
+                "p_value": 0.011,
+                "duration_hours": 48,
+            },
         ],
         "construction_halt": [
-            {"date": "2026-02-08", "ward": "New Town", "aqi_before": 245, "aqi_after": 178, "ate_ugm3": -67, "p_value": 0.007, "duration_hours": 96},
-            {"date": "2025-12-14", "ward": "Kasba", "aqi_before": 198, "aqi_after": 155, "ate_ugm3": -43, "p_value": 0.024, "duration_hours": 48},
+            {
+                "date": "2026-02-08",
+                "ward": "New Town",
+                "aqi_before": 245,
+                "aqi_after": 178,
+                "ate_ugm3": -67,
+                "p_value": 0.007,
+                "duration_hours": 96,
+            },
+            {
+                "date": "2025-12-14",
+                "ward": "Kasba",
+                "aqi_before": 198,
+                "aqi_after": 155,
+                "ate_ugm3": -43,
+                "p_value": 0.024,
+                "duration_hours": 48,
+            },
         ],
         "show_cause_notice": [
-            {"date": "2025-10-30", "ward": "Topsia", "aqi_before": 334, "aqi_after": 267, "ate_ugm3": -67, "p_value": 0.019, "duration_hours": 168},
-            {"date": "2026-03-12", "ward": "Garden Reach", "aqi_before": 290, "aqi_after": 230, "ate_ugm3": -60, "p_value": 0.032, "duration_hours": 120},
+            {
+                "date": "2025-10-30",
+                "ward": "Topsia",
+                "aqi_before": 334,
+                "aqi_after": 267,
+                "ate_ugm3": -67,
+                "p_value": 0.019,
+                "duration_hours": 168,
+            },
+            {
+                "date": "2026-03-12",
+                "ward": "Garden Reach",
+                "aqi_before": 290,
+                "aqi_after": 230,
+                "ate_ugm3": -60,
+                "p_value": 0.032,
+                "duration_hours": 120,
+            },
         ],
         "industrial_curtailment_50": [
-            {"date": "2026-04-05", "ward": "Metiabruz", "aqi_before": 378, "aqi_after": 255, "ate_ugm3": -123, "p_value": 0.001, "duration_hours": 120},
+            {
+                "date": "2026-04-05",
+                "ward": "Metiabruz",
+                "aqi_before": 378,
+                "aqi_after": 255,
+                "ate_ugm3": -123,
+                "p_value": 0.001,
+                "duration_hours": 120,
+            },
         ],
         "combined_emergency": [
-            {"date": "2026-01-22", "ward": "Entally", "aqi_before": 421, "aqi_after": 248, "ate_ugm3": -173, "p_value": 0.0004, "duration_hours": 48},
+            {
+                "date": "2026-01-22",
+                "ward": "Entally",
+                "aqi_before": 421,
+                "aqi_after": 248,
+                "ate_ugm3": -173,
+                "p_value": 0.0004,
+                "duration_hours": 48,
+            },
         ],
     }
 
-    precedents = historical_precedents.get(action_type, historical_precedents["combined_emergency"])
+    precedents = historical_precedents.get(
+        action_type, historical_precedents["combined_emergency"]
+    )
     avg_ate = round(sum(p["ate_ugm3"] for p in precedents) / len(precedents), 1)
-    success_rate = round(sum(1 for p in precedents if p["ate_ugm3"] < -30) / len(precedents) * 100, 0)
+    success_rate = round(
+        sum(1 for p in precedents if p["ate_ugm3"] < -30) / len(precedents) * 100, 0
+    )
 
     # Neo4j-style knowledge graph relationship summary
     graph_relationships = {
@@ -415,9 +577,11 @@ def get_historical_outcomes(ward_id: int, action_type: str, db: Session) -> Dict
             "typical_effect_window_hours": max(p["duration_hours"] for p in precedents),
         },
         "knowledge_graph": graph_relationships,
-        "confidence": "HIGH" if success_rate >= 80 else ("MEDIUM" if success_rate >= 50 else "LOW"),
+        "confidence": "HIGH"
+        if success_rate >= 80
+        else ("MEDIUM" if success_rate >= 50 else "LOW"),
         "agent_reasoning": (
-            f"Based on {len(precedents)} historical precedents, {action_type.replace('_',' ')} "
+            f"Based on {len(precedents)} historical precedents, {action_type.replace('_', ' ')} "
             f"has achieved an average AQI reduction of {abs(avg_ate):.0f} μg/m³ "
             f"(success rate: {success_rate:.0f}%). "
             f"Precedent confidence: {'HIGH — strong evidence base' if success_rate >= 80 else 'MEDIUM — limited data'}."
@@ -427,15 +591,20 @@ def get_historical_outcomes(ward_id: int, action_type: str, db: Session) -> Dict
 
 # ─── Tool: Generate Show-Cause Notice ─────────────────────────────────────────
 
-def generate_show_cause_notice(industry_id: str, violation_type: str, ward_id: int, db: Session) -> Dict[str, Any]:
+
+def generate_show_cause_notice(
+    industry_id: str, violation_type: str, ward_id: int, db: Session
+) -> Dict[str, Any]:
     """Generate a legally defensible show-cause notice under Air Act 1981."""
     ward = db.query(Ward).filter(Ward.id == ward_id).first()
     if not ward:
         return {"error": "Ward not found"}
 
     weather = (
-        db.query(Weather).filter(Weather.city == ward.city)
-        .order_by(Weather.recorded_at.desc()).first()
+        db.query(Weather)
+        .filter(Weather.city == ward.city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
     )
     wind_dir = weather.wind_dir if weather and weather.wind_dir else 210.0
     wind_speed = weather.wind_speed if weather and weather.wind_speed else 5.5
@@ -443,10 +612,18 @@ def generate_show_cause_notice(industry_id: str, violation_type: str, ward_id: i
     # Wind correlation for legal causation
     bearing_deg = round(wind_dir, 1)
     cardinal = {
-        (0, 45): "North", (45, 90): "North-East", (90, 135): "East", (135, 180): "South-East",
-        (180, 225): "South", (225, 270): "South-West", (270, 315): "West", (315, 360): "North-West"
+        (0, 45): "North",
+        (45, 90): "North-East",
+        (90, 135): "East",
+        (135, 180): "South-East",
+        (180, 225): "South",
+        (225, 270): "South-West",
+        (270, 315): "West",
+        (315, 360): "North-West",
     }
-    wind_cardinal = next((v for (lo, hi), v in cardinal.items() if lo <= wind_dir < hi), "South")
+    wind_cardinal = next(
+        (v for (lo, hi), v in cardinal.items() if lo <= wind_dir < hi), "South"
+    )
 
     # Legal provisions (Air Act 1981)
     legal_provisions = {
@@ -456,7 +633,10 @@ def generate_show_cause_notice(industry_id: str, violation_type: str, ward_id: i
         "open_burning": "Section 16(2)(c) (Power of Board), Municipal Solid Waste Rules 2016",
     }
 
-    provision = legal_provisions.get(violation_type, "Section 21 and 31A of Air (Prevention and Control of Pollution) Act, 1981")
+    provision = legal_provisions.get(
+        violation_type,
+        "Section 21 and 31A of Air (Prevention and Control of Pollution) Act, 1981",
+    )
 
     notice_date = datetime.utcnow().strftime("%d %B %Y")
     case_id = f"AETHER-SCN-{datetime.utcnow().strftime('%Y%m%d')}-{ward.ward_no:03d}-{industry_id}"
@@ -481,7 +661,7 @@ Ward #{ward.ward_no}, {ward.name}, {ward.city}
 This notice is issued under the powers conferred by **{provision}** following detection of environmental violations as described below.
 
 **VIOLATIONS DETECTED:**
-1. Violation Type: **{violation_type.replace('_', ' ').upper()}**
+1. Violation Type: **{violation_type.replace("_", " ").upper()}**
 2. Detection Method: AETHER AI Platform continuous monitoring (CEMS data + satellite cross-correlation)
 3. Date and Time: {notice_date}
 
@@ -528,6 +708,7 @@ Submit written response to the WBPCB Regional Office within 7 days. Failure to r
 
 # ─── Tool: Vulnerable Population ─────────────────────────────────────────────
 
+
 def get_vulnerable_population(ward_id: int, db: Session) -> Dict[str, Any]:
     """Get vulnerable population breakdown for health impact prioritization."""
     ward = db.query(Ward).filter(Ward.id == ward_id).first()
@@ -536,7 +717,7 @@ def get_vulnerable_population(ward_id: int, db: Session) -> Dict[str, Any]:
 
     pop = ward.population or 50000
     # Kolkata demographics from Census 2011 extrapolated
-    elderly_pct = 0.08   # 65+
+    elderly_pct = 0.08  # 65+
     children_pct = 0.12  # <5
     respiratory_pct = 0.06  # asthma/COPD prevalence
 
@@ -547,10 +728,13 @@ def get_vulnerable_population(ward_id: int, db: Session) -> Dict[str, Any]:
 
     # Risk index: higher if more schools/hospitals near
     risk_index = (
-        (ward.school_count * 200 + ward.hospital_count * 500 + total_vulnerable * 0.1) /
-        max(pop, 1) * 100
+        (ward.school_count * 200 + ward.hospital_count * 500 + total_vulnerable * 0.1)
+        / max(pop, 1)
+        * 100
     )
-    risk_level = "CRITICAL" if risk_index > 3 else "HIGH" if risk_index > 1.5 else "MODERATE"
+    risk_level = (
+        "CRITICAL" if risk_index > 3 else "HIGH" if risk_index > 1.5 else "MODERATE"
+    )
 
     return {
         "ward_id": ward_id,
@@ -572,14 +756,15 @@ def get_vulnerable_population(ward_id: int, db: Session) -> Dict[str, Any]:
         "risk_index": round(risk_index, 2),
         "risk_level": risk_level,
         "priority_message": (
-            f"Ward {ward.name} has {total_vulnerable:,} vulnerable residents ({total_vulnerable/pop*100:.0f}% of population). "
-            f"With {ward.school_count} schools ({ward.school_count*450:,} children) and {ward.hospital_count} hospitals, "
+            f"Ward {ward.name} has {total_vulnerable:,} vulnerable residents ({total_vulnerable / pop * 100:.0f}% of population). "
+            f"With {ward.school_count} schools ({ward.school_count * 450:,} children) and {ward.hospital_count} hospitals, "
             f"health protection is {risk_level} priority."
         ),
     }
 
 
 # ─── Tool: Permit Status ──────────────────────────────────────────────────────
+
 
 def get_permit_status(ward_id: int, db: Session) -> Dict[str, Any]:
     """Check industrial permit compliance status in a ward."""
@@ -600,26 +785,40 @@ def get_permit_status(ward_id: int, db: Session) -> Dict[str, Any]:
         violation_count = random.randint(0, 5)
 
         permit_status = (
-            "EXPIRED" if days_to_expiry < 0 else
-            "EXPIRING_SOON" if days_to_expiry < 30 else "VALID"
+            "EXPIRED"
+            if days_to_expiry < 0
+            else "EXPIRING_SOON"
+            if days_to_expiry < 30
+            else "VALID"
         )
         if permit_status == "EXPIRED":
             expired_count += 1
         if days_since_inspection > 90:
             overdue_inspection += 1
 
-        units.append({
-            "unit_id": f"IND-{ward.ward_no:03d}-{i+1:02d}",
-            "industry_type": random.choice(["Foundry", "Chemical", "Textile", "Brick Kiln"]),
-            "permit_status": permit_status,
-            "permit_expiry": (now + timedelta(days=days_to_expiry)).strftime("%Y-%m-%d"),
-            "days_since_last_inspection": days_since_inspection,
-            "historical_violations": violation_count,
-            "risk_score": round(
-                (violation_count * 20 + (1 if permit_status == "EXPIRED" else 0) * 30 +
-                 min(100, days_since_inspection * 0.5)) / 100, 2
-            ),
-        })
+        units.append(
+            {
+                "unit_id": f"IND-{ward.ward_no:03d}-{i + 1:02d}",
+                "industry_type": random.choice(
+                    ["Foundry", "Chemical", "Textile", "Brick Kiln"]
+                ),
+                "permit_status": permit_status,
+                "permit_expiry": (now + timedelta(days=days_to_expiry)).strftime(
+                    "%Y-%m-%d"
+                ),
+                "days_since_last_inspection": days_since_inspection,
+                "historical_violations": violation_count,
+                "risk_score": round(
+                    (
+                        violation_count * 20
+                        + (1 if permit_status == "EXPIRED" else 0) * 30
+                        + min(100, days_since_inspection * 0.5)
+                    )
+                    / 100,
+                    2,
+                ),
+            }
+        )
 
     units.sort(key=lambda x: x["risk_score"], reverse=True)
 
@@ -630,7 +829,9 @@ def get_permit_status(ward_id: int, db: Session) -> Dict[str, Any]:
         "permit_summary": {
             "valid": n_units - expired_count,
             "expired": expired_count,
-            "expiring_within_30_days": sum(1 for u in units if u["permit_status"] == "EXPIRING_SOON"),
+            "expiring_within_30_days": sum(
+                1 for u in units if u["permit_status"] == "EXPIRING_SOON"
+            ),
         },
         "inspection_summary": {
             "overdue_inspection_90days": overdue_inspection,
@@ -640,13 +841,14 @@ def get_permit_status(ward_id: int, db: Session) -> Dict[str, Any]:
         "enforcement_recommendation": (
             f"{expired_count} unit(s) operating with EXPIRED permits — immediate action warranted. "
             f"{overdue_inspection} unit(s) overdue for inspection (>90 days)."
-            if expired_count > 0 else
-            f"No expired permits detected. {overdue_inspection} units overdue for routine inspection."
+            if expired_count > 0
+            else f"No expired permits detected. {overdue_inspection} units overdue for routine inspection."
         ),
     }
 
 
 # ─── Dispatcher ───────────────────────────────────────────────────────────────
+
 
 def invoke_tool(tool_name: str, params: Dict[str, Any], db: Session) -> Dict[str, Any]:
     """Central dispatcher for all agent tools."""
@@ -658,9 +860,13 @@ def invoke_tool(tool_name: str, params: Dict[str, Any], db: Session) -> Dict[str
         elif tool_name == "get_industrial_cems":
             return get_industrial_cems(params["ward_id"], db)
         elif tool_name == "simulate_intervention":
-            return simulate_intervention(params["ward_id"], params.get("action_type", "combined_emergency"), db)
+            return simulate_intervention(
+                params["ward_id"], params.get("action_type", "combined_emergency"), db
+            )
         elif tool_name == "get_historical_outcomes":
-            return get_historical_outcomes(params["ward_id"], params.get("action_type", "combined_emergency"), db)
+            return get_historical_outcomes(
+                params["ward_id"], params.get("action_type", "combined_emergency"), db
+            )
         elif tool_name == "generate_show_cause_notice":
             return generate_show_cause_notice(
                 params.get("industry_id", "IND-001"),

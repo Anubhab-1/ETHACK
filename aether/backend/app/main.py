@@ -15,11 +15,11 @@ from app.config import get_settings
 from app.database import create_tables
 
 settings = get_settings()
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s"
+)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
-
-
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
 
     import os
     import sys
+
     is_testing = os.environ.get("APP_ENV") == "testing" or "pytest" in sys.modules
 
     if not is_testing:
@@ -36,11 +37,13 @@ async def lifespan(app: FastAPI):
 
         # Seed data on first run
         from app.database import SessionLocal
+
         db = SessionLocal()
         try:
             from datetime import datetime
 
             from app.models import CitizenReport, Station, Ward
+
             if db.query(Station).count() == 0:
                 logger.info("First run detected — seeding stations and wards...")
                 from app.scripts.seed_stations import seed_all_stations
@@ -49,6 +52,7 @@ async def lifespan(app: FastAPI):
                     seed_kolkata_wards,
                     seed_mumbai_wards,
                 )
+
                 seed_all_stations(db)
                 seed_kolkata_wards(db)
                 seed_delhi_wards(db)
@@ -56,89 +60,108 @@ async def lifespan(app: FastAPI):
 
             if db.query(CitizenReport).count() == 0:
                 logger.info("Seeding initial mock citizen reports...")
-                kolkata_wards = db.query(Ward).filter(Ward.city == "Kolkata").limit(5).all()
+                kolkata_wards = (
+                    db.query(Ward).filter(Ward.city == "Kolkata").limit(5).all()
+                )
                 delhi_wards = db.query(Ward).filter(Ward.city == "Delhi").limit(2).all()
-                mumbai_wards = db.query(Ward).filter(Ward.city == "Mumbai").limit(2).all()
+                mumbai_wards = (
+                    db.query(Ward).filter(Ward.city == "Mumbai").limit(2).all()
+                )
 
                 reports = []
                 if len(kolkata_wards) >= 3:
-                    reports.append(CitizenReport(
-                        ward_id=kolkata_wards[0].id,
-                        city="Kolkata",
-                        reporter_name="Debasish S.",
-                        report_type="garbage_burning",
-                        description="Thick black smoke from garbage dump burning near Sector V park. Smells like plastic. Difficult to breathe.",
-                        severity="high",
-                        lat=kolkata_wards[0].lat + 0.001,
-                        lon=kolkata_wards[0].lon - 0.001,
-                        status="pending",
-                        upvote_count=4,
-                        created_at=datetime.utcnow()
-                    ))
-                    reports.append(CitizenReport(
-                        ward_id=kolkata_wards[1].id,
-                        city="Kolkata",
-                        reporter_name="Ananya R.",
-                        report_type="construction_dust",
-                        description="Uncovered demolition site near the metro corridor. Excessive dust blow, road visibility is reduced.",
-                        severity="medium",
-                        lat=kolkata_wards[1].lat - 0.0005,
-                        lon=kolkata_wards[1].lon + 0.0005,
-                        status="pending",
-                        upvote_count=2,
-                        created_at=datetime.utcnow()
-                    ))
-                    reports.append(CitizenReport(
-                        ward_id=kolkata_wards[2].id,
-                        city="Kolkata",
-                        reporter_name="Sanjay M.",
-                        report_type="vehicle_emissions",
-                        description="Multiple overloaded commercial diesel trucks emitting heavy dark smoke at the crossroads.",
-                        severity="low",
-                        lat=kolkata_wards[2].lat + 0.0008,
-                        lon=kolkata_wards[2].lon + 0.0002,
-                        status="verified",
-                        upvote_count=6,
-                        created_at=datetime.utcnow()
-                    ))
+                    reports.append(
+                        CitizenReport(
+                            ward_id=kolkata_wards[0].id,
+                            city="Kolkata",
+                            reporter_name="Debasish S.",
+                            report_type="garbage_burning",
+                            description="Thick black smoke from garbage dump burning near Sector V park. Smells like plastic. Difficult to breathe.",
+                            severity="high",
+                            lat=kolkata_wards[0].lat + 0.001,
+                            lon=kolkata_wards[0].lon - 0.001,
+                            status="pending",
+                            upvote_count=4,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
+                    reports.append(
+                        CitizenReport(
+                            ward_id=kolkata_wards[1].id,
+                            city="Kolkata",
+                            reporter_name="Ananya R.",
+                            report_type="construction_dust",
+                            description="Uncovered demolition site near the metro corridor. Excessive dust blow, road visibility is reduced.",
+                            severity="medium",
+                            lat=kolkata_wards[1].lat - 0.0005,
+                            lon=kolkata_wards[1].lon + 0.0005,
+                            status="pending",
+                            upvote_count=2,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
+                    reports.append(
+                        CitizenReport(
+                            ward_id=kolkata_wards[2].id,
+                            city="Kolkata",
+                            reporter_name="Sanjay M.",
+                            report_type="vehicle_emissions",
+                            description="Multiple overloaded commercial diesel trucks emitting heavy dark smoke at the crossroads.",
+                            severity="low",
+                            lat=kolkata_wards[2].lat + 0.0008,
+                            lon=kolkata_wards[2].lon + 0.0002,
+                            status="verified",
+                            upvote_count=6,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
                 if len(delhi_wards) >= 1:
-                    reports.append(CitizenReport(
-                        ward_id=delhi_wards[0].id,
-                        city="Delhi",
-                        reporter_name="Preeti G.",
-                        report_type="garbage_burning",
-                        description="Biomass and leaf burning on the roadside in Anand Vihar block. High smog levels.",
-                        severity="high",
-                        lat=delhi_wards[0].lat + 0.0012,
-                        lon=delhi_wards[0].lon - 0.0008,
-                        status="pending",
-                        upvote_count=3,
-                        created_at=datetime.utcnow()
-                    ))
+                    reports.append(
+                        CitizenReport(
+                            ward_id=delhi_wards[0].id,
+                            city="Delhi",
+                            reporter_name="Preeti G.",
+                            report_type="garbage_burning",
+                            description="Biomass and leaf burning on the roadside in Anand Vihar block. High smog levels.",
+                            severity="high",
+                            lat=delhi_wards[0].lat + 0.0012,
+                            lon=delhi_wards[0].lon - 0.0008,
+                            status="pending",
+                            upvote_count=3,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
                 if len(mumbai_wards) >= 1:
-                    reports.append(CitizenReport(
-                        ward_id=mumbai_wards[0].id,
-                        city="Mumbai",
-                        reporter_name="Vikram A.",
-                        report_type="industrial_smoke",
-                        description="Fumes leaking from a chemical processing facility chimney down in Chembur industrial zone.",
-                        severity="high",
-                        lat=mumbai_wards[0].lat - 0.0015,
-                        lon=mumbai_wards[0].lon + 0.001,
-                        status="pending",
-                        upvote_count=8,
-                        created_at=datetime.utcnow()
-                    ))
+                    reports.append(
+                        CitizenReport(
+                            ward_id=mumbai_wards[0].id,
+                            city="Mumbai",
+                            reporter_name="Vikram A.",
+                            report_type="industrial_smoke",
+                            description="Fumes leaking from a chemical processing facility chimney down in Chembur industrial zone.",
+                            severity="high",
+                            lat=mumbai_wards[0].lat - 0.0015,
+                            lon=mumbai_wards[0].lon + 0.001,
+                            status="pending",
+                            upvote_count=8,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
 
                 if reports:
                     db.add_all(reports)
                     db.commit()
-                    logger.info(f"Successfully seeded {len(reports)} mock citizen reports.")
+                    logger.info(
+                        f"Successfully seeded {len(reports)} mock citizen reports."
+                    )
 
             # Run the first CPCB/weather refresh synchronously (blocking)
             try:
                 from app.scripts.refresh_data import refresh_all
-                logger.info("📡 Running initial database CPCB/weather refresh synchronously...")
+
+                logger.info(
+                    "📡 Running initial database CPCB/weather refresh synchronously..."
+                )
                 refresh_all(db)
                 logger.info("📡 Initial database refresh complete.")
             except Exception as e:
@@ -152,6 +175,7 @@ async def lifespan(app: FastAPI):
         try:
             from app.database import SessionLocal as KGSession
             from app.services.knowledge_graph import seed_knowledge_graph
+
             kg_db = KGSession()
             seed_knowledge_graph(db=kg_db, city="Kolkata")
             kg_db.close()
@@ -161,19 +185,24 @@ async def lifespan(app: FastAPI):
 
         # Start APScheduler background scheduler
         from app.scheduler import start_scheduler
+
         start_scheduler()
     else:
-        logger.info("🧪 Running in testing mode — skipping DB migrations, seeds, external API syncs, and scheduler.")
+        logger.info(
+            "🧪 Running in testing mode — skipping DB migrations, seeds, external API syncs, and scheduler."
+        )
 
-    logger.info("✅ AETHER National v2.0 ready — 5-agent constitutional intelligence online!")
+    logger.info(
+        "✅ AETHER National v2.0 ready — 5-agent constitutional intelligence online!"
+    )
     yield
 
     if not is_testing:
         logger.info("AETHER shutting down background scheduler...")
         from app.scheduler import shutdown_scheduler
+
         shutdown_scheduler()
     logger.info("AETHER shutting down...")
-
 
 
 app = FastAPI(
@@ -210,12 +239,13 @@ app.add_middleware(
 async def add_request_tracing(request, call_next):
     import time
     import uuid
+
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     request.state.request_id = request_id
-    
+
     logger.info(f"[{request_id}] {request.method} {request.url.path} - STARTED")
     start_time = time.time()
-    
+
     try:
         response = await call_next(request)
         process_time = (time.time() - start_time) * 1000
@@ -234,6 +264,7 @@ async def add_request_tracing(request, call_next):
         )
         raise e
 
+
 from app.api import (  # noqa: E402
     advisory,
     agents,
@@ -242,16 +273,16 @@ from app.api import (  # noqa: E402
     attribution,
     attribution_advanced,
     causal_impact,
+    citizen,
     diagnostics,
     enforcement_advanced,
     forecast,
     forecast_advanced,
+    forecast_models,
     health,
     reports,
     simulation,
     ws,
-    forecast_models,
-    citizen,
 )
 
 app.include_router(health.router, prefix="/api", tags=["Health"])
@@ -275,8 +306,6 @@ app.include_router(enforcement_advanced.router, tags=["Enforcement Advanced"])
 app.include_router(agents_advanced.router, tags=["Agents Advanced"])
 
 
-
-
 @app.get("/")
 def root():
     return {
@@ -285,4 +314,3 @@ def root():
         "docs": "/docs",
         "version": "2.0.0",
     }
-

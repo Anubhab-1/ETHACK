@@ -3,6 +3,7 @@ AETHER — ST-GCN Spatio-Temporal Graph Convolutional Network Model
 Provides graph construction from station coordinates and wind alignment.
 Falls back gracefully when torch or torch_geometric is not installed.
 """
+
 from __future__ import annotations
 
 import logging
@@ -15,19 +16,23 @@ logger = logging.getLogger(__name__)
 try:
     import torch  # type: ignore
     import torch.nn as nn  # type: ignore
+
     TORCH_AVAILABLE = True
 except Exception:
     TORCH_AVAILABLE = False
     torch = None
+
     class nn:
         class Module:
             pass
+
     logger.warning("torch not available. STGCN models will stub out.")
 
 try:
     from torch_geometric.nn import GCNConv  # type: ignore
 except Exception:
     if TORCH_AVAILABLE:
+
         class GCNConv(nn.Module):
             def __init__(self, in_channels, out_channels):
                 super().__init__()
@@ -36,6 +41,7 @@ except Exception:
             def forward(self, x, edge_index=None, edge_weight=None):
                 return self.linear(x)
     else:
+
         class GCNConv:
             def __init__(self, *args, **kwargs):
                 pass
@@ -43,14 +49,15 @@ except Exception:
             def __call__(self, *args, **kwargs):
                 pass
 
+
 class STGCNBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3):
         if not TORCH_AVAILABLE:
             return
         super().__init__()
-        self.temporal_conv = nn.Conv2d(in_channels, out_channels,
-                                       (kernel_size, 1),
-                                       padding=(kernel_size//2, 0))
+        self.temporal_conv = nn.Conv2d(
+            in_channels, out_channels, (kernel_size, 1), padding=(kernel_size // 2, 0)
+        )
         self.spatial_conv = GCNConv(out_channels, out_channels)
         self.bn = nn.BatchNorm2d(out_channels)
 
@@ -62,16 +69,17 @@ class STGCNBlock(nn.Module):
         x = self.spatial_conv(x, edge_index, edge_weight)
         return torch.relu(self.bn(x))
 
+
 class AetherSTGCN(nn.Module):
-    def __init__(self, num_nodes, num_features, num_timesteps_input=24, num_timesteps_output=72):
+    def __init__(
+        self, num_nodes, num_features, num_timesteps_input=24, num_timesteps_output=72
+    ):
         if not TORCH_AVAILABLE:
             return
         super().__init__()
-        self.st_blocks = nn.ModuleList([
-            STGCNBlock(num_features, 64),
-            STGCNBlock(64, 64),
-            STGCNBlock(64, 32)
-        ])
+        self.st_blocks = nn.ModuleList(
+            [STGCNBlock(num_features, 64), STGCNBlock(64, 64), STGCNBlock(64, 32)]
+        )
         self.fc = nn.Linear(32 * num_timesteps_input, num_timesteps_output)
 
     def forward(self, x, edge_index, edge_weight):
@@ -81,15 +89,21 @@ class AetherSTGCN(nn.Module):
             x = block(x, edge_index, edge_weight)
         return self.fc(x.reshape(x.size(0), -1))
 
-def build_wind_aligned_graph(stations_df, wind_direction_deg, aqi_history_matrix,
-                             distance_threshold_km=15, correlation_threshold=0.6):
+
+def build_wind_aligned_graph(
+    stations_df,
+    wind_direction_deg,
+    aqi_history_matrix,
+    distance_threshold_km=15,
+    correlation_threshold=0.6,
+):
     """
     stations_df: DataFrame with columns [station_id, lat, lon, ward_id]
     wind_direction_deg: current wind direction (0=North, 90=East)
     aqi_history_matrix: (n_stations, n_timesteps) historical AQI values
     """
     n = len(stations_df)
-    coords = stations_df[['lat', 'lon']].values
+    coords = stations_df[["lat", "lon"]].values
 
     # Haversine distance matrix
     dist_matrix = haversine_distance_matrix(coords)
@@ -108,7 +122,7 @@ def build_wind_aligned_graph(stations_df, wind_direction_deg, aqi_history_matrix
     edge_weights = []
 
     for i in range(n):
-        for j in range(i+1, n):
+        for j in range(i + 1, n):
             if dist_matrix[i, j] > distance_threshold_km:
                 continue
             if corr_matrix[i, j] < correlation_threshold:
@@ -116,7 +130,7 @@ def build_wind_aligned_graph(stations_df, wind_direction_deg, aqi_history_matrix
 
             # Wind alignment: dot product of station-to-station vector with wind
             dx = coords[j, 1] - coords[i, 1]  # lon diff
-            dy = coords[j, 0] - coords[i, 0]   # lat diff
+            dy = coords[j, 0] - coords[i, 0]  # lat diff
             station_vec = np.array([dx, dy])
             station_vec = station_vec / (np.linalg.norm(station_vec) + 1e-8)
 
@@ -142,10 +156,12 @@ def build_wind_aligned_graph(stations_df, wind_direction_deg, aqi_history_matrix
 
     return edge_index, edge_weight
 
+
 def haversine_distance_matrix(coords):
     """Compute haversine distance matrix in km"""
     try:
         from sklearn.metrics.pairwise import haversine_distances
+
         coords_rad = np.radians(coords)
         return haversine_distances(coords_rad) * 6371  # Earth radius in km
     except ImportError:
@@ -158,7 +174,10 @@ def haversine_distance_matrix(coords):
                 lat2, lon2 = np.radians(coords[j, 0]), np.radians(coords[j, 1])
                 dlat = lat2 - lat1
                 dlon = lon2 - lon1
-                a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+                a = (
+                    np.sin(dlat / 2) ** 2
+                    + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+                )
                 c = 2 * np.arcsin(np.sqrt(a))
                 dist[i, j] = 6371 * c
         return dist

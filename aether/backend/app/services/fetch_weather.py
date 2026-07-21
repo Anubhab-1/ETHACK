@@ -53,15 +53,17 @@ def fetch_weather(city: str = "Kolkata", db: Session = None) -> list[dict]:
 
         records = []
         for i, t in enumerate(times):
-            records.append({
-                "time": t,
-                "temp_c": temps[i] if i < len(temps) else None,
-                "humidity_pct": humidities[i] if i < len(humidities) else None,
-                "wind_speed": wind_speeds[i] if i < len(wind_speeds) else None,
-                "wind_dir": wind_dirs[i] if i < len(wind_dirs) else None,
-                "pressure": pressures[i] if i < len(pressures) else None,
-                "precipitation": precips[i] if i < len(precips) else None,
-            })
+            records.append(
+                {
+                    "time": t,
+                    "temp_c": temps[i] if i < len(temps) else None,
+                    "humidity_pct": humidities[i] if i < len(humidities) else None,
+                    "wind_speed": wind_speeds[i] if i < len(wind_speeds) else None,
+                    "wind_dir": wind_dirs[i] if i < len(wind_dirs) else None,
+                    "pressure": pressures[i] if i < len(pressures) else None,
+                    "precipitation": precips[i] if i < len(precips) else None,
+                }
+            )
 
         logger.info(f"Fetched {len(records)} weather records for {city}")
         return records
@@ -81,10 +83,11 @@ def upsert_weather(records: list[dict], city: str, db: Session) -> int:
                 dt = dt.replace(tzinfo=timezone.utc)
 
             # Check if record exists
-            existing = db.query(Weather).filter(
-                Weather.city == city,
-                Weather.recorded_at == dt
-            ).first()
+            existing = (
+                db.query(Weather)
+                .filter(Weather.city == city, Weather.recorded_at == dt)
+                .first()
+            )
             if existing:
                 continue
 
@@ -111,9 +114,12 @@ def upsert_weather(records: list[dict], city: str, db: Session) -> int:
 
 def get_current_weather(city: str, db: Session) -> dict | None:
     """Get the most recent weather record for a city."""
-    rec = db.query(Weather).filter(
-        Weather.city == city
-    ).order_by(Weather.recorded_at.desc()).first()
+    rec = (
+        db.query(Weather)
+        .filter(Weather.city == city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
+    )
 
     if not rec:
         return None
@@ -150,14 +156,20 @@ def get_weather_forecast(city: str, hours_ahead: int = 72) -> list[dict]:
 
         result = []
         for i, t in enumerate(times[:hours_ahead]):
-            result.append({
-                "time": t,
-                "temp_c": hourly.get("temperature_2m", [None]*len(times))[i],
-                "humidity_pct": hourly.get("relative_humidity_2m", [None]*len(times))[i],
-                "wind_speed": hourly.get("wind_speed_10m", [None]*len(times))[i],
-                "wind_dir": hourly.get("wind_direction_10m", [None]*len(times))[i],
-                "pressure": hourly.get("surface_pressure", [None]*len(times))[i],
-            })
+            result.append(
+                {
+                    "time": t,
+                    "temp_c": hourly.get("temperature_2m", [None] * len(times))[i],
+                    "humidity_pct": hourly.get(
+                        "relative_humidity_2m", [None] * len(times)
+                    )[i],
+                    "wind_speed": hourly.get("wind_speed_10m", [None] * len(times))[i],
+                    "wind_dir": hourly.get("wind_direction_10m", [None] * len(times))[
+                        i
+                    ],
+                    "pressure": hourly.get("surface_pressure", [None] * len(times))[i],
+                }
+            )
         return result
     except Exception as e:
         logger.error(f"Weather forecast error: {e}")

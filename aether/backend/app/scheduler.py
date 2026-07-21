@@ -9,16 +9,19 @@ import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from app.cli.train_forecasts import run_training
 from app.database import SessionLocal
 from app.scripts.refresh_data import refresh_all
-from app.cli.train_forecasts import run_training
 
 logger = logging.getLogger(__name__)
 scheduler = BackgroundScheduler()
 
+
 def scheduled_refresh_job():
     """Trigger periodic database data refresh."""
-    logger.info("⏰ Background job: Starting periodic data refresh (WAQI + Open-Meteo)...")
+    logger.info(
+        "⏰ Background job: Starting periodic data refresh (WAQI + Open-Meteo)..."
+    )
     db = SessionLocal()
     try:
         refresh_all(db)
@@ -40,15 +43,23 @@ def scheduled_train_job():
     except Exception as e:
         logger.error(f"⏰ Forecast training job failed: {e}")
 
+
 def start_scheduler():
     """Start the background scheduler."""
     if not scheduler.running:
         # Run every 30 minutes to capture hourly updates with low latency
-        scheduler.add_job(scheduled_refresh_job, "interval", minutes=30, id="data_refresh_job")
+        scheduler.add_job(
+            scheduled_refresh_job, "interval", minutes=30, id="data_refresh_job"
+        )
         # Daily model training at 02:00 local time (non-critical)
-        scheduler.add_job(scheduled_train_job, "cron", hour=2, minute=0, id="daily_train_models")
+        scheduler.add_job(
+            scheduled_train_job, "cron", hour=2, minute=0, id="daily_train_models"
+        )
         scheduler.start()
-        logger.info("⏰ Background scheduler initialized and started (interval: 30 minutes).")
+        logger.info(
+            "⏰ Background scheduler initialized and started (interval: 30 minutes)."
+        )
+
 
 def shutdown_scheduler():
     """Gracefully shutdown the background scheduler."""

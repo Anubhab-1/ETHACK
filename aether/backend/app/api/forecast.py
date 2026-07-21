@@ -20,11 +20,15 @@ router = APIRouter()
 _training_jobs: dict[str, dict] = {}
 
 
-def find_nearest_ward(lat: float, lon: float, db: Session, city: str = "Kolkata") -> Ward | None:
+def find_nearest_ward(
+    lat: float, lon: float, db: Session, city: str = "Kolkata"
+) -> Ward | None:
     wards = db.query(Ward).filter(Ward.city == city).all()
     if not wards:
         return None
-    nearest = min(wards, key=lambda w: math.sqrt((w.lat - lat) ** 2 + (w.lon - lon) ** 2))
+    nearest = min(
+        wards, key=lambda w: math.sqrt((w.lat - lat) ** 2 + (w.lon - lon) ** 2)
+    )
     return nearest
 
 
@@ -75,6 +79,7 @@ def trigger_training(city: str = Query("Kolkata"), db: Session = Depends(get_db)
 
     def run_training() -> None:
         from app.main import app
+
         is_test_session = get_db in app.dependency_overrides
         if is_test_session:
             session = next(app.dependency_overrides[get_db]())

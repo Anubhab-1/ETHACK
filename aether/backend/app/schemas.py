@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 
 # ── Station ────────────────────────────────────────────────────────────────────
 
+
 class StationOut(BaseModel):
     id: int
     station_code: str
@@ -25,6 +26,7 @@ class StationOut(BaseModel):
 
 
 # ── Reading ────────────────────────────────────────────────────────────────────
+
 
 class ReadingOut(BaseModel):
     id: int
@@ -43,6 +45,7 @@ class ReadingOut(BaseModel):
 
 
 # ── Live AQI ───────────────────────────────────────────────────────────────────
+
 
 class LiveAQIPoint(BaseModel):
     station_id: int
@@ -70,6 +73,7 @@ class HeatmapPoint(BaseModel):
 
 
 # ── Ward ───────────────────────────────────────────────────────────────────────
+
 
 class WardOut(BaseModel):
     id: int
@@ -99,6 +103,7 @@ class WardDetail(WardOut):
 
 # ── Forecast ───────────────────────────────────────────────────────────────────
 
+
 class ForecastPoint(BaseModel):
     forecast_for: datetime
     horizon_hours: int
@@ -118,6 +123,7 @@ class ForecastResponse(BaseModel):
 
 # ── Attribution ────────────────────────────────────────────────────────────────
 
+
 class AttributionResponse(BaseModel):
     ward_id: int
     ward_name: str
@@ -128,6 +134,7 @@ class AttributionResponse(BaseModel):
 
 
 # ── Enforcement ────────────────────────────────────────────────────────────────
+
 
 class EnforcementActionOut(BaseModel):
     id: int
@@ -168,7 +175,6 @@ class DecreeSignOffIn(BaseModel):
     priority_score: float = 75.0
 
 
-
 class EnforcementStats(BaseModel):
     open: int
     deployed: int
@@ -177,6 +183,7 @@ class EnforcementStats(BaseModel):
 
 
 # ── Advisory ───────────────────────────────────────────────────────────────────
+
 
 class AdvisoryRequest(BaseModel):
     question: str = Field(
@@ -210,6 +217,7 @@ class AdvisoryResponse(BaseModel):
 
 # ── City ───────────────────────────────────────────────────────────────────────
 
+
 class CityOut(BaseModel):
     id: str
     name: str
@@ -221,6 +229,7 @@ class CityOut(BaseModel):
 
 # ── Health ─────────────────────────────────────────────────────────────────────
 
+
 class HealthResponse(BaseModel):
     status: str
     version: str
@@ -229,6 +238,7 @@ class HealthResponse(BaseModel):
 
 
 # ── Citizen Reports ────────────────────────────────────────────────────────────
+
 
 class CitizenReportIn(BaseModel):
     ward_id: int
@@ -263,6 +273,7 @@ class CitizenReportOut(BaseModel):
 
 # ── Citizen Subscriptions ──────────────────────────────────────────────────────
 
+
 class CitizenSubscriptionIn(BaseModel):
     city: str
     ward_id: int
@@ -286,6 +297,7 @@ class CitizenSubscriptionOut(BaseModel):
 
 
 # ── Agent Simulation ─────────────────────────────────────────────────────────
+
 
 class ToolCall(BaseModel):
     tool_name: str
@@ -333,6 +345,7 @@ class AgentSimulationResponse(BaseModel):
 
 # ── Inspector Routing & Legal Query ───────────────────────────────────────────
 
+
 class InspectorLocation(BaseModel):
     id: int
     lat: float
@@ -349,5 +362,3 @@ class InspectorRoutesInput(BaseModel):
 class LegalQueryInput(BaseModel):
     question: str = Field(..., min_length=1, max_length=500)
     limit: int = Field(3, ge=1, le=10)
-
-

@@ -24,7 +24,7 @@ router = APIRouter()
 def get_reports(
     city: str = Query("Kolkata"),
     limit: int = Query(50, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Retrieve all citizen reports for a given city."""
     # Outer join with Ward to get ward name
@@ -65,7 +65,7 @@ def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
         status="pending",
         upvote_count=0,
         photo_url=report_in.photo_url,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
 
     db.add(new_report)
@@ -75,15 +75,20 @@ def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
     # Escalation Logic: If severity is high, auto-trigger a municipal action
     if report_in.severity.lower() == "high":
         # Check if an open enforcement action already exists for this ward and type
-        existing = db.query(EnforcementAction).filter(
-            EnforcementAction.ward_id == report_in.ward_id,
-            EnforcementAction.target_type == report_in.report_type,
-            EnforcementAction.status == "open"
-        ).first()
+        existing = (
+            db.query(EnforcementAction)
+            .filter(
+                EnforcementAction.ward_id == report_in.ward_id,
+                EnforcementAction.target_type == report_in.report_type,
+                EnforcementAction.status == "open",
+            )
+            .first()
+        )
 
         if not existing:
             import random
             from datetime import timedelta
+
             detected_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 15))
             action = EnforcementAction(
                 ward_id=report_in.ward_id,
@@ -95,7 +100,7 @@ def create_report(report_in: CitizenReportIn, db: Session = Depends(get_db)):
                 alerts_sent=0,
                 alerts_confirmed=0,
                 created_at=datetime.utcnow(),
-                detected_at=detected_time
+                detected_at=detected_time,
             )
             db.add(action)
             db.commit()
@@ -117,7 +122,7 @@ def get_report_by_id(report_id: int, db: Session = Depends(get_db)):
     )
     if not result:
         raise HTTPException(status_code=404, detail="Report not found")
-        
+
     report, ward_name = result
     out = CitizenReportOut.model_validate(report)
     out.ward_name = ward_name or f"Ward #{report.ward_id}"
@@ -141,11 +146,15 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
         ward_name = ward.name if ward else f"Ward #{report.ward_id}"
 
         # Escalate to enforcement queue
-        existing = db.query(EnforcementAction).filter(
-            EnforcementAction.ward_id == report.ward_id,
-            EnforcementAction.target_type == report.report_type,
-            EnforcementAction.status == "open"
-        ).first()
+        existing = (
+            db.query(EnforcementAction)
+            .filter(
+                EnforcementAction.ward_id == report.ward_id,
+                EnforcementAction.target_type == report.report_type,
+                EnforcementAction.status == "open",
+            )
+            .first()
+        )
 
         if existing:
             # Boost priority
@@ -154,6 +163,7 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
         else:
             import random
             from datetime import timedelta
+
             detected_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 15))
             action = EnforcementAction(
                 ward_id=report.ward_id,
@@ -165,7 +175,7 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
                 alerts_sent=0,
                 alerts_confirmed=0,
                 created_at=datetime.utcnow(),
-                detected_at=detected_time
+                detected_at=detected_time,
             )
             db.add(action)
 
@@ -180,9 +190,14 @@ def upvote_report(report_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/reports/evidence-package/{industry_id}")
-def get_evidence_package(industry_id: str, violation_type: str = "cpcb_norm_violation", db: Session = Depends(get_db)):
+def get_evidence_package(
+    industry_id: str,
+    violation_type: str = "cpcb_norm_violation",
+    db: Session = Depends(get_db),
+):
     """Generate an automated legal evidence package for an industrial site violation."""
     from app.services.evidence_generator import generate_evidence_package
+
     return generate_evidence_package(industry_id, violation_type, db)
 
 
@@ -194,14 +209,18 @@ def post_inspector_routes(payload: InspectorRoutesInput):
     n_inspectors (int), and time_budget_hours (float).
     """
     from app.services.route_optimizer import optimize_inspector_routes
+
     locations = [loc.model_dump() for loc in payload.locations]
-    return optimize_inspector_routes(locations, payload.n_inspectors, payload.time_budget_hours)
+    return optimize_inspector_routes(
+        locations, payload.n_inspectors, payload.time_budget_hours
+    )
 
 
 @router.post("/reports/legal-query")
 def post_legal_query(payload: LegalQueryInput, db: Session = Depends(get_db)):
     """Query regulatory frameworks (Air Act, CPCB, NGT) using TF-IDF RAG."""
     from app.services.rag_legal import query_legal
+
     return query_legal(payload.question, db, limit=payload.limit)
 
 
@@ -209,6 +228,5 @@ def post_legal_query(payload: LegalQueryInput, db: Session = Depends(get_db)):
 def get_violation_risk(city: str = Query("Kolkata"), db: Session = Depends(get_db)):
     """Ranks wards by environmental violation risk using XGBoost & SHAP."""
     from app.services.risk_scorer import predict_violation_risk
+
     return predict_violation_risk(city, db)
-
-

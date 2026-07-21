@@ -10,6 +10,7 @@ The heuristic layer is always primary when <30 readings are available.
 The NMF layer activates when enough multi-pollutant data is present.
 Both methods are combined: NMF refines heuristic weights using measured speciation.
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 # ─── PMF / NMF Source Apportionment ──────────────────────────────────────────
 
+
 def _build_speciation_matrix(ward: Ward, db: Session) -> Optional[List[List[float]]]:
     """
     Build multi-pollutant speciation matrix from station readings.
@@ -34,19 +36,28 @@ def _build_speciation_matrix(ward: Ward, db: Session) -> Optional[List[List[floa
 
     Returns None if insufficient data (<20 readings).
     """
-    stations = db.query(Station).filter(
-        Station.city == ward.city, Station.active
-    ).limit(5).all()
+    stations = (
+        db.query(Station)
+        .filter(Station.city == ward.city, Station.active)
+        .limit(5)
+        .all()
+    )
 
     if not stations:
         return None
 
     station_ids = [s.id for s in stations]
-    readings = db.query(Reading).filter(
-        Reading.station_id.in_(station_ids),
-        Reading.pm25.isnot(None),
-        Reading.pm10.isnot(None),
-    ).order_by(Reading.measured_at.desc()).limit(100).all()
+    readings = (
+        db.query(Reading)
+        .filter(
+            Reading.station_id.in_(station_ids),
+            Reading.pm25.isnot(None),
+            Reading.pm10.isnot(None),
+        )
+        .order_by(Reading.measured_at.desc())
+        .limit(100)
+        .all()
+    )
 
     if len(readings) < 20:
         return None
@@ -67,7 +78,9 @@ def _build_speciation_matrix(ward: Ward, db: Session) -> Optional[List[List[floa
     return matrix if len(matrix) >= 20 else None
 
 
-def _simple_nmf(X: List[List[float]], n_components: int = 5, max_iter: int = 200) -> tuple:
+def _simple_nmf(
+    X: List[List[float]], n_components: int = 5, max_iter: int = 200
+) -> tuple:
     """
     Lightweight NMF (Non-negative Matrix Factorization) using numpy vectorized ops.
     Replaces the previous pure-Python O(N³) triple-nested list comprehension
@@ -111,11 +124,11 @@ def _interpret_source_profiles(H: List[List[float]]) -> List[str]:
     Species order: [PM2.5, PM10, NO2, SO2, CO, O3]
     """
     source_signatures = {
-        "traffic": [1, 0.8, 1.5, 0.3, 1.2, 0.2],        # High NO2, CO
-        "industrial": [1, 0.9, 0.8, 1.8, 0.5, 0.1],      # High SO2
+        "traffic": [1, 0.8, 1.5, 0.3, 1.2, 0.2],  # High NO2, CO
+        "industrial": [1, 0.9, 0.8, 1.8, 0.5, 0.1],  # High SO2
         "construction": [0.6, 2.0, 0.2, 0.1, 0.1, 0.1],  # High PM10/PM2.5 ratio
-        "biomass": [1.5, 1.2, 0.4, 0.3, 2.0, 0.1],       # High CO
-        "secondary": [0.8, 0.6, 1.0, 0.8, 0.2, 1.5],     # High O3
+        "biomass": [1.5, 1.2, 0.4, 0.3, 2.0, 0.1],  # High CO
+        "secondary": [0.8, 0.6, 1.0, 0.8, 0.2, 1.5],  # High O3
     }
 
     names = list(source_signatures.keys())
@@ -134,7 +147,9 @@ def _interpret_source_profiles(H: List[List[float]]) -> List[str]:
             norm_H = math.sqrt(sum(v**2 for v in H[k]))
             norm_P = math.sqrt(sum(v**2 for v in profiles[i]))
             if norm_H > 0 and norm_P > 0:
-                sim = sum(H[k][j] * profiles[i][j] for j in range(len(H[k]))) / (norm_H * norm_P)
+                sim = sum(H[k][j] * profiles[i][j] for j in range(len(H[k]))) / (
+                    norm_H * norm_P
+                )
                 if sim > best_sim:
                     best_sim = sim
                     best_name = name
@@ -191,7 +206,9 @@ def run_pmf_attribution(
 
     result = {}
     for source in source_keys:
-        vals = bootstrap_contributions.get(source, bootstrap_contributions.get(secondary_alias.get(source, ""), []))
+        vals = bootstrap_contributions.get(
+            source, bootstrap_contributions.get(secondary_alias.get(source, ""), [])
+        )
         if not vals:
             # No NMF bootstrap data for this source category.
             # Use a wide-CI placeholder and flag it as estimated rather than
@@ -233,12 +250,14 @@ def run_pmf_attribution(
     }
 
 
-
 def get_current_weather_for_ward(ward: Ward, db: Session) -> Dict:
     """Get most recent weather reading for the ward's city."""
-    weather = db.query(Weather).filter(
-        Weather.city == ward.city
-    ).order_by(Weather.recorded_at.desc()).first()
+    weather = (
+        db.query(Weather)
+        .filter(Weather.city == ward.city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
+    )
 
     if not weather:
         return {"wind_dir": 0, "wind_speed": 5, "temp_c": 28}
@@ -255,12 +274,14 @@ def get_current_aqi_for_ward(
     ward: Ward,
     db: Session,
     stations: Optional[List[Station]] = None,
-    latest_readings: Optional[Dict[int, float]] = None
+    latest_readings: Optional[Dict[int, float]] = None,
 ) -> float:  # noqa
     """Get interpolated AQI for a ward using nearest stations."""
     # Get all stations in the same city if not pre-fetched
     if stations is None:
-        stations = db.query(Station).filter(Station.city == ward.city, Station.active).all()
+        stations = (
+            db.query(Station).filter(Station.city == ward.city, Station.active).all()
+        )
     if not stations:
         return 150.0  # Default moderate
 
@@ -285,9 +306,12 @@ def get_current_aqi_for_ward(
                 weights.append(w)
                 aqis.append(aqi_val)
         else:
-            reading = db.query(Reading).filter(
-                Reading.station_id == st.id
-            ).order_by(Reading.measured_at.desc()).first()
+            reading = (
+                db.query(Reading)
+                .filter(Reading.station_id == st.id)
+                .order_by(Reading.measured_at.desc())
+                .first()
+            )
             if reading and reading.aqi:
                 w = 1.0 / max(dist, 0.001)
                 weights.append(w)
@@ -303,15 +327,21 @@ def get_current_aqi_for_ward(
 
 def get_pm_ratio(ward: Ward, db: Session) -> float:  # noqa
     """Get PM10/PM2.5 ratio as proxy for construction dust."""
-    stations = db.query(Station).filter(
-        Station.city == ward.city, Station.active
-    ).limit(3).all()
+    stations = (
+        db.query(Station)
+        .filter(Station.city == ward.city, Station.active)
+        .limit(3)
+        .all()
+    )
 
     pm10_vals, pm25_vals = [], []
     for st in stations:
-        r = db.query(Reading).filter(
-            Reading.station_id == st.id
-        ).order_by(Reading.measured_at.desc()).first()
+        r = (
+            db.query(Reading)
+            .filter(Reading.station_id == st.id)
+            .order_by(Reading.measured_at.desc())
+            .first()
+        )
         if r:
             if r.pm10:
                 pm10_vals.append(r.pm10)
@@ -323,7 +353,13 @@ def get_pm_ratio(ward: Ward, db: Session) -> float:  # noqa
     return (sum(pm10_vals) / len(pm10_vals)) / max(sum(pm25_vals) / len(pm25_vals), 1)
 
 
-def attribute_sources(ward: Ward, aqi: float, weather: dict, time_features: dict, pm10: Optional[float] = None) -> dict:
+def attribute_sources(
+    ward: Ward,
+    aqi: float,
+    weather: dict,
+    time_features: dict,
+    pm10: Optional[float] = None,
+) -> dict:
     """
     Compute pollution source attribution for a ward.
 
@@ -343,9 +379,9 @@ def attribute_sources(ward: Ward, aqi: float, weather: dict, time_features: dict
     # ── Traffic ──────────────────────────────────────────────────────────────
     # Peaks during rush hour, correlates with road density
     traffic_score = (
-        min(ward.road_density, 1.0) * 0.25 +
-        (1.0 if is_rush_hour else 0.3) * 0.20 +
-        (0.8 if aqi > 200 else 0.4) * 0.15
+        min(ward.road_density, 1.0) * 0.25
+        + (1.0 if is_rush_hour else 0.3) * 0.20
+        + (0.8 if aqi > 200 else 0.4) * 0.15
     )
 
     # ── Industrial ───────────────────────────────────────────────────────────
@@ -353,16 +389,16 @@ def attribute_sources(ward: Ward, aqi: float, weather: dict, time_features: dict
     satellite_no2 = min(ward.industrial_score / 100.0, 1.0)  # normalize as proxy
     wind_speed = weather.get("wind_speed", 5)
     industrial_score = (
-        min(ward.industrial_score / 100.0, 1.0) * 0.30 +
-        satellite_no2 * 0.25 +
-        (0.5 if wind_speed < 5 else 0.2) * 0.10
+        min(ward.industrial_score / 100.0, 1.0) * 0.30
+        + satellite_no2 * 0.25
+        + (0.5 if wind_speed < 5 else 0.2) * 0.10
     )
 
     # ── Construction ─────────────────────────────────────────────────────────
     pm_ratio = pm10 / max(aqi * 0.55, 1) if pm10 else 1.5
     construction_score = (
-        min(ward.construction_count / 10.0, 1.0) * 0.35 +
-        (0.3 if pm_ratio > 1.5 else 0.1) * 0.15
+        min(ward.construction_count / 10.0, 1.0) * 0.35
+        + (0.3 if pm_ratio > 1.5 else 0.1) * 0.15
     )
 
     # ── Biomass ──────────────────────────────────────────────────────────────
@@ -370,17 +406,14 @@ def attribute_sources(ward: Ward, aqi: float, weather: dict, time_features: dict
     wind_dir = weather.get("wind_dir", 0)
     is_nw_wind = 290 <= wind_dir <= 340
     biomass_score = (
-        (0.6 if is_winter else 0.1) * 0.30 +
-        (0.4 if is_nw_wind else 0.1) * 0.25 +
-        (0.3 if aqi > 300 and is_morning else 0.1) * 0.15
+        (0.6 if is_winter else 0.1) * 0.30
+        + (0.4 if is_nw_wind else 0.1) * 0.25
+        + (0.3 if aqi > 300 and is_morning else 0.1) * 0.15
     )
 
     # ── Residential ──────────────────────────────────────────────────────────
     # Baseline + evening cooking hours
-    residential_score = (
-        0.15 +
-        (0.2 if is_evening_cooking else 0.05) * 0.10
-    )
+    residential_score = 0.15 + (0.2 if is_evening_cooking else 0.05) * 0.10
 
     scores = {
         "traffic": traffic_score,
@@ -397,7 +430,9 @@ def attribute_sources(ward: Ward, aqi: float, weather: dict, time_features: dict
     primary = max(breakdown, key=breakdown.get)
     confidence = round(0.5 + (breakdown[primary] / 100) * 0.5, 2)
 
-    explanation = _generate_explanation(primary, breakdown, ward, weather, time_features)
+    explanation = _generate_explanation(
+        primary, breakdown, ward, weather, time_features
+    )
 
     return {
         "breakdown": breakdown,
@@ -407,7 +442,9 @@ def attribute_sources(ward: Ward, aqi: float, weather: dict, time_features: dict
     }
 
 
-def _generate_explanation(primary: str, breakdown: dict, ward: Ward, weather: dict, time_features: dict) -> str:
+def _generate_explanation(
+    primary: str, breakdown: dict, ward: Ward, weather: dict, time_features: dict
+) -> str:
     """Generate human-readable explanation for attribution."""
     hour = time_features["hour"]
     is_rush = 7 <= hour <= 10 or 17 <= hour <= 20
@@ -417,13 +454,20 @@ def _generate_explanation(primary: str, breakdown: dict, ward: Ward, weather: di
         "traffic": (
             f"Ward {ward.ward_no} is primarily affected by vehicular traffic emissions "
             f"({breakdown['traffic']:.0f}%). "
-            + ("Rush hour conditions are amplifying road-source pollutants. " if is_rush else "")
+            + (
+                "Rush hour conditions are amplifying road-source pollutants. "
+                if is_rush
+                else ""
+            )
             + "Road density in this area contributes significantly to PM2.5 and NOx levels."
         ),
         "industrial": (
             f"Industrial emissions account for {breakdown['industrial']:.0f}% of ward pollution. "
-            + (f"Low wind speeds ({weather.get('wind_speed', 0):.1f} km/h) are trapping stack emissions. "
-               if weather.get("wind_speed", 5) < 5 else "")
+            + (
+                f"Low wind speeds ({weather.get('wind_speed', 0):.1f} km/h) are trapping stack emissions. "
+                if weather.get("wind_speed", 5) < 5
+                else ""
+            )
             + "Proximity to industrial zones is the dominant factor."
         ),
         "construction": (
@@ -433,18 +477,26 @@ def _generate_explanation(primary: str, breakdown: dict, ward: Ward, weather: di
         ),
         "biomass": (
             f"Biomass burning (stubble/agricultural fires) is the primary source ({breakdown['biomass']:.0f}%). "
-            + (f"North-westerly winds ({wind_dir:.0f}°) are transporting Gangetic plain smoke. "
-               if 290 <= wind_dir <= 340 else "")
+            + (
+                f"North-westerly winds ({wind_dir:.0f}°) are transporting Gangetic plain smoke. "
+                if 290 <= wind_dir <= 340
+                else ""
+            )
             + "Winter inversion layer is trapping smoke close to the surface."
         ),
         "residential": (
             f"Residential sources (cooking, waste burning) dominate at {breakdown['residential']:.0f}%. "
-            + ("Evening cooking hours elevate biomass combustion from households. "
-               if 17 <= hour <= 21 else "")
+            + (
+                "Evening cooking hours elevate biomass combustion from households. "
+                if 17 <= hour <= 21
+                else ""
+            )
             + "Low industrial/traffic activity makes residential sources the relative leader."
         ),
     }
-    return explanations.get(primary, "Multiple sources contributing to current pollution levels.")
+    return explanations.get(
+        primary, "Multiple sources contributing to current pollution levels."
+    )
 
 
 def run_attribution_for_ward(ward: Ward, db: Session) -> dict:

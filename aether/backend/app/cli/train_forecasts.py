@@ -3,6 +3,7 @@ AETHER — CLI to train XGBoost forecast models
 Usage: python -m app.cli.train_forecasts --city Kolkata
 Or: call `scheduled_train_job()` from the scheduler for automated runs.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -30,8 +31,15 @@ def run_training(cities: Sequence[str]):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train XGBoost forecast models for cities")
-    parser.add_argument("--city", "-c", nargs="*", help="City or cities to train (default: Kolkata Delhi Mumbai)")
+    parser = argparse.ArgumentParser(
+        description="Train XGBoost forecast models for cities"
+    )
+    parser.add_argument(
+        "--city",
+        "-c",
+        nargs="*",
+        help="City or cities to train (default: Kolkata Delhi Mumbai)",
+    )
     args = parser.parse_args()
 
     cities = args.city if args.city else ["Kolkata", "Delhi", "Mumbai"]
@@ -39,5 +47,7 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s — %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s — %(message)s"
+    )
     main()

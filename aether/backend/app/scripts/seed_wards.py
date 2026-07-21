@@ -19,43 +19,135 @@ logger = logging.getLogger(__name__)
 # Kolkata bounding box: 22.45 to 22.65 lat, 88.25 to 88.55 lon
 # 144 wards organized roughly in a grid across the city
 KOLKATA_BOUNDS = {
-    "lat_min": 22.46, "lat_max": 22.64,
-    "lon_min": 22.26, "lon_max": 88.52,
+    "lat_min": 22.46,
+    "lat_max": 22.64,
+    "lon_min": 22.26,
+    "lon_max": 88.52,
 }
 
 # Known high-pollution zones for realistic local modifiers
 HIGH_POLLUTION_AREAS = [
-    {"name": "Howrah Industrial", "lat_center": 22.590, "lon_center": 88.270, "radius": 0.04},
-    {"name": "Barrackpore Industrial", "lat_center": 22.760, "lon_center": 88.380, "radius": 0.05},
-    {"name": "Garden Reach Port", "lat_center": 22.530, "lon_center": 88.300, "radius": 0.03},
-    {"name": "New Town Construction", "lat_center": 22.575, "lon_center": 88.450, "radius": 0.04},
+    {
+        "name": "Howrah Industrial",
+        "lat_center": 22.590,
+        "lon_center": 88.270,
+        "radius": 0.04,
+    },
+    {
+        "name": "Barrackpore Industrial",
+        "lat_center": 22.760,
+        "lon_center": 88.380,
+        "radius": 0.05,
+    },
+    {
+        "name": "Garden Reach Port",
+        "lat_center": 22.530,
+        "lon_center": 88.300,
+        "radius": 0.03,
+    },
+    {
+        "name": "New Town Construction",
+        "lat_center": 22.575,
+        "lon_center": 88.450,
+        "radius": 0.04,
+    },
 ]
 
 # Ward names (sampling of real KMC ward names/areas)
 AREA_NAMES = [
-    "Amherst Street", "Ultadanga", "Belgachia", "Shyambazar", "Hatibagan",
-    "Jorasanko", "Posta", "Rajabazar", "Manicktala", "Phool Bagan",
-    "Narkeldanga", "Entally", "Tiljala", "Topsia", "Park Circus",
-    "Ballygunge", "Dhakuria", "Jadavpur", "Behala", "Barisha",
-    "Tollygunge", "Regent Park", "Lake Gardens", "Alipore", "Kalighat",
-    "Bhowanipore", "Rashbehari", "Ekdalia", "Gariahat", "Lake Town",
-    "Kestopur", "Baguiati", "VIP Nagar", "Teghoria", "Rajarhat New Town",
-    "Bidhannagar Sector V", "Salt Lake Sector III", "Noapara", "Dum Dum",
-    "Airport Zone", "Patuli", "Garia", "Sonarpur", "Narendrapur",
-    "Princep Street", "Chowringhee", "Dharmatala", "Esplanade", "BBD Bag",
-    "Strand Road", "Garden Reach", "Metiabruz", "Khidderpore", "Watgunge",
-    "Fort William Zone", "Maidan", "Victoria", "Park Street", "Camac Street",
-    "Elgin", "Chetla", "Shibpur Howrah", "Howrah Station", "Liluah Howrah",
-    "Howrah North", "Belur", "Bally", "Baidyabati", "Uttarpara",
-    "Konnagar", "Serampore", "Chandannagar", "Hooghly District",
-    "Dakshineswar", "Baranagar", "Kamarhati", "Khardah", "Titagarh",
-    "Barrackpore", "Naihati", "Bhatpara", "Jagatdal", "Nainan",
-    "Ichapur", "Ashokenagar", "Amdanga", "Sodepur", "Agarpara",
+    "Amherst Street",
+    "Ultadanga",
+    "Belgachia",
+    "Shyambazar",
+    "Hatibagan",
+    "Jorasanko",
+    "Posta",
+    "Rajabazar",
+    "Manicktala",
+    "Phool Bagan",
+    "Narkeldanga",
+    "Entally",
+    "Tiljala",
+    "Topsia",
+    "Park Circus",
+    "Ballygunge",
+    "Dhakuria",
+    "Jadavpur",
+    "Behala",
+    "Barisha",
+    "Tollygunge",
+    "Regent Park",
+    "Lake Gardens",
+    "Alipore",
+    "Kalighat",
+    "Bhowanipore",
+    "Rashbehari",
+    "Ekdalia",
+    "Gariahat",
+    "Lake Town",
+    "Kestopur",
+    "Baguiati",
+    "VIP Nagar",
+    "Teghoria",
+    "Rajarhat New Town",
+    "Bidhannagar Sector V",
+    "Salt Lake Sector III",
+    "Noapara",
+    "Dum Dum",
+    "Airport Zone",
+    "Patuli",
+    "Garia",
+    "Sonarpur",
+    "Narendrapur",
+    "Princep Street",
+    "Chowringhee",
+    "Dharmatala",
+    "Esplanade",
+    "BBD Bag",
+    "Strand Road",
+    "Garden Reach",
+    "Metiabruz",
+    "Khidderpore",
+    "Watgunge",
+    "Fort William Zone",
+    "Maidan",
+    "Victoria",
+    "Park Street",
+    "Camac Street",
+    "Elgin",
+    "Chetla",
+    "Shibpur Howrah",
+    "Howrah Station",
+    "Liluah Howrah",
+    "Howrah North",
+    "Belur",
+    "Bally",
+    "Baidyabati",
+    "Uttarpara",
+    "Konnagar",
+    "Serampore",
+    "Chandannagar",
+    "Hooghly District",
+    "Dakshineswar",
+    "Baranagar",
+    "Kamarhati",
+    "Khardah",
+    "Titagarh",
+    "Barrackpore",
+    "Naihati",
+    "Bhatpara",
+    "Jagatdal",
+    "Nainan",
+    "Ichapur",
+    "Ashokenagar",
+    "Amdanga",
+    "Sodepur",
+    "Agarpara",
 ]
 
 
 def _distance_to_area(lat: float, lon: float, area: dict) -> float:
-    return math.sqrt((lat - area["lat_center"])**2 + (lon - area["lon_center"])**2)
+    return math.sqrt((lat - area["lat_center"]) ** 2 + (lon - area["lon_center"]) ** 2)
 
 
 def _compute_industrial_score(lat: float, lon: float) -> float:
@@ -102,7 +194,9 @@ def seed_kolkata_wards(db: Session):
 
             # Features
             industrial_score = _compute_industrial_score(lat, lon)
-            road_density = random.uniform(0.3, 1.0) * (0.8 + 0.4 * min(industrial_score / 100, 1))
+            road_density = random.uniform(0.3, 1.0) * (
+                0.8 + 0.4 * min(industrial_score / 100, 1)
+            )
             construction_count = max(0, int(random.gauss(3, 2)))
             population = random.randint(40000, 200000)
             school_count = max(1, int(population / 20000))
@@ -110,7 +204,15 @@ def seed_kolkata_wards(db: Session):
             elderly_percentage = round(random.uniform(5.0, 16.0), 2)
             child_percentage = round(random.uniform(4.0, 12.0), 2)
             low_income_percentage = round(random.uniform(10.0, 45.0), 2)
-            svi_index = round((elderly_percentage * 0.4 + child_percentage * 0.4 + low_income_percentage * 0.2) / 100.0, 4)
+            svi_index = round(
+                (
+                    elderly_percentage * 0.4
+                    + child_percentage * 0.4
+                    + low_income_percentage * 0.2
+                )
+                / 100.0,
+                4,
+            )
 
             ward = Ward(
                 ward_no=ward_no,
@@ -162,7 +264,15 @@ def seed_delhi_wards(db: Session):
         elderly_percentage = round(random.uniform(5.0, 16.0), 2)
         child_percentage = round(random.uniform(4.0, 12.0), 2)
         low_income_percentage = round(random.uniform(10.0, 45.0), 2)
-        svi_index = round((elderly_percentage * 0.4 + child_percentage * 0.4 + low_income_percentage * 0.2) / 100.0, 4)
+        svi_index = round(
+            (
+                elderly_percentage * 0.4
+                + child_percentage * 0.4
+                + low_income_percentage * 0.2
+            )
+            / 100.0,
+            4,
+        )
 
         ward = Ward(
             ward_no=i + 1,
@@ -210,7 +320,15 @@ def seed_mumbai_wards(db: Session):
         elderly_percentage = round(random.uniform(5.0, 16.0), 2)
         child_percentage = round(random.uniform(4.0, 12.0), 2)
         low_income_percentage = round(random.uniform(10.0, 45.0), 2)
-        svi_index = round((elderly_percentage * 0.4 + child_percentage * 0.4 + low_income_percentage * 0.2) / 100.0, 4)
+        svi_index = round(
+            (
+                elderly_percentage * 0.4
+                + child_percentage * 0.4
+                + low_income_percentage * 0.2
+            )
+            / 100.0,
+            4,
+        )
 
         ward = Ward(
             ward_no=i + 1,
@@ -238,6 +356,7 @@ def seed_mumbai_wards(db: Session):
 
 if __name__ == "__main__":
     from app.database import SessionLocal, create_tables
+
     create_tables()
     db = SessionLocal()
     n = seed_kolkata_wards(db)

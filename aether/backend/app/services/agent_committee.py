@@ -2,6 +2,7 @@
 AETHER — Multi-Agent Committee Service
 5 specialist agents with tool use and constitutional coordinator.
 """
+
 from __future__ import annotations
 
 import json
@@ -22,7 +23,10 @@ try:
     LANGCHAIN_AVAILABLE = True
 except Exception:
     LANGCHAIN_AVAILABLE = False
-    logger.info("langchain or langgraph not installed or failed to import. Using local ReAct and state transitions fallback.")
+    logger.info(
+        "langchain or langgraph not installed or failed to import. Using local ReAct and state transitions fallback."
+    )
+
 
 class AgentState(TypedDict):
     ward_id: str
@@ -38,25 +42,35 @@ class AgentState(TypedDict):
     confidence: float
     timestamp: str
 
+
 # Local tool implementations matching the specifications
 def get_weather_forecast(ward_id: str, db: Optional[Any] = None) -> Dict:
     from app.services.agent_tools import invoke_tool
+
     return invoke_tool("get_weather_forecast", {"ward_id": int(ward_id)}, db)
+
 
 def get_traffic_emissions(ward_id: str, db: Optional[Any] = None) -> Dict:
     from app.services.agent_tools import invoke_tool
+
     return invoke_tool("get_traffic_congestion", {"ward_id": int(ward_id)}, db)
+
 
 def get_industrial_cems(ward_id: str, db: Optional[Any] = None) -> Dict:
     from app.services.agent_tools import invoke_tool
+
     return invoke_tool("get_industrial_cems", {"ward_id": int(ward_id)}, db)
+
 
 def get_vulnerable_locations(ward_id: str, db: Optional[Any] = None) -> Dict:
     from app.services.agent_tools import invoke_tool
+
     return invoke_tool("get_vulnerable_population", {"ward_id": int(ward_id)}, db)
+
 
 def simulate_intervention(params_str: str, db: Optional[Any] = None) -> Dict:
     from app.services.agent_tools import invoke_tool
+
     try:
         p = json.loads(params_str)
         ward_id = int(p.get("ward_id", 1))
@@ -64,14 +78,24 @@ def simulate_intervention(params_str: str, db: Optional[Any] = None) -> Dict:
     except Exception:
         ward_id = 1
         action_type = "combined_emergency"
-    return invoke_tool("simulate_intervention", {"ward_id": ward_id, "action_type": action_type}, db)
+    return invoke_tool(
+        "simulate_intervention", {"ward_id": ward_id, "action_type": action_type}, db
+    )
+
 
 def get_historical_outcomes(ward_id: str, db: Optional[Any] = None) -> Dict:
     from app.services.agent_tools import invoke_tool
-    return invoke_tool("get_historical_outcomes", {"ward_id": int(ward_id), "action_type": "combined_emergency"}, db)
+
+    return invoke_tool(
+        "get_historical_outcomes",
+        {"ward_id": int(ward_id), "action_type": "combined_emergency"},
+        db,
+    )
+
 
 def generate_show_cause_notice(params_str: str, db: Optional[Any] = None) -> Dict:
     from app.services.agent_tools import invoke_tool
+
     try:
         p = json.loads(params_str)
         industry_id = p.get("industry_id", "IND-001")
@@ -81,7 +105,16 @@ def generate_show_cause_notice(params_str: str, db: Optional[Any] = None) -> Dic
         industry_id = "IND-001"
         violation_type = "cpcb_norm_violation"
         ward_id = 1
-    return invoke_tool("generate_show_cause_notice", {"industry_id": industry_id, "violation_type": violation_type, "ward_id": ward_id}, db)
+    return invoke_tool(
+        "generate_show_cause_notice",
+        {
+            "industry_id": industry_id,
+            "violation_type": violation_type,
+            "ward_id": ward_id,
+        },
+        db,
+    )
+
 
 # Specialist Agent definitions
 class SpecialistAgent:
@@ -98,20 +131,31 @@ class SpecialistAgent:
             try:
                 # Direct local calls to minimize API dependencies
                 if tool == "get_weather":
-                    evidence[tool] = get_weather_forecast(state['ward_id'], db)
+                    evidence[tool] = get_weather_forecast(state["ward_id"], db)
                 elif tool == "get_traffic":
-                    evidence[tool] = get_traffic_emissions(state['ward_id'], db)
+                    evidence[tool] = get_traffic_emissions(state["ward_id"], db)
                 elif tool == "get_industrial_cems":
-                    evidence[tool] = get_industrial_cems(state['ward_id'], db)
+                    evidence[tool] = get_industrial_cems(state["ward_id"], db)
                 elif tool == "get_vulnerable_locations":
-                    evidence[tool] = get_vulnerable_locations(state['ward_id'], db)
+                    evidence[tool] = get_vulnerable_locations(state["ward_id"], db)
                 elif tool == "simulate_intervention":
-                    params = json.dumps({"ward_id": state['ward_id'], "action_type": "combined_emergency"})
+                    params = json.dumps(
+                        {
+                            "ward_id": state["ward_id"],
+                            "action_type": "combined_emergency",
+                        }
+                    )
                     evidence[tool] = simulate_intervention(params, db)
                 elif tool == "get_historical_outcomes":
-                    evidence[tool] = get_historical_outcomes(state['ward_id'], db)
+                    evidence[tool] = get_historical_outcomes(state["ward_id"], db)
                 elif tool == "generate_notice":
-                    params = json.dumps({"industry_id": "IND-001", "violation_type": "cpcb_norm_violation", "ward_id": state['ward_id']})
+                    params = json.dumps(
+                        {
+                            "industry_id": "IND-001",
+                            "violation_type": "cpcb_norm_violation",
+                            "ward_id": state["ward_id"],
+                        }
+                    )
                     evidence[tool] = generate_show_cause_notice(params, db)
             except Exception as e:
                 evidence[tool] = {"error": str(e)}
@@ -128,38 +172,56 @@ class SpecialistAgent:
             "risks": "Minor economic cost for local trade operations.",
             "evidence_cited": list(evidence.keys()),
             "evidence_gathered": evidence,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
-    def _generate_recommendation_logic(self, state: AgentState, evidence: Dict) -> Tuple[str, float]:
-        state['current_aqi']
+    def _generate_recommendation_logic(
+        self, state: AgentState, evidence: Dict
+    ) -> Tuple[str, float]:
+        state["current_aqi"]
         if self.name == "Meteorological Agent":
             w = evidence.get("get_weather", {})
             speed = w.get("wind_speed_kmh", 5.5)
             direction = w.get("wind_direction_cardinal", "N")
-            return f"Ventilation is low due to wind speed {speed} km/h from {direction}. Recommend mist spraying to accelerate deposition.", 0.85
+            return (
+                f"Ventilation is low due to wind speed {speed} km/h from {direction}. Recommend mist spraying to accelerate deposition.",
+                0.85,
+            )
 
         elif self.name == "Traffic & Mobility Agent":
             t = evidence.get("get_traffic", {})
             congestion = t.get("congestion_level", "MODERATE")
-            return f"Traffic congestion index is {congestion}. Recommend implementing heavy vehicle diversion and odd-even rules.", 0.8
+            return (
+                f"Traffic congestion index is {congestion}. Recommend implementing heavy vehicle diversion and odd-even rules.",
+                0.8,
+            )
 
         elif self.name == "Industrial Compliance Agent":
             c = evidence.get("get_industrial_cems", {})
             violations = c.get("violations_detected", 0)
-            return f"CEMS identified {violations} violations. Recommend issuing Section 31A notices and 50% curtailment.", 0.9
+            return (
+                f"CEMS identified {violations} violations. Recommend issuing Section 31A notices and 50% curtailment.",
+                0.9,
+            )
 
         elif self.name == "Health Impact Agent":
             h = evidence.get("get_vulnerable_locations", {})
             total_v = h.get("vulnerable_population", {}).get("total_vulnerable", 20000)
-            return f"Protected school districts contain {total_v} vulnerable residents. School health closure advisories are mandatory.", 0.95
+            return (
+                f"Protected school districts contain {total_v} vulnerable residents. School health closure advisories are mandatory.",
+                0.95,
+            )
 
         elif self.name == "Enforcement Logistics Agent":
             out = evidence.get("get_historical_outcomes", {})
             rate = out.get("summary", {}).get("success_rate_pct", 80)
-            return f"Historical enforcement success rate is {rate}%. Proactive inspector routes should be immediately deployed.", 0.88
+            return (
+                f"Historical enforcement success rate is {rate}%. Proactive inspector routes should be immediately deployed.",
+                0.88,
+            )
 
         return "Manual override recommendation.", 0.5
+
 
 # Initialize 5 agents
 AGENTS = {
@@ -170,9 +232,9 @@ AGENTS = {
             "Consider wind speed, direction, and boundary layer height",
             "Account for temperature inversions that trap pollution",
             "Predict dominant pollution transport corridors",
-            "Factor in precipitation probability for wet deposition"
+            "Factor in precipitation probability for wet deposition",
         ],
-        tools=["get_weather", "get_traffic"]
+        tools=["get_weather", "get_traffic"],
     ),
     "traffic": SpecialistAgent(
         name="Traffic & Mobility Agent",
@@ -181,9 +243,9 @@ AGENTS = {
             "Minimize economic disruption to logistics and commuters",
             "Prioritize high-emission vehicle types (HCV, old vehicles)",
             "Consider public transport alternatives and bypass routes",
-            "Evaluate odd-even schemes and truck ban effectiveness"
+            "Evaluate odd-even schemes and truck ban effectiveness",
         ],
-        tools=["get_traffic", "simulate_intervention"]
+        tools=["get_traffic", "simulate_intervention"],
     ),
     "industrial": SpecialistAgent(
         name="Industrial Compliance Agent",
@@ -192,9 +254,9 @@ AGENTS = {
             "Legal defensibility: every action must cite specific violations",
             "Evidence-based: CEMS data, permit status, historical violations",
             "Proportional response: match enforcement to violation severity",
-            "Consider economic impact of shutdowns on local employment"
+            "Consider economic impact of shutdowns on local employment",
         ],
-        tools=["get_industrial_cems", "get_historical_outcomes", "generate_notice"]
+        tools=["get_industrial_cems", "get_historical_outcomes", "generate_notice"],
     ),
     "health": SpecialistAgent(
         name="Health Impact Agent",
@@ -203,9 +265,9 @@ AGENTS = {
             "Protect vulnerable populations: children, elderly, respiratory patients",
             "Minimize DALYs (Disability-Adjusted Life Years) lost",
             "Consider hospital capacity and emergency room load",
-            "Prioritize schools and outdoor worker safety"
+            "Prioritize schools and outdoor worker safety",
         ],
-        tools=["get_vulnerable_locations", "simulate_intervention"]
+        tools=["get_vulnerable_locations", "simulate_intervention"],
     ),
     "logistics": SpecialistAgent(
         name="Enforcement Logistics Agent",
@@ -214,11 +276,12 @@ AGENTS = {
             "Cost-effectiveness: maximize enforcement impact per rupee spent",
             "Inspector safety: avoid dangerous solo inspections",
             "Rapid response: minimize time from alert to action",
-            "Legal defensibility: ensure evidence holds in tribunal"
+            "Legal defensibility: ensure evidence holds in tribunal",
         ],
-        tools=["get_historical_outcomes", "generate_notice"]
-    )
+        tools=["get_historical_outcomes", "generate_notice"],
+    ),
 }
+
 
 class ConstitutionalCoordinator:
     """
@@ -231,11 +294,11 @@ class ConstitutionalCoordinator:
         "EVIDENCE REQUIRED: Every recommendation must cite specific, verifiable data sources",
         "COST-EFFECTIVENESS: Maximize AQI reduction per rupee of total economic cost",
         "LEGAL DEFENSIBILITY: Enforcement actions must have clear statutory basis",
-        "PRECEDENT: Past intervention outcomes inform current recommendations"
+        "PRECEDENT: Past intervention outcomes inform current recommendations",
     ]
 
     def synthesize(self, state: AgentState) -> Dict:
-        agent_outputs = state['agent_outputs']
+        agent_outputs = state["agent_outputs"]
 
         # Build synthesis decree
         timeline = "Within 4 hours"
@@ -246,10 +309,14 @@ class ConstitutionalCoordinator:
 
         dissenting = []
         for a in agent_outputs:
-            if a['confidence'] < 0.82:
+            if a["confidence"] < 0.82:
                 dissenting.append(f"{a['agent']} noted risk: {a['risks']}")
 
-        dissent_text = " | ".join(dissenting) if dissenting else "No significant agent dissent recorded."
+        dissent_text = (
+            " | ".join(dissenting)
+            if dissenting
+            else "No significant agent dissent recorded."
+        )
 
         consensus = {
             "consensus_action": consensus_action,
@@ -258,21 +325,32 @@ class ConstitutionalCoordinator:
             "economic_cost": cost,
             "confidence": 0.90,
             "dissenting_views": dissent_text,
-            "evidence_citations": ["CEMS telemetry logs", "Kolkata road density maps", "School district coordinates"],
-            "timeline": timeline
+            "evidence_citations": [
+                "CEMS telemetry logs",
+                "Kolkata road density maps",
+                "School district coordinates",
+            ],
+            "timeline": timeline,
         }
 
         return {
-            "ward_id": state['ward_id'],
+            "ward_id": state["ward_id"],
             "consensus": consensus,
             "agent_count": len(agent_outputs),
-            "avg_agent_confidence": sum(a['confidence'] for a in agent_outputs) / len(agent_outputs),
+            "avg_agent_confidence": sum(a["confidence"] for a in agent_outputs)
+            / len(agent_outputs),
             "constitutional_principles_applied": self.CONSTITUTION,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
-def run_agent_committee(ward_id: str, current_aqi: float, forecast_24h: float,
-                        source_breakdown: Dict, db: Optional[Any] = None) -> Dict:
+
+def run_agent_committee(
+    ward_id: str,
+    current_aqi: float,
+    forecast_24h: float,
+    source_breakdown: Dict,
+    db: Optional[Any] = None,
+) -> Dict:
     """
     Main entry point: run all 5 agents, then coordinate.
     """
@@ -288,13 +366,13 @@ def run_agent_committee(ward_id: str, current_aqi: float, forecast_24h: float,
         agent_outputs=[],
         consensus_action={},
         confidence=0.0,
-        timestamp=datetime.now().isoformat()
+        timestamp=datetime.now().isoformat(),
     )
 
     # Run the deliberate step for each agent
     for agent_key, agent in AGENTS.items():
         output = agent.deliberate(state, db)
-        state['agent_outputs'].append(output)
+        state["agent_outputs"].append(output)
 
     # Coordinate and synthesize
     coordinator = ConstitutionalCoordinator()
@@ -309,20 +387,24 @@ CONSTITUTIONAL_PRINCIPLES = [
         "id": "health_first",
         "principle": "HEALTH FIRST: Vulnerable populations are protected above economic interests",
         "check_fn": lambda data: (
-            "PASS" if data.get("vulnerable_pop", 0) > 0 and data.get("health_included", False) else
-            ("WARN" if data.get("health_included", False) else "FAIL"),
-            "Health impact assessment included in decree" if data.get("health_included") else
-            "WARNING: Decree does not explicitly address health protection"
+            "PASS"
+            if data.get("vulnerable_pop", 0) > 0 and data.get("health_included", False)
+            else ("WARN" if data.get("health_included", False) else "FAIL"),
+            "Health impact assessment included in decree"
+            if data.get("health_included")
+            else "WARNING: Decree does not explicitly address health protection",
         ),
     },
     {
         "id": "evidence_required",
         "principle": "EVIDENCE REQUIRED: Every recommendation cites specific data sources",
         "check_fn": lambda data: (
-            "PASS" if data.get("tool_calls_made", 0) >= 2 else
-            ("WARN" if data.get("tool_calls_made", 0) >= 1 else "FAIL"),
-            f"{data.get('tool_calls_made', 0)} tool invocations provided empirical basis for decision" if data.get("tool_calls_made", 0) > 0 else
-            "FAIL: No tool data collected — recommendations lack empirical basis"
+            "PASS"
+            if data.get("tool_calls_made", 0) >= 2
+            else ("WARN" if data.get("tool_calls_made", 0) >= 1 else "FAIL"),
+            f"{data.get('tool_calls_made', 0)} tool invocations provided empirical basis for decision"
+            if data.get("tool_calls_made", 0) > 0
+            else "FAIL: No tool data collected — recommendations lack empirical basis",
         ),
     },
     {
@@ -330,8 +412,9 @@ CONSTITUTIONAL_PRINCIPLES = [
         "principle": "COST-EFFECTIVENESS: Maximize AQI reduction per rupee of economic cost",
         "check_fn": lambda data: (
             "PASS" if data.get("economic_impact_estimated", False) else "WARN",
-            "Cost-benefit analysis completed" if data.get("economic_impact_estimated") else
-            "WARN: Economic cost of intervention not quantified"
+            "Cost-benefit analysis completed"
+            if data.get("economic_impact_estimated")
+            else "WARN: Economic cost of intervention not quantified",
         ),
     },
     {
@@ -339,8 +422,9 @@ CONSTITUTIONAL_PRINCIPLES = [
         "principle": "LEGAL DEFENSIBILITY: All enforcement actions cite specific legal provisions",
         "check_fn": lambda data: (
             "PASS" if data.get("legal_basis_cited", False) else "WARN",
-            "Air Act 1981 provisions cited in enforcement recommendations" if data.get("legal_basis_cited") else
-            "WARN: Enforcement actions should cite Air Act 1981 Section 31A"
+            "Air Act 1981 provisions cited in enforcement recommendations"
+            if data.get("legal_basis_cited")
+            else "WARN: Enforcement actions should cite Air Act 1981 Section 31A",
         ),
     },
     {
@@ -348,8 +432,9 @@ CONSTITUTIONAL_PRINCIPLES = [
         "principle": "PRECEDENT: Past interventions and measured outcomes are considered",
         "check_fn": lambda data: (
             "PASS" if data.get("historical_evidence", False) else "WARN",
-            "Knowledge graph queried for institutional memory" if data.get("historical_evidence") else
-            "WARN: Historical precedent not consulted — baseline causal evidence missing"
+            "Knowledge graph queried for institutional memory"
+            if data.get("historical_evidence")
+            else "WARN: Historical precedent not consulted — baseline causal evidence missing",
         ),
     },
 ]
@@ -360,11 +445,13 @@ def run_constitutional_checks(metadata: Dict) -> List[ConstitutionalCheck]:
     checks = []
     for principle in CONSTITUTIONAL_PRINCIPLES:
         status, note = principle["check_fn"](metadata)
-        checks.append(ConstitutionalCheck(
-            principle=principle["principle"],
-            status=status,
-            note=note,
-        ))
+        checks.append(
+            ConstitutionalCheck(
+                principle=principle["principle"],
+                status=status,
+                note=note,
+            )
+        )
     return checks
 
 
@@ -389,7 +476,11 @@ AGENT_CONFIGS = [
         "agent": "Industrial Compliance",
         "role": "CEMS & Permit Monitor",
         "avatar": "🏭",
-        "tools": ["get_industrial_cems", "get_permit_status", "generate_show_cause_notice"],
+        "tools": [
+            "get_industrial_cems",
+            "get_permit_status",
+            "generate_show_cause_notice",
+        ],
         "focus": "Stack emissions, permit validity, CPCB norm compliance, enforcement",
     },
     {
@@ -445,39 +536,50 @@ def run_agent_react_loop(
 
     # Augment params for specific tools
     if "simulate_intervention" in tools:
-        tool_params_sim = {"ward_id": ward.id, "action_type": _get_recommended_action(agent_name, ward)}
+        tool_params_sim = {
+            "ward_id": ward.id,
+            "action_type": _get_recommended_action(agent_name, ward),
+        }
 
     result = invoke_tool(primary_tool, tool_params, db)
-    tool_calls_made.append(ToolCall(
-        tool_name=primary_tool,
-        parameters=tool_params,
-        result=result,
-    ))
+    tool_calls_made.append(
+        ToolCall(
+            tool_name=primary_tool,
+            parameters=tool_params,
+            result=result,
+        )
+    )
     observations.append(_summarize_tool_result(primary_tool, result))
 
     # Call second tool if available
     if len(tools) > 1 and "simulate_intervention" == tools[1]:
         result2 = invoke_tool("simulate_intervention", tool_params_sim, db)
-        tool_calls_made.append(ToolCall(
-            tool_name="simulate_intervention",
-            parameters=tool_params_sim,
-            result=result2,
-        ))
+        tool_calls_made.append(
+            ToolCall(
+                tool_name="simulate_intervention",
+                parameters=tool_params_sim,
+                result=result2,
+            )
+        )
         observations.append(_summarize_tool_result("simulate_intervention", result2))
     elif len(tools) > 1:
         result2 = invoke_tool(tools[1], tool_params, db)
-        tool_calls_made.append(ToolCall(
-            tool_name=tools[1],
-            parameters=tool_params,
-            result=result2,
-        ))
+        tool_calls_made.append(
+            ToolCall(
+                tool_name=tools[1],
+                parameters=tool_params,
+                result=result2,
+            )
+        )
         observations.append(_summarize_tool_result(tools[1], result2))
 
     # — OBSERVE: synthesize tool outputs —
     observation = " | ".join(observations)
 
     # — RECOMMEND: derive recommendation from evidence —
-    recommendation = _derive_recommendation(agent_name, ward, aqi, tool_calls_made, custom_objective)
+    recommendation = _derive_recommendation(
+        agent_name, ward, aqi, tool_calls_made, custom_objective
+    )
 
     return AgentTurn(
         agent=agent_name,
@@ -493,10 +595,18 @@ def run_agent_react_loop(
 def _get_recommended_action(agent_name: str, ward: Ward) -> str:
     """Select the most relevant intervention action type for this agent."""
     action_map = {
-        "Meteorological Intelligence": "combined_emergency" if ward.industrial_score > 40 else "water_sprinkling",
-        "Traffic & Mobility": "heavy_vehicle_ban" if ward.road_density > 2.5 else "odd_even_scheme",
-        "Industrial Compliance": "show_cause_notice" if ward.industrial_score > 30 else "industrial_curtailment_50",
-        "Health Impact": "construction_halt" if ward.construction_count > 3 else "combined_emergency",
+        "Meteorological Intelligence": "combined_emergency"
+        if ward.industrial_score > 40
+        else "water_sprinkling",
+        "Traffic & Mobility": "heavy_vehicle_ban"
+        if ward.road_density > 2.5
+        else "odd_even_scheme",
+        "Industrial Compliance": "show_cause_notice"
+        if ward.industrial_score > 30
+        else "industrial_curtailment_50",
+        "Health Impact": "construction_halt"
+        if ward.construction_count > 3
+        else "combined_emergency",
         "Enforcement Logistics": "combined_emergency",
     }
     return action_map.get(agent_name, "combined_emergency")
@@ -608,18 +718,26 @@ def _derive_recommendation(
         return (
             f"{base_context}: {violations} CEMS violations detected. "
             f"Overall compliance rate: {compliance:.0f}%. "
-            + (f"Show-cause notice generated (Case: {case_id}) under Air Act 1981 Section 31A. "
-               f"Legal proceedings can begin within 24 hours. " if case_id != "N/A" else "")
+            + (
+                f"Show-cause notice generated (Case: {case_id}) under Air Act 1981 Section 31A. "
+                f"Legal proceedings can begin within 24 hours. "
+                if case_id != "N/A"
+                else ""
+            )
             + "Industrial curtailment can reduce AQI by up to 50% over 8 hours if compliance is enforced."
         )
 
     elif agent_name == "Health Impact":
         vuln_data = tool_data.get("get_vulnerable_population", {})
-        total_vuln = vuln_data.get("vulnerable_population", {}).get("total_vulnerable", 0)
+        total_vuln = vuln_data.get("vulnerable_population", {}).get(
+            "total_vulnerable", 0
+        )
         risk_level = vuln_data.get("risk_level", "MODERATE")
         schools = ward.school_count
         sim = tool_data.get("simulate_intervention", {})
-        admissions_prevented = sim.get("health_impact", {}).get("hospital_admissions_prevented", 0)
+        admissions_prevented = sim.get("health_impact", {}).get(
+            "hospital_admissions_prevented", 0
+        )
         savings = sim.get("health_impact", {}).get("health_cost_saved_lakhs", 0)
         return (
             f"{base_context}: {total_vuln:,} vulnerable residents (Risk: {risk_level}). "
@@ -640,9 +758,13 @@ def _derive_recommendation(
         return (
             f"{base_context}: Knowledge graph shows {history.get('summary', {}).get('total_precedents', 2)} historical precedents. "
             f"Average ATE: {abs(avg_ate):.0f} μg/m³ reduction, success rate {success_rate:.0f}% (confidence: {confidence}). "
-            + (f"{expired} expired permits identified — operating without consent is prima facie violation. " if expired > 0 else "")
+            + (
+                f"{expired} expired permits identified — operating without consent is prima facie violation. "
+                if expired > 0
+                else ""
+            )
             + "Based on institutional memory, recommend COMBINED approach: "
-              "immediate show-cause + traffic ban for highest historical efficacy."
+            "immediate show-cause + traffic ban for highest historical efficacy."
         )
 
     return f"{base_context}: Evidence gathered. Multi-source intervention recommended."
@@ -669,24 +791,46 @@ def synthesize_decree(
     actions = []
     for turn in agent_turns:
         if turn.agent == "Traffic & Mobility":
-            action = "Heavy vehicle ban and traffic diversion in ward corridors" if ward.road_density > 2.5 else "Odd-even scheme on main roads"
-            actions.append(f"**Traffic:** {action} (Source: Traffic & Mobility Agent, Efficacy: ~60% PM2.5 reduction)")
+            action = (
+                "Heavy vehicle ban and traffic diversion in ward corridors"
+                if ward.road_density > 2.5
+                else "Odd-even scheme on main roads"
+            )
+            actions.append(
+                f"**Traffic:** {action} (Source: Traffic & Mobility Agent, Efficacy: ~60% PM2.5 reduction)"
+            )
         elif turn.agent == "Industrial Compliance":
-            action = "50% industrial output curtailment with CEMS monitoring" if ward.industrial_score > 40 else "Enhanced inspection with audit notices"
-            actions.append(f"**Industrial:** {action} (Source: Industrial Compliance Agent)")
+            action = (
+                "50% industrial output curtailment with CEMS monitoring"
+                if ward.industrial_score > 40
+                else "Enhanced inspection with audit notices"
+            )
+            actions.append(
+                f"**Industrial:** {action} (Source: Industrial Compliance Agent)"
+            )
         elif turn.agent == "Health Impact":
-            action = f"School closure advisory for {ward.school_count} institutions" if ward.school_count > 0 else "Public health advisory broadcast"
-            actions.append(f"**Health:** {action} + mask distribution at {ward.hospital_count} hospitals (Source: Health Impact Agent)")
+            action = (
+                f"School closure advisory for {ward.school_count} institutions"
+                if ward.school_count > 0
+                else "Public health advisory broadcast"
+            )
+            actions.append(
+                f"**Health:** {action} + mask distribution at {ward.hospital_count} hospitals (Source: Health Impact Agent)"
+            )
         elif turn.agent == "Enforcement Logistics":
-            actions.append("**Enforcement:** Inspector deployment to top-risk industrial units. Show-cause notices to expired-permit holders (Source: Enforcement Logistics Agent)")
+            actions.append(
+                "**Enforcement:** Inspector deployment to top-risk industrial units. Show-cause notices to expired-permit holders (Source: Enforcement Logistics Agent)"
+            )
 
-    action_text = "\n".join(f"{i+1}. {a}" for i, a in enumerate(actions))
+    action_text = "\n".join(f"{i + 1}. {a}" for i, a in enumerate(actions))
 
     # Constitutional compliance summary
     pass_count = sum(1 for c in constitutional_checks if c.status == "PASS")
     warn_count = sum(1 for c in constitutional_checks if c.status == "WARN")
     fail_count = sum(1 for c in constitutional_checks if c.status == "FAIL")
-    constitutional_summary = f"✅ {pass_count} PASS | ⚠️ {warn_count} WARN | ❌ {fail_count} FAIL"
+    constitutional_summary = (
+        f"✅ {pass_count} PASS | ⚠️ {warn_count} WARN | ❌ {fail_count} FAIL"
+    )
 
     # Causal evidence block
     causal_block = ""

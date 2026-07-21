@@ -21,18 +21,73 @@ logger = logging.getLogger(__name__)
 # Mock database of industrial sites in Kolkata/Delhi/Mumbai for evidence generation
 MOCK_INDUSTRIES = {
     "Kolkata": [
-        {"id": "IND-KOL-01", "name": "Howrah Metallurgical Foundry", "lat": 22.585, "lon": 88.312, "type": "Foundry", "permit_no": "WBSPCB/COE/2024-8871", "permit_expiry": "2026-08-30", "stack_height_meters": 45.0},
-        {"id": "IND-KOL-02", "name": "Cossipore Chemical Processing", "lat": 22.621, "lon": 88.371, "type": "Chemical", "permit_no": "WBSPCB/COE/2025-1092", "permit_expiry": "2027-02-15", "stack_height_meters": 35.0},
-        {"id": "IND-KOL-03", "name": "Metiabruz Textile Dyeing", "lat": 22.535, "lon": 88.291, "type": "Textile", "permit_no": "WBSPCB/COE/2023-4512", "permit_expiry": "2025-12-31", "stack_height_meters": 30.0},
+        {
+            "id": "IND-KOL-01",
+            "name": "Howrah Metallurgical Foundry",
+            "lat": 22.585,
+            "lon": 88.312,
+            "type": "Foundry",
+            "permit_no": "WBSPCB/COE/2024-8871",
+            "permit_expiry": "2026-08-30",
+            "stack_height_meters": 45.0,
+        },
+        {
+            "id": "IND-KOL-02",
+            "name": "Cossipore Chemical Processing",
+            "lat": 22.621,
+            "lon": 88.371,
+            "type": "Chemical",
+            "permit_no": "WBSPCB/COE/2025-1092",
+            "permit_expiry": "2027-02-15",
+            "stack_height_meters": 35.0,
+        },
+        {
+            "id": "IND-KOL-03",
+            "name": "Metiabruz Textile Dyeing",
+            "lat": 22.535,
+            "lon": 88.291,
+            "type": "Textile",
+            "permit_no": "WBSPCB/COE/2023-4512",
+            "permit_expiry": "2025-12-31",
+            "stack_height_meters": 30.0,
+        },
     ],
     "Delhi": [
-        {"id": "IND-DEL-01", "name": "Okhla Electroplaters", "lat": 28.535, "lon": 77.261, "type": "Metallurgical", "permit_no": "DPCC/IND/2024-9981", "permit_expiry": "2026-04-10", "stack_height_meters": 40.0},
-        {"id": "IND-DEL-02", "name": "Mayapuri Waste Recyclers", "lat": 28.631, "lon": 77.132, "type": "Recycling", "permit_no": "DPCC/IND/2025-3341", "permit_expiry": "2027-11-22", "stack_height_meters": 25.0},
+        {
+            "id": "IND-DEL-01",
+            "name": "Okhla Electroplaters",
+            "lat": 28.535,
+            "lon": 77.261,
+            "type": "Metallurgical",
+            "permit_no": "DPCC/IND/2024-9981",
+            "permit_expiry": "2026-04-10",
+            "stack_height_meters": 40.0,
+        },
+        {
+            "id": "IND-DEL-02",
+            "name": "Mayapuri Waste Recyclers",
+            "lat": 28.631,
+            "lon": 77.132,
+            "type": "Recycling",
+            "permit_no": "DPCC/IND/2025-3341",
+            "permit_expiry": "2027-11-22",
+            "stack_height_meters": 25.0,
+        },
     ],
     "Mumbai": [
-        {"id": "IND-BOM-01", "name": "Chembur Refractories", "lat": 19.035, "lon": 72.891, "type": "Manufacturing", "permit_no": "MPCB/CTE/2024-4421", "permit_expiry": "2026-09-18", "stack_height_meters": 50.0},
-    ]
+        {
+            "id": "IND-BOM-01",
+            "name": "Chembur Refractories",
+            "lat": 19.035,
+            "lon": 72.891,
+            "type": "Manufacturing",
+            "permit_no": "MPCB/CTE/2024-4421",
+            "permit_expiry": "2026-09-18",
+            "stack_height_meters": 50.0,
+        },
+    ],
 }
+
 
 def calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate bearing from point 1 to point 2 in degrees (0 = North, 180 = South)."""
@@ -41,12 +96,17 @@ def calculate_bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> flo
     dlon_r = math.radians(lon2 - lon1)
 
     y = math.sin(dlon_r) * math.cos(lat2_r)
-    x = math.cos(lat1_r) * math.sin(lat2_r) - math.sin(lat1_r) * math.cos(lat2_r) * math.cos(dlon_r)
+    x = math.cos(lat1_r) * math.sin(lat2_r) - math.sin(lat1_r) * math.cos(
+        lat2_r
+    ) * math.cos(dlon_r)
 
     bearing = math.atan2(y, x)
     return (math.degrees(bearing) + 360) % 360
 
-def generate_evidence_package(industry_id: str, violation_type: str, db: Session) -> Dict[str, Any]:
+
+def generate_evidence_package(
+    industry_id: str, violation_type: str, db: Session
+) -> Dict[str, Any]:
     """
     Assembles a full digital evidence package for an industrial violation.
     Calculates meteorological correlation (wind direction vs bearing from source to ward).
@@ -73,7 +133,7 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
             "type": "Foundry",
             "permit_no": "WBSPCB/COE/2024-9988",
             "permit_expiry": "2026-12-31",
-            "stack_height_meters": 40.0
+            "stack_height_meters": 40.0,
         }
 
     # 2. Get nearest ward and current weather
@@ -82,7 +142,9 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
     if wards:
         nearest_ward = min(
             wards,
-            key=lambda w: math.sqrt((w.lat - industry["lat"])**2 + (w.lon - industry["lon"])**2)
+            key=lambda w: math.sqrt(
+                (w.lat - industry["lat"]) ** 2 + (w.lon - industry["lon"]) ** 2
+            ),
         )
 
     # Fetch weather
@@ -103,8 +165,7 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
 
     if nearest_ward:
         bearing = calculate_bearing(
-            industry["lat"], industry["lon"],
-            nearest_ward.lat, nearest_ward.lon
+            industry["lat"], industry["lon"], nearest_ward.lat, nearest_ward.lon
         )
         # Wind correlation is high if wind blows FROM industry TO ward
         # So wind direction should be close to the bearing angle
@@ -124,14 +185,21 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
     cems_readings = []
     base_pm25 = 120.0 if "violation" in violation_type else 35.0
     for h in range(12):
-        ts = now - timedelta(hours=12-h)
-        pm = round(base_pm25 + math.sin(h) * 15.0 + (30.0 if "violation" in violation_type else 0.0), 1)
-        cems_readings.append({
-            "timestamp": ts.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "pm25_mg_nm3": pm,
-            "limit_mg_nm3": 50.0,
-            "exceeded": pm > 50.0
-        })
+        ts = now - timedelta(hours=12 - h)
+        pm = round(
+            base_pm25
+            + math.sin(h) * 15.0
+            + (30.0 if "violation" in violation_type else 0.0),
+            1,
+        )
+        cems_readings.append(
+            {
+                "timestamp": ts.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "pm25_mg_nm3": pm,
+                "limit_mg_nm3": 50.0,
+                "exceeded": pm > 50.0,
+            }
+        )
 
     # 5. Query legal regulations (RAG)
     legal_docs = query_legal(violation_type.replace("_", " "), db, limit=2)
@@ -180,5 +248,5 @@ def generate_evidence_package(industry_id: str, violation_type: str, db: Session
         },
         "cems_timeseries_12h": cems_readings,
         "legal_basis": legal_docs,
-        "show_cause_notice_draft": notice_text
+        "show_cause_notice_draft": notice_text,
     }

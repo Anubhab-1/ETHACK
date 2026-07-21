@@ -38,7 +38,10 @@ def refresh_all(db: Session):
                     "Falling back to legacy CPCB fetcher."
                 )
                 from app.services.fetch_cpcb import fetch_live_cpcb, upsert_readings
-                stations = db.query(Station).filter(Station.city == city, Station.active).all()
+
+                stations = (
+                    db.query(Station).filter(Station.city == city, Station.active).all()
+                )
                 station_map = {s.station_code: s for s in stations}
                 if station_map:
                     records = fetch_live_cpcb(city=city, db=db)
@@ -47,6 +50,7 @@ def refresh_all(db: Session):
             # ── Verification: OpenAQ/Municipal verification baseline ───────
             try:
                 from app.services.fetch_verification import fetch_and_store_verification
+
                 fetch_and_store_verification(city, db)
             except Exception as ev:
                 logger.error(f"Failed to ingest verification baseline for {city}: {ev}")
@@ -57,13 +61,17 @@ def refresh_all(db: Session):
 
             # ── Enforcement: automated spike detection ─────────────────────
             from app.services.enforcement_scorer import detect_spikes_and_auto_escalate
+
             anomalies = detect_spikes_and_auto_escalate(db, city)
             if anomalies > 0:
-                logger.info(f"🚨 Spike detection: {anomalies} enforcement actions created for {city}")
+                logger.info(
+                    f"🚨 Spike detection: {anomalies} enforcement actions created for {city}"
+                )
 
             # ── Citizen Alerts: evaluate subscription thresholds ───────────
             try:
                 from app.services.citizen_notifier import evaluate_citizen_alerts
+
                 evaluate_citizen_alerts(db, city)
             except Exception as ec:
                 logger.error(f"Failed to evaluate citizen alerts for {city}: {ec}")
@@ -77,6 +85,7 @@ def refresh_all(db: Session):
 
 if __name__ == "__main__":
     from app.database import SessionLocal, create_tables
+
     create_tables()
     db = SessionLocal()
     refresh_all(db)

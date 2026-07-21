@@ -15,10 +15,10 @@ from app.database import get_db
 from app.models import Attribution, EnforcementAction, Ward
 from app.schemas import (
     AttributionResponse,
-    EnforcementStats,
-    EnforcementStatusUpdate,
     DecreeSignOffIn,
     EnforcementActionOut,
+    EnforcementStats,
+    EnforcementStatusUpdate,
 )
 from app.services.attributor import (
     run_attribution_for_ward,
@@ -49,6 +49,7 @@ def get_pmf_attribution(ward_id: int, db: Session = Depends(get_db)):
         breakdown = result["breakdown"]
         # Add ±15% synthetic CI for demo when real data is insufficient
         import random
+
         rng = random.Random(ward.id)
         ci_breakdown = {}
         for source, pct in breakdown.items():
@@ -101,9 +102,14 @@ def get_attribution(ward_id: int, db: Session = Depends(get_db)):
     # Check for recent cached attribution (< 2 hours old)
     from sqlalchemy import desc
 
-    recent = db.query(Attribution).filter(
-        Attribution.ward_id == ward_id,
-    ).order_by(desc(Attribution.computed_at)).first()
+    recent = (
+        db.query(Attribution)
+        .filter(
+            Attribution.ward_id == ward_id,
+        )
+        .order_by(desc(Attribution.computed_at))
+        .first()
+    )
 
     if recent and (datetime.utcnow() - recent.computed_at).total_seconds() < 7200:
         return AttributionResponse(
@@ -156,25 +162,29 @@ def get_enforcement_queue(
 
     result = []
     for a, ward in rows:
-        result.append({
-            "id": a.id,
-            "ward_id": a.ward_id,
-            "ward_name": ward.name if ward else "Unknown",
-            "ward_no": ward.ward_no if ward else 0,
-            "ward_lat": ward.lat if ward else 0.0,
-            "ward_lon": ward.lon if ward else 0.0,
-            "city": a.city,
-            "priority_score": a.priority_score,
-            "action_text": a.action_text,
-            "target_type": a.target_type,
-            "status": a.status,
-            "alerts_sent": a.alerts_sent or 0,
-            "alerts_confirmed": a.alerts_confirmed or 0,
-            "created_at": a.created_at.isoformat(),
-            "detected_at": a.detected_at.isoformat() if a.detected_at else None,
-            "acknowledged_at": a.acknowledged_at.isoformat() if a.acknowledged_at else None,
-            "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
-        })
+        result.append(
+            {
+                "id": a.id,
+                "ward_id": a.ward_id,
+                "ward_name": ward.name if ward else "Unknown",
+                "ward_no": ward.ward_no if ward else 0,
+                "ward_lat": ward.lat if ward else 0.0,
+                "ward_lon": ward.lon if ward else 0.0,
+                "city": a.city,
+                "priority_score": a.priority_score,
+                "action_text": a.action_text,
+                "target_type": a.target_type,
+                "status": a.status,
+                "alerts_sent": a.alerts_sent or 0,
+                "alerts_confirmed": a.alerts_confirmed or 0,
+                "created_at": a.created_at.isoformat(),
+                "detected_at": a.detected_at.isoformat() if a.detected_at else None,
+                "acknowledged_at": a.acknowledged_at.isoformat()
+                if a.acknowledged_at
+                else None,
+                "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
+            }
+        )
 
     return result
 
@@ -196,12 +206,12 @@ def approve_decree(payload: DecreeSignOffIn, db: Session = Depends(get_db)):
         alerts_sent=0,
         alerts_confirmed=0,
         created_at=datetime.utcnow(),
-        detected_at=datetime.utcnow()
+        detected_at=datetime.utcnow(),
     )
     db.add(new_action)
     db.commit()
     db.refresh(new_action)
-    
+
     # Formulate output with ward metadata
     out = EnforcementActionOut.model_validate(new_action)
     out.ward_name = ward.name
@@ -218,13 +228,24 @@ def update_enforcement_status(
     db: Session = Depends(get_db),
 ):
     """Mark an enforcement action as deployed or resolved, enforcing a state-machine."""
-    action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    action = (
+        db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    )
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
 
-    valid_statuses = ["open", "detected", "dispatched", "deployed", "evidence_collected", "resolved"]
+    valid_statuses = [
+        "open",
+        "detected",
+        "dispatched",
+        "deployed",
+        "evidence_collected",
+        "resolved",
+    ]
     if update.status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Status must be one of {valid_statuses}")
+        raise HTTPException(
+            status_code=400, detail=f"Status must be one of {valid_statuses}"
+        )
 
     # Map legacy states to canonical states for transition checks
     current_canonical = action.status
@@ -237,23 +258,23 @@ def update_enforcement_status(
         "dispatched": ["evidence_collected", "resolved"],
         "deployed": ["evidence_collected", "resolved"],
         "evidence_collected": ["resolved"],
-        "resolved": []  # terminal state
+        "resolved": [],  # terminal state
     }
 
     allowed_targets = valid_transitions.get(current_canonical, [])
     # Allow self-transitions or transitions to legacy aliases
     is_self_or_alias = (
-        current_canonical == target_canonical or
-        (current_canonical == "open" and target_canonical == "detected") or
-        (current_canonical == "detected" and target_canonical == "open") or
-        (current_canonical == "deployed" and target_canonical == "dispatched") or
-        (current_canonical == "dispatched" and target_canonical == "deployed")
+        current_canonical == target_canonical
+        or (current_canonical == "open" and target_canonical == "detected")
+        or (current_canonical == "detected" and target_canonical == "open")
+        or (current_canonical == "deployed" and target_canonical == "dispatched")
+        or (current_canonical == "dispatched" and target_canonical == "deployed")
     )
-    
+
     if not is_self_or_alias and target_canonical not in allowed_targets:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid state transition from '{current_canonical}' to '{target_canonical}'"
+            detail=f"Invalid state transition from '{current_canonical}' to '{target_canonical}'",
         )
 
     # Apply updates
@@ -281,7 +302,6 @@ def update_enforcement_status(
     return {"id": action.id, "status": action.status, "updated": True}
 
 
-
 @router.post("/enforcement/{action_id}/broadcast")
 def broadcast_alerts(
     action_id: int,
@@ -296,7 +316,9 @@ def broadcast_alerts(
 
     import requests
 
-    action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    action = (
+        db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    )
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
 
@@ -307,16 +329,21 @@ def broadcast_alerts(
 
     # Attempt real Twilio SMS if credentials are configured
     twilio_status = "simulated"
-    if (settings.twilio_account_sid and settings.twilio_auth_token and
-            settings.twilio_from_number and settings.twilio_to_number):
+    if (
+        settings.twilio_account_sid
+        and settings.twilio_auth_token
+        and settings.twilio_from_number
+        and settings.twilio_to_number
+    ):
         try:
             from app.models import Ward
             from app.services.attributor import get_current_aqi_for_ward
+
             ward = db.query(Ward).filter(Ward.id == action.ward_id).first()
             aqi_val = get_current_aqi_for_ward(ward, db) if ward else "N/A"
 
             message_body = (
-                f"KMC Alert: Ward {ward.ward_no if ward else '?' } ({ward.name if ward else '?'}) "
+                f"KMC Alert: Ward {ward.ward_no if ward else '?'} ({ward.name if ward else '?'}) "
                 f"AQI is severe ({round(aqi_val) if isinstance(aqi_val, (int, float)) else aqi_val}). "
                 f"Enforcement action '{action.target_type}' deployed. Citizens advised to wear masks and limit outdoor activities."
             )
@@ -326,7 +353,7 @@ def broadcast_alerts(
             data = {
                 "From": settings.twilio_from_number,
                 "To": settings.twilio_to_number,
-                "Body": message_body
+                "Body": message_body,
             }
             res = requests.post(url, auth=auth, data=data, timeout=10)
             if res.status_code == 201:
@@ -334,7 +361,9 @@ def broadcast_alerts(
                 logger.info(f"Twilio alert sent successfully: {twilio_status}")
             else:
                 twilio_status = f"failed_http_{res.status_code}"
-                logger.warning(f"Twilio API failed with status {res.status_code}: {res.text}")
+                logger.warning(
+                    f"Twilio API failed with status {res.status_code}: {res.text}"
+                )
         except Exception as e:
             twilio_status = f"error_{str(e)}"
             logger.error(f"Error invoking Twilio alert gateway: {e}")
@@ -347,7 +376,7 @@ def broadcast_alerts(
         "alerts_sent": action.alerts_sent,
         "alerts_confirmed": action.alerts_confirmed,
         "twilio_status": twilio_status,
-        "updated": True
+        "updated": True,
     }
 
 
@@ -361,7 +390,9 @@ def confirm_alert_receipt(
     settings = get_settings()
     if x_admin_key != settings.admin_key:
         raise HTTPException(status_code=403, detail="Forbidden: Invalid X-Admin-Key")
-    action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    action = (
+        db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    )
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
 
@@ -370,15 +401,20 @@ def confirm_alert_receipt(
 
     # Increment alert confirmed by a random amount
     import random
+
     increment = random.randint(8, 18)
-    action.alerts_confirmed = min(action.alerts_sent, (action.alerts_confirmed or 0) + increment)
+    action.alerts_confirmed = min(
+        action.alerts_sent, (action.alerts_confirmed or 0) + increment
+    )
     db.commit()
     db.refresh(action)
     return {
         "id": action.id,
         "alerts_sent": action.alerts_sent,
         "alerts_confirmed": action.alerts_confirmed,
-        "ratio": round(action.alerts_confirmed / action.alerts_sent, 2) if action.alerts_sent else 0
+        "ratio": round(action.alerts_confirmed / action.alerts_sent, 2)
+        if action.alerts_sent
+        else 0,
     }
 
 
@@ -387,16 +423,31 @@ def get_enforcement_stats(city: str = Query("Kolkata"), db: Session = Depends(ge
     """Get enforcement action counts by status."""
 
     counts = {}
-    for status in ["open", "detected", "dispatched", "deployed", "evidence_collected", "resolved"]:
-        count = db.query(EnforcementAction).filter(
-            EnforcementAction.city == city,
-            EnforcementAction.status == status,
-        ).count()
+    for status in [
+        "open",
+        "detected",
+        "dispatched",
+        "deployed",
+        "evidence_collected",
+        "resolved",
+    ]:
+        count = (
+            db.query(EnforcementAction)
+            .filter(
+                EnforcementAction.city == city,
+                EnforcementAction.status == status,
+            )
+            .count()
+        )
         counts[status] = count
 
     # Combine aliases for counts to keep the UI stats clean and fully compatible
     open_count = counts.get("open", 0) + counts.get("detected", 0)
-    deployed_count = counts.get("deployed", 0) + counts.get("dispatched", 0) + counts.get("evidence_collected", 0)
+    deployed_count = (
+        counts.get("deployed", 0)
+        + counts.get("dispatched", 0)
+        + counts.get("evidence_collected", 0)
+    )
     resolved_count = counts.get("resolved", 0)
 
     return EnforcementStats(
@@ -405,7 +456,6 @@ def get_enforcement_stats(city: str = Query("Kolkata"), db: Session = Depends(ge
         resolved=resolved_count,
         total=open_count + deployed_count + resolved_count,
     )
-
 
 
 @router.post("/enforcement/recompute", status_code=202)
@@ -426,6 +476,7 @@ def recompute_queue(
 
     def _run(city: str):
         from app.database import SessionLocal
+
         bg_db = SessionLocal()
         try:
             recompute_enforcement_queue(city, bg_db)
@@ -441,37 +492,45 @@ def recompute_queue(
 
 
 @router.get("/enforcement/{action_id}/notice/export")
-def export_enforcement_notice(
-    action_id: int,
-    db: Session = Depends(get_db)
-):
+def export_enforcement_notice(action_id: int, db: Session = Depends(get_db)):
     """
     Generate and export a beautifully formatted HTML Show-Cause Notice
     under Section 31A of the Air (Prevention and Control of Pollution) Act, 1981.
     """
     from fastapi.responses import HTMLResponse
+
     from app.models import EnforcementAction, Ward
-    
-    action = db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+
+    action = (
+        db.query(EnforcementAction).filter(EnforcementAction.id == action_id).first()
+    )
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-        
+
     ward = db.query(Ward).filter(Ward.id == action.ward_id).first()
     ward_name = ward.name if ward else f"Ward #{action.ward_id}"
     ward_no = ward.ward_no if ward else action.ward_id
-    
+
     # Select appropriate legal act sections
-    legal_provisions = "Section 21 of the Air Act, 1981 and CPCB Emission Standards 2009."
-    
+    legal_provisions = (
+        "Section 21 of the Air Act, 1981 and CPCB Emission Standards 2009."
+    )
+
     notice_date = action.created_at.strftime("%d %B %Y")
     ref_no = f"MNC/ENF/{action.created_at.strftime('%Y%m')}/{action.id:04d}"
-    
+
     # Check if there is high correlation (downwind) based on wind bearing (using weather details if available)
     from app.models import Weather
-    weather = db.query(Weather).filter(Weather.city == action.city).order_by(Weather.recorded_at.desc()).first()
+
+    weather = (
+        db.query(Weather)
+        .filter(Weather.city == action.city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
+    )
     wind_speed = weather.wind_speed if weather and weather.wind_speed else 8.5
     wind_dir = weather.wind_dir if weather and weather.wind_dir else 210.0
-    
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -576,14 +635,14 @@ def export_enforcement_notice(
     </head>
     <body>
         <button class="print-btn" onclick="window.print()">🖨️ Print Notice</button>
-        
+
         <div class="letterhead">
             <div class="logo-seal">🏛️</div>
             <div class="dept-title">Municipal Air Quality Enforcement Commission</div>
             <div class="dept-sub">Environment & Public Health Directorate, City of {action.city}</div>
             <div class="dept-sub">Statutory Order Issued under Environmental Protection Mandate</div>
         </div>
-        
+
         <div class="meta-info">
             <div>
                 <strong>Ref No:</strong> {ref_no}<br>
@@ -594,35 +653,35 @@ def export_enforcement_notice(
                 <strong>Target Coordinates:</strong> {ward.lat if ward else 22.57}°N, {ward.lon if ward else 88.36}°E
             </div>
         </div>
-        
+
         <div class="notice-title">
             Show-Cause Notice under Section 31A of the Air (Prevention and Control of Pollution) Act, 1981
         </div>
-        
+
         <div class="notice-body">
             <p>To,<br>
             <strong>The Occupier / Proprietor / Person-in-Charge</strong><br>
             Commercial / Industrial Operations under: {action.target_type}<br>
             {ward_name}, {action.city}</p>
-            
+
             <p><strong>WHEREAS</strong> the AETHER Municipal Air Quality forecasting models and spatial sensors have continuously registered elevated particulate levels and gaseous concentrations matching emissions emanating from your geographical area: <span class="section-label">"{action.action_text}"</span>.</p>
-            
+
             <p><strong>AND WHEREAS</strong> meteorological downlink data reports prevailing local winds at {wind_speed:.1f} km/h from {wind_dir:.1f} degrees, establishing a direct downwind trajectory and causation mapping to the surrounding public receptor zones.</p>
-            
+
             <p><strong>AND WHEREAS</strong> the failure to observe statutory emission limits or permit guidelines violates the mandates specified under <span class="section-label">{legal_provisions}</span>.</p>
-            
+
             <p><strong>NOW THEREFORE</strong>, you are hereby directed to <strong>SHOW CAUSE</strong> in writing within seven (7) days of the receipt of this notice why appropriate actions including immediate shutdown of utilities, suspension of consent, or prosecution under Section 37 of the Air Act, 1981, should not be directed by this Commission.</p>
-            
+
             <p>Take notice that in the event of failure to reply or execute immediate mitigation controls (sweeping, water sprinkling, stack monitoring) within the stipulated period, this Commission will proceed unilaterally under statutory rules.</p>
         </div>
-        
+
         <div class="signature-block">
             <br>
             <strong>Member Secretary</strong><br>
             Municipal Air Quality Enforcement Commission<br>
             <em>State Environmental Protection Administration Division</em>
         </div>
-        
+
         <div class="footer-notes">
             This is a computer-generated statutory instrument issued via the AETHER Municipal Control Center.<br>
             To verify the authenticity of this order, reference Case ID: SCN-{action_id:04d}-{action.ward_id:02d}.
@@ -631,4 +690,3 @@ def export_enforcement_notice(
     </html>
     """
     return HTMLResponse(content=html_content)
-

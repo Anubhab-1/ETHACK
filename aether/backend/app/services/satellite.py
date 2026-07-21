@@ -4,13 +4,14 @@ Queries Copernicus Data Space Ecosystem API for real-time orbit metadata,
 integrates Open-Meteo Air Quality proxies, and applies regression calibration
 to produce tropospheric column densities (10^-4 mol/m²).
 """
+
 from __future__ import annotations
 
 import logging
 import math
-import time
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
+
 import requests
 
 from app.config import get_settings
@@ -20,15 +21,15 @@ logger = logging.getLogger(__name__)
 # Bounding boxes for cities in WKT POLYGON format for Copernicus OData intersection queries
 BOUNDS_WKT = {
     "Kolkata": "POLYGON((88.25 22.45, 88.48 22.45, 88.48 22.65, 88.25 22.65, 88.25 22.45))",
-    "Delhi":   "POLYGON((76.84 28.40, 77.35 28.40, 77.35 28.88, 76.84 28.88, 76.84 28.40))",
-    "Mumbai":  "POLYGON((72.74 18.89, 73.01 18.89, 73.01 19.30, 72.74 19.30, 72.74 18.89))",
+    "Delhi": "POLYGON((76.84 28.40, 77.35 28.40, 77.35 28.88, 76.84 28.88, 76.84 28.40))",
+    "Mumbai": "POLYGON((72.74 18.89, 73.01 18.89, 73.01 19.30, 72.74 19.30, 72.74 18.89))",
 }
 
 # Coordinate boxes for Open-Meteo grid sampling
 BOUNDS_COORDS = {
     "Kolkata": (22.45, 88.25, 22.65, 88.48),
-    "Delhi":   (28.40, 76.84, 28.88, 77.35),
-    "Mumbai":  (18.89, 72.74, 19.30, 73.01),
+    "Delhi": (28.40, 76.84, 28.88, 77.35),
+    "Mumbai": (18.89, 72.74, 19.30, 73.01),
 }
 
 
@@ -44,8 +45,12 @@ def search_copernicus_s5p_product(city: str) -> Optional[Dict]:
         return None
 
     # Search for S5P L2 NO2 products in the last 7 days to guarantee recent passes
-    start_date = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+00:00", "Z")
-    
+    start_date = (
+        (datetime.now(timezone.utc) - timedelta(days=7))
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
     # Construct OData query URL
     url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
     params = {
@@ -63,14 +68,14 @@ def search_copernicus_s5p_product(city: str) -> Optional[Dict]:
         resp = requests.get(url, params=params, timeout=12)
         resp.raise_for_status()
         data = resp.json()
-        
+
         results = data.get("value", [])
         if results:
             product = results[0]
             name = product.get("Name", "")
             product_id = product.get("Id", "")
             start_time = product.get("ContentDate", {}).get("Start", "")
-            
+
             # Extract orbit number from product name if possible
             # Example: S5P_L2__NO2____20260714T073000_20260714T091130_45239_03_020400_20260714T110000.nc
             orbit = "Unknown"
@@ -79,18 +84,22 @@ def search_copernicus_s5p_product(city: str) -> Optional[Dict]:
                 if len(p) == 5 and p.isdigit():
                     orbit = p
                     break
-            
-            logger.info(f"Found Sentinel-5P product for {city}: ID={product_id}, Orbit={orbit}")
+
+            logger.info(
+                f"Found Sentinel-5P product for {city}: ID={product_id}, Orbit={orbit}"
+            )
             return {
                 "product_id": product_id,
                 "product_name": name,
                 "fetched_at": start_time,
                 "orbit": orbit,
-                "source": "Copernicus Sentinel-5P TROPOMI"
+                "source": "Copernicus Sentinel-5P TROPOMI",
             }
     except Exception as e:
-        logger.warning(f"Copernicus catalog search failed for {city}: {e}. Falling back to default orbit meta.")
-    
+        logger.warning(
+            f"Copernicus catalog search failed for {city}: {e}. Falling back to default orbit meta."
+        )
+
     return None
 
 
@@ -99,7 +108,7 @@ def calibrate_surface_to_column(pm25: Optional[float], no2: Optional[float]) -> 
     Calibration mapping: converts ground/surface concentration (ug/m3) into
     calibrated tropospheric NO2 column density (10^-4 mol/m²).
     Typical range: 0.5 (clean) to 5.0 (severe congestion).
-    
+
     Formula: CD = beta_0 + beta_1 * surface_no2 + beta_2 * surface_pm25
     """
     val_no2 = no2 if no2 is not None else 10.0
@@ -120,7 +129,7 @@ def fetch_calibrated_satellite_grid(city: str) -> Dict:
     calibration mapping to return a grid of Sentinel-5P Tropospheric NO2 Column densities.
     """
     settings = get_settings()
-    
+
     # 1. Search Copernicus Data Space OData for orbit metadata
     s5p_meta = search_copernicus_s5p_product(city)
     if not s5p_meta:
@@ -130,7 +139,7 @@ def fetch_calibrated_satellite_grid(city: str) -> Dict:
             "product_name": f"S5P_L2__NO2____MOCK_PASS_{city.upper()}_LATEST.nc",
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "orbit": str(45200 + hash(city) % 500),
-            "source": "Sentinel-5P (Copernicus API Offline)"
+            "source": "Sentinel-5P (Copernicus API Offline)",
         }
 
     # 2. Extract grid coordinates
@@ -139,8 +148,12 @@ def fetch_calibrated_satellite_grid(city: str) -> Dict:
 
     # Generate 8x8 grid = 64 pixels (Copernicus spatial resolution aligned)
     n_lat, n_lon = 8, 8
-    lats = [round(lat_min + (lat_max - lat_min) * i / (n_lat - 1), 4) for i in range(n_lat)]
-    lons = [round(lon_min + (lon_max - lon_min) * j / (n_lon - 1), 4) for j in range(n_lon)]
+    lats = [
+        round(lat_min + (lat_max - lat_min) * i / (n_lat - 1), 4) for i in range(n_lat)
+    ]
+    lons = [
+        round(lon_min + (lon_max - lon_min) * j / (n_lon - 1), 4) for j in range(n_lon)
+    ]
 
     lat_str = ",".join(str(lat) for lat in lats for _ in lons)
     lon_str = ",".join(str(lon) for _ in lats for lon in lons)
@@ -171,36 +184,40 @@ def fetch_calibrated_satellite_grid(city: str) -> Dict:
             lon = entry.get("longitude")
             current = entry.get("current", {})
             pm25 = current.get("pm2_5")
-            no2  = current.get("nitrogen_dioxide")
+            no2 = current.get("nitrogen_dioxide")
 
             if lat is None or lon is None:
                 continue
 
             # Calibrate surface pm25/no2 to column density (mol/m2)
             calibrated_value = calibrate_surface_to_column(pm25, no2)
-            
+
             # Simulated spatial uncertainty (pixel-level noise + calibration error variance)
             rng_seed = hash(f"{lat}_{lon}_{i}")
             pixel_noise = 0.05 + 0.05 * math.sin(rng_seed)
             uncertainty = round(0.08 * calibrated_value + pixel_noise, 3)
 
-            grid.append({
-                "lat": round(lat, 4),
-                "lon": round(lon, 4),
-                "value": calibrated_value,
-                "pm25": pm25,
-                "no2": no2,
-                "uncertainty_margin": uncertainty,
-                "unit": "10^-4 mol/m²",
-            })
+            grid.append(
+                {
+                    "lat": round(lat, 4),
+                    "lon": round(lon, 4),
+                    "value": calibrated_value,
+                    "pm25": pm25,
+                    "no2": no2,
+                    "uncertainty_margin": uncertainty,
+                    "unit": "10^-4 mol/m²",
+                }
+            )
 
     except Exception as e:
-        logger.error(f"Open-Meteo batch fetching failed for {city}: {e}. Generating calibrated fallback grid.")
+        logger.error(
+            f"Open-Meteo batch fetching failed for {city}: {e}. Generating calibrated fallback grid."
+        )
         # Generates fallback grid using hotspot distances
         HOTSPOTS = {
             "Kolkata": [(22.58, 88.30, 4.2), (22.62, 88.37, 3.1), (22.57, 88.43, 3.8)],
-            "Delhi":   [(28.64, 77.31, 5.8), (28.69, 77.16, 4.9), (28.53, 77.26, 4.5)],
-            "Mumbai":  [(19.00, 72.90, 3.6), (19.12, 72.85, 2.9), (19.03, 72.87, 3.2)],
+            "Delhi": [(28.64, 77.31, 5.8), (28.69, 77.16, 4.9), (28.53, 77.26, 4.5)],
+            "Mumbai": [(19.00, 72.90, 3.6), (19.12, 72.85, 2.9), (19.03, 72.87, 3.2)],
         }
         hotspots = HOTSPOTS.get(city, [])
         for lat in lats:
@@ -209,17 +226,19 @@ def fetch_calibrated_satellite_grid(city: str) -> Dict:
                 for h_lat, h_lon, h_peak in hotspots:
                     dist = math.sqrt((lat - h_lat) ** 2 + (lon - h_lon) ** 2)
                     base_cd += h_peak * math.exp(-dist / 0.04)
-                
+
                 calibrated_value = max(0.1, min(10.0, round(base_cd, 3)))
-                grid.append({
-                    "lat": round(lat, 4),
-                    "lon": round(lon, 4),
-                    "value": calibrated_value,
-                    "pm25": round(calibrated_value * 30.0, 1),
-                    "no2": round(calibrated_value * 15.0, 1),
-                    "uncertainty_margin": round(0.12 * calibrated_value, 3),
-                    "unit": "10^-4 mol/m²",
-                })
+                grid.append(
+                    {
+                        "lat": round(lat, 4),
+                        "lon": round(lon, 4),
+                        "value": calibrated_value,
+                        "pm25": round(calibrated_value * 30.0, 1),
+                        "no2": round(calibrated_value * 15.0, 1),
+                        "uncertainty_margin": round(0.12 * calibrated_value, 3),
+                        "unit": "10^-4 mol/m²",
+                    }
+                )
 
     return {
         "city": city,
@@ -230,5 +249,5 @@ def fetch_calibrated_satellite_grid(city: str) -> Dict:
         "product_name": s5p_meta["product_name"],
         "product_id": s5p_meta["product_id"],
         "fetched_at": s5p_meta["fetched_at"],
-        "real_data": True
+        "real_data": True,
     }

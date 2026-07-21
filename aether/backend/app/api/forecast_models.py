@@ -2,12 +2,13 @@
 AETHER — Forecast Model Admin API
 Provides simple metadata listing for stored model artifacts (XGBoost JSON, ST-GCN weights).
 """
+
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
-import re
 
 from fastapi import APIRouter
 
@@ -40,16 +41,23 @@ def list_models():
             continue
         stat = p.stat()
         info = _parse_model_filename(p.name)
-        info.update({
-            "filename": p.name,
-            "size_bytes": stat.st_size,
-            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            "path": str(p.resolve()),
-        })
+        info.update(
+            {
+                "filename": p.name,
+                "size_bytes": stat.st_size,
+                "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "path": str(p.resolve()),
+            }
+        )
         # Attach metrics payload if available (e.g. kolkata_24h.metrics.json)
         try:
             import json
-            metrics_name = p.with_suffix("").name + ".metrics.json" if p.suffix != ".json" else p.stem + ".metrics.json"
+
+            metrics_name = (
+                p.with_suffix("").name + ".metrics.json"
+                if p.suffix != ".json"
+                else p.stem + ".metrics.json"
+            )
             metrics_path = MODEL_DIR / metrics_name
             if metrics_path.exists():
                 with open(metrics_path, "r", encoding="utf-8") as mf:

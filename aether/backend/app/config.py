@@ -7,7 +7,9 @@ from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
 # Forcibly load local .env variables to override any system-wide environment variables
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+env_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"
+)
 load_dotenv(env_path, override=True)
 
 
@@ -41,7 +43,9 @@ class Settings(BaseSettings):
 
     # Open-Meteo
     open_meteo_base: str = "https://api.open-meteo.com/v1/forecast"
-    open_meteo_airquality_base: str = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    open_meteo_airquality_base: str = (
+        "https://air-quality-api.open-meteo.com/v1/air-quality"
+    )
 
     class Config:
         env_file = ".env"
@@ -49,7 +53,13 @@ class Settings(BaseSettings):
 
     def __init__(self, **values):
         super().__init__(**values)
-        for placeholder_field in ["cpcb_api_key", "openai_api_key", "twilio_account_sid", "twilio_auth_token", "waqi_token"]:
+        for placeholder_field in [
+            "cpcb_api_key",
+            "openai_api_key",
+            "twilio_account_sid",
+            "twilio_auth_token",
+            "waqi_token",
+        ]:
             val = getattr(self, placeholder_field, "")
             if val and ("your_" in val or val in ("YOUR_TOKEN", "changeme")):
                 setattr(self, placeholder_field, "")

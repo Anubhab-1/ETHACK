@@ -1,6 +1,7 @@
 """
 AETHER — PMF & Real-time Emission Inventory Fusion API Router
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,6 +20,7 @@ from app.services.attribution_advanced import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/attribution-advanced", tags=["attribution"])
+
 
 @router.get("/{ward_id}")
 async def get_advanced_attribution(ward_id: str, db: Session = Depends(get_db)):
@@ -44,18 +46,20 @@ async def get_advanced_attribution(ward_id: str, db: Session = Depends(get_db)):
             pmf.fit(speciation, n_bootstrap=30)
             pmf_result = pmf.get_latest_contributions(list(speciation.columns))
         except Exception as e:
-            logger.warning(f"PMF analysis failed: {e}. Falling back to default inventory.")
+            logger.warning(
+                f"PMF analysis failed: {e}. Falling back to default inventory."
+            )
             pmf_result = {
-                'contributions': [],
-                'note': f'PMF analysis error: {e}',
-                'confidence_level': None
+                "contributions": [],
+                "note": f"PMF analysis error: {e}",
+                "confidence_level": None,
             }
     else:
         # Fallback: empty contributions
         pmf_result = {
-            'contributions': [],
-            'note': 'Insufficient speciation data history to run PMF (need 15+ readings). Using real-time inventory fallback.',
-            'confidence_level': None
+            "contributions": [],
+            "note": "Insufficient speciation data history to run PMF (need 15+ readings). Using real-time inventory fallback.",
+            "confidence_level": None,
         }
 
     # 3. Fetch real-time emission inventory
@@ -66,9 +70,9 @@ async def get_advanced_attribution(ward_id: str, db: Session = Depends(get_db)):
 
     # Sort contributions by percentage descending
     sorted_contribs = sorted(
-        final_breakdown['contributions'],
-        key=lambda x: x['contribution_percent'],
-        reverse=True
+        final_breakdown["contributions"],
+        key=lambda x: x["contribution_percent"],
+        reverse=True,
     )
 
     return {
@@ -78,8 +82,8 @@ async def get_advanced_attribution(ward_id: str, db: Session = Depends(get_db)):
         "realtime_inventory": inventory,
         "ensemble_breakdown": {
             "contributions": sorted_contribs,
-            "summary": final_breakdown['summary']
+            "summary": final_breakdown["summary"],
         },
         "top_sources": sorted_contribs[:3],
-        "methodology": "PMF (chemical fingerprinting) + Real-time inventory fusion + Bayesian ensemble"
+        "methodology": "PMF (chemical fingerprinting) + Real-time inventory fusion + Bayesian ensemble",
     }

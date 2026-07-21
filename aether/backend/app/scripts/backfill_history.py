@@ -17,7 +17,9 @@ from app.database import SessionLocal, create_tables
 from app.models import Reading, Station, Weather
 from app.services.forecaster import train_model
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s — %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s — %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -34,12 +36,15 @@ def backfill_city_history(city: str, days: int, db: Session):
     start_time = now - timedelta(days=days)
 
     # Check if we already have history
-    existing = db.query(Reading).filter(
-        Reading.station_id == stations[0].id,
-        Reading.measured_at >= start_time
-    ).count()
+    existing = (
+        db.query(Reading)
+        .filter(Reading.station_id == stations[0].id, Reading.measured_at >= start_time)
+        .count()
+    )
     if existing >= days * 24:
-        logger.info(f"Historical readings already present for {city} ({existing} count). Skipping backfill.")
+        logger.info(
+            f"Historical readings already present for {city} ({existing} count). Skipping backfill."
+        )
         return
 
     # Generate weather history
@@ -52,10 +57,20 @@ def backfill_city_history(city: str, days: int, db: Session):
 
         # Seasonality (Winter is colder, summer is hotter)
         temp_base = 18 if month in [11, 12, 1, 2] else 32
-        temp = temp_base + 6 * math.sin((hour - 14) * math.pi / 12) + random.uniform(-2, 2)
-        humidity = 60 - 20 * math.sin((hour - 14) * math.pi / 12) + random.uniform(-5, 5)
-        wind_speed = max(1.0, 5 + 4 * math.sin((hour - 12) * math.pi / 12) + random.uniform(-2, 2))
-        wind_dir = (180 + 90 * math.sin(current_time.day * math.pi / 15) + random.uniform(-20, 20)) % 360
+        temp = (
+            temp_base + 6 * math.sin((hour - 14) * math.pi / 12) + random.uniform(-2, 2)
+        )
+        humidity = (
+            60 - 20 * math.sin((hour - 14) * math.pi / 12) + random.uniform(-5, 5)
+        )
+        wind_speed = max(
+            1.0, 5 + 4 * math.sin((hour - 12) * math.pi / 12) + random.uniform(-2, 2)
+        )
+        wind_dir = (
+            180
+            + 90 * math.sin(current_time.day * math.pi / 15)
+            + random.uniform(-20, 20)
+        ) % 360
         pressure = 1013 - 3 * math.sin((hour - 10) * math.pi / 12)
 
         w = Weather(
@@ -66,7 +81,7 @@ def backfill_city_history(city: str, days: int, db: Session):
             wind_speed=round(wind_speed, 1),
             wind_dir=round(wind_dir, 1),
             pressure=round(pressure, 1),
-            precipitation=0.0
+            precipitation=0.0,
         )
         weather_records.append(w)
         current_time += timedelta(hours=1)
@@ -93,7 +108,13 @@ def backfill_city_history(city: str, days: int, db: Session):
             weekend_modifier = -25 if day_of_week >= 5 else 0
             winter_modifier = 60 if month in [11, 12, 1, 2] else -20
 
-            aqi = base_aqi + rush_hour_modifier + weekend_modifier + winter_modifier + random.uniform(-15, 15)
+            aqi = (
+                base_aqi
+                + rush_hour_modifier
+                + weekend_modifier
+                + winter_modifier
+                + random.uniform(-15, 15)
+            )
             aqi = max(15.0, min(480.0, aqi))
 
             pm25 = aqi * 0.45 + random.uniform(-5, 5)
@@ -119,7 +140,7 @@ def backfill_city_history(city: str, days: int, db: Session):
                 pm25=round(max(2.0, pm25), 1),
                 pm10=round(max(5.0, pm10), 1),
                 aqi=round(aqi, 1),
-                category=cat
+                category=cat,
             )
             readings.append(r)
             current_time += timedelta(hours=1)

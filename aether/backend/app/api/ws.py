@@ -38,7 +38,9 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
                     new_city = data.get("city")
                     if new_city:
                         subscribed_city = new_city
-                        logger.info(f"🔄 WebSocket subscription updated to: city={subscribed_city}")
+                        logger.info(
+                            f"🔄 WebSocket subscription updated to: city={subscribed_city}"
+                        )
         except (WebSocketDisconnect, RuntimeError):
             pass
 
@@ -49,7 +51,11 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
             db = SessionLocal()
             try:
                 current_city = subscribed_city
-                stations = db.query(Station).filter(Station.city == current_city, Station.active).all()
+                stations = (
+                    db.query(Station)
+                    .filter(Station.city == current_city, Station.active)
+                    .all()
+                )
                 station_ids = [s.id for s in stations]
                 station_map = {s.id: s for s in stations}
 
@@ -67,7 +73,11 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
 
                     readings = (
                         db.query(Reading)
-                        .join(latest_subq, (Reading.station_id == latest_subq.c.station_id) & (Reading.measured_at == latest_subq.c.max_ts))
+                        .join(
+                            latest_subq,
+                            (Reading.station_id == latest_subq.c.station_id)
+                            & (Reading.measured_at == latest_subq.c.max_ts),
+                        )
                         .all()
                     )
 
@@ -75,61 +85,79 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
                     for r in readings:
                         if r.station_id in station_map:
                             s = station_map[r.station_id]
-                            points.append({
-                                "station_id": s.id,
-                                "station_code": s.station_code,
-                                "name": s.name,
-                                "lat": s.lat,
-                                "lon": s.lon,
-                                "city": s.city,
-                                "aqi": r.aqi,
-                                "category": aqi_to_category(r.aqi) if r.aqi is not None else None,
-                                "pm25": r.pm25,
-                                "pm10": r.pm10,
-                                "measured_at": r.measured_at.isoformat() if r.measured_at else None,
-                            })
+                            points.append(
+                                {
+                                    "station_id": s.id,
+                                    "station_code": s.station_code,
+                                    "name": s.name,
+                                    "lat": s.lat,
+                                    "lon": s.lon,
+                                    "city": s.city,
+                                    "aqi": r.aqi,
+                                    "category": aqi_to_category(r.aqi)
+                                    if r.aqi is not None
+                                    else None,
+                                    "pm25": r.pm25,
+                                    "pm10": r.pm10,
+                                    "measured_at": r.measured_at.isoformat()
+                                    if r.measured_at
+                                    else None,
+                                }
+                            )
 
                     # Push telemetry package
-                    await websocket.send_json({
-                        "type": "telemetry_update",
-                        "city": current_city,
-                        "station_count": len(points),
-                        "readings": points
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "telemetry_update",
+                            "city": current_city,
+                            "station_count": len(points),
+                            "readings": points,
+                        }
+                    )
 
                     # Check for threshold spikes (AQI >= 300)
                     for p in points:
                         if p["aqi"] is not None and p["aqi"] >= 300:
-                            await websocket.send_json({
-                                "type": "alert",
-                                "alert_type": "threshold_spike",
-                                "severity": "critical",
-                                "station_name": p["name"],
-                                "city": current_city,
-                                "aqi": p["aqi"],
-                                "message": f"🚨 CRITICAL ALERT: {p['name']} ({current_city}) AQI is severe ({p['aqi']}). Immediate abatement recommended."
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "alert",
+                                    "alert_type": "threshold_spike",
+                                    "severity": "critical",
+                                    "station_name": p["name"],
+                                    "city": current_city,
+                                    "aqi": p["aqi"],
+                                    "message": f"🚨 CRITICAL ALERT: {p['name']} ({current_city}) AQI is severe ({p['aqi']}). Immediate abatement recommended.",
+                                }
+                            )
 
                     # Check for SLA breach targets (open enforcement actions in current city older than 2 hours)
                     from datetime import datetime, timedelta
+
                     from app.models import EnforcementAction
+
                     two_hours_ago = datetime.utcnow() - timedelta(hours=2)
-                    overdue_actions = db.query(EnforcementAction).filter(
-                        EnforcementAction.city == current_city,
-                        EnforcementAction.status == "open",
-                        EnforcementAction.created_at < two_hours_ago
-                    ).all()
+                    overdue_actions = (
+                        db.query(EnforcementAction)
+                        .filter(
+                            EnforcementAction.city == current_city,
+                            EnforcementAction.status == "open",
+                            EnforcementAction.created_at < two_hours_ago,
+                        )
+                        .all()
+                    )
 
                     for action in overdue_actions:
-                        await websocket.send_json({
-                            "type": "alert",
-                            "alert_type": "sla_breach",
-                            "severity": "high",
-                            "action_id": action.id,
-                            "ward_id": action.ward_id,
-                            "city": current_city,
-                            "message": f"⏳ SLA BREACH: Enforcement action #{action.id} ('{action.action_text}') has been pending for over 2 hours without field deployment!"
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "alert",
+                                "alert_type": "sla_breach",
+                                "severity": "high",
+                                "action_id": action.id,
+                                "ward_id": action.ward_id,
+                                "city": current_city,
+                                "message": f"⏳ SLA BREACH: Enforcement action #{action.id} ('{action.action_text}') has been pending for over 2 hours without field deployment!",
+                            }
+                        )
 
             except WebSocketDisconnect:
                 break
@@ -150,5 +178,3 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
     finally:
         reader_task.cancel()
         logger.info(f"🔌 WebSocket subscriber disconnected: city={subscribed_city}")
-
-

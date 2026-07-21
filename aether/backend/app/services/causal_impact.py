@@ -12,6 +12,7 @@ For each intervention, we:
 This proves: "The intervention reduced AQI by X μg/m³ (p < 0.05)"
 Not just: "AQI dropped after intervention"
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,10 +32,7 @@ logger = logging.getLogger(__name__)
 def _get_ward_aqi_series(ward: Ward, days: int, db: Session) -> List[float]:
     """Get daily average AQI series for a ward over `days` days."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    stations = db.query(Station).filter(
-        Station.city == ward.city,
-        Station.active
-    ).all()
+    stations = db.query(Station).filter(Station.city == ward.city, Station.active).all()
 
     if not stations:
         # Simulate a realistic AQI series using seeded randomness
@@ -140,10 +138,13 @@ def _permutation_test(
         return 1.0
 
     # Observed ATE
-    observed_ate = sum(
-        target_series[pre_period_len + t] - counterfactual[pre_period_len + t]
-        for t in range(post_len)
-    ) / post_len
+    observed_ate = (
+        sum(
+            target_series[pre_period_len + t] - counterfactual[pre_period_len + t]
+            for t in range(post_len)
+        )
+        / post_len
+    )
 
     # Permutation: randomly shift intervention point
     n_exceeds = 0
@@ -152,10 +153,13 @@ def _permutation_test(
     for _ in range(n_permutations):
         # Pick a random placebo intervention point in pre-period
         placebo_start = rng.randint(1, max(1, pre_period_len - post_len))
-        placebo_ate = sum(
-            target_series[placebo_start + t] - counterfactual[placebo_start + t]
-            for t in range(post_len)
-        ) / post_len
+        placebo_ate = (
+            sum(
+                target_series[placebo_start + t] - counterfactual[placebo_start + t]
+                for t in range(post_len)
+            )
+            / post_len
+        )
 
         # Count how many placebo effects are as extreme as observed
         if abs(placebo_ate) >= abs(observed_ate):
@@ -219,20 +223,26 @@ def compute_causal_impact(
         post_actual = [target_series[-1]]
         post_counterfactual = [counterfactual[-1]]
 
-    ate = round(sum(post_actual[t] - post_counterfactual[t] for t in range(len(post_actual))) / len(post_actual), 1)
+    ate = round(
+        sum(post_actual[t] - post_counterfactual[t] for t in range(len(post_actual)))
+        / len(post_actual),
+        1,
+    )
 
     # 6. Bootstrap 95% CI on ATE
     bootstrap_ates = []
     rng = random.Random(42)
     for _ in range(200):
-        sample_idx = [rng.randint(0, len(post_actual) - 1) for _ in range(len(post_actual))]
+        sample_idx = [
+            rng.randint(0, len(post_actual) - 1) for _ in range(len(post_actual))
+        ]
         sample_ate = sum(
             post_actual[i] - post_counterfactual[i] for i in sample_idx
         ) / len(sample_idx)
         bootstrap_ates.append(sample_ate)
 
     bootstrap_ates.sort()
-    ci_lower = round(bootstrap_ates[5], 1)   # 2.5th percentile
+    ci_lower = round(bootstrap_ates[5], 1)  # 2.5th percentile
     ci_upper = round(bootstrap_ates[195], 1)  # 97.5th percentile
 
     # 7. Permutation test p-value
@@ -241,14 +251,18 @@ def compute_causal_impact(
     # 8. Health & economic impact
     pm25_ate = ate * 0.55  # PM2.5 ~ 55% of AQI
     pop = ward.population or 50000
-    hospital_admissions_prevented = round(abs(pm25_ate) * pop * 0.0001 * (post_days / 14), 1)
+    hospital_admissions_prevented = round(
+        abs(pm25_ate) * pop * 0.0001 * (post_days / 14), 1
+    )
     daly_avoided = round(abs(pm25_ate) * pop * 0.0000015 * post_days, 2)
     economic_value_lakhs = round(hospital_admissions_prevented * 1.2, 1)
 
     # 9. Statistical interpretation
     is_significant = p_value < 0.05
     effect_direction = "reduction" if ate < 0 else "increase"
-    effect_magnitude = "LARGE" if abs(ate) > 40 else "MODERATE" if abs(ate) > 20 else "SMALL"
+    effect_magnitude = (
+        "LARGE" if abs(ate) > 40 else "MODERATE" if abs(ate) > 20 else "SMALL"
+    )
 
     interpretation = (
         f"The {intervention_type.replace('_', ' ')} intervention in {ward.name} resulted in a "
@@ -256,9 +270,12 @@ def compute_causal_impact(
         f"AQI {effect_direction} of {abs(ate):.1f} μg/m³ "
         f"(95% CI: {abs(ci_upper):.1f} to {abs(ci_lower):.1f} μg/m³, p = {p_value:.3f}). "
         f"Effect magnitude: {effect_magnitude}. "
-        + (f"Approximately {hospital_admissions_prevented:.0f} hospital admissions prevented, "
-           f"saving ~Rs {economic_value_lakhs:.1f} lakh in health costs."
-           if ate < 0 else "Intervention appears to have increased pollution — investigate implementation failure.")
+        + (
+            f"Approximately {hospital_admissions_prevented:.0f} hospital admissions prevented, "
+            f"saving ~Rs {economic_value_lakhs:.1f} lakh in health costs."
+            if ate < 0
+            else "Intervention appears to have increased pollution — investigate implementation failure."
+        )
     )
 
     return {
@@ -288,7 +305,9 @@ def compute_causal_impact(
             "counterfactual": [round(v, 1) for v in counterfactual],
             "intervention_index": actual_pre_len,
             "dates": [
-                (datetime.utcnow() - timedelta(days=min_len - i - 1)).strftime("%Y-%m-%d")
+                (datetime.utcnow() - timedelta(days=min_len - i - 1)).strftime(
+                    "%Y-%m-%d"
+                )
                 for i in range(min_len)
             ],
         },
@@ -302,7 +321,9 @@ def compute_causal_impact(
     }
 
 
-def get_intervention_history_for_ward(ward_id: int, db: Session) -> List[Dict[str, Any]]:
+def get_intervention_history_for_ward(
+    ward_id: int, db: Session
+) -> List[Dict[str, Any]]:
     """Get all past enforcement actions and their causal impact estimates."""
     actions = (
         db.query(EnforcementAction)
@@ -323,20 +344,24 @@ def get_intervention_history_for_ward(ward_id: int, db: Session) -> List[Dict[st
                 pre_days=14,
                 post_days=7,
             )
-            results.append({
-                "action_id": action.id,
-                "type": action.target_type,
-                "created_at": action.created_at.isoformat(),
-                "causal_impact": impact.get("causal_estimate", {}),
-            })
+            results.append(
+                {
+                    "action_id": action.id,
+                    "type": action.target_type,
+                    "created_at": action.created_at.isoformat(),
+                    "causal_impact": impact.get("causal_estimate", {}),
+                }
+            )
         else:
-            results.append({
-                "action_id": action.id,
-                "type": action.target_type,
-                "created_at": action.created_at.isoformat(),
-                "causal_impact": None,
-                "status": action.status,
-            })
+            results.append(
+                {
+                    "action_id": action.id,
+                    "type": action.target_type,
+                    "created_at": action.created_at.isoformat(),
+                    "causal_impact": None,
+                    "status": action.status,
+                }
+            )
 
     # If no real actions, return synthetic historical examples
     if not results:
@@ -374,22 +399,33 @@ def get_intervention_history_for_ward(ward_id: int, db: Session) -> List[Dict[st
 
 try:
     from causalimpact import CausalImpact as pyCausalImpact
+
     CAUSALIMPACT_AVAILABLE = True
 except ImportError:
     CAUSALIMPACT_AVAILABLE = False
-    logger.info("causalimpact package not installed. CausalImpactAnalyzer will use mathematical BSTS fallback.")
+    logger.info(
+        "causalimpact package not installed. CausalImpactAnalyzer will use mathematical BSTS fallback."
+    )
+
 
 class CausalImpactAnalyzer:
     """
     Prove that interventions actually caused AQI reduction.
     Uses synthetic control methodology.
     """
+
     def __init__(self, vsl_inr: float = 15000000.0):
         self.vsl_inr = vsl_inr  # Value of Statistical Life in India
 
-    def analyze(self, ward_id: str, intervention_date: str,
-                pre_period_days: int = 90, post_period_days: int = 30,
-                n_control_wards: int = 5, db: Optional[Session] = None) -> Dict:
+    def analyze(
+        self,
+        ward_id: str,
+        intervention_date: str,
+        pre_period_days: int = 90,
+        post_period_days: int = 30,
+        n_control_wards: int = 5,
+        db: Optional[Session] = None,
+    ) -> Dict:
         """
         Analyze the causal impact of an intervention.
         """
@@ -400,6 +436,7 @@ class CausalImpactAnalyzer:
         if db:
             try:
                 from app.models import Ward
+
                 w_id = int(ward_id)
                 ward = db.query(Ward).filter(Ward.id == w_id).first()
                 if ward:
@@ -415,24 +452,30 @@ class CausalImpactAnalyzer:
         target_series = [max(20.0, 150.0 + rng.gauss(0, 20)) for _ in range(total_days)]
         control_series_list = []
         for c in range(n_control_wards):
-            control_series_list.append([max(20.0, 160.0 + rng.gauss(0, 15)) for _ in range(total_days)])
+            control_series_list.append(
+                [max(20.0, 160.0 + rng.gauss(0, 15)) for _ in range(total_days)]
+            )
 
         # Post-intervention reduction simulation for target
         for t in range(pre_period_days, total_days):
             target_series[t] -= 35.0 + rng.uniform(-5.0, 5.0)
 
         intervention_dt = pd.to_datetime(intervention_date)
-        pre_start = (intervention_dt - timedelta(days=pre_period_days)).strftime('%Y-%m-%d')
-        pre_end = (intervention_dt - timedelta(days=1)).strftime('%Y-%m-%d')
+        pre_start = (intervention_dt - timedelta(days=pre_period_days)).strftime(
+            "%Y-%m-%d"
+        )
+        pre_end = (intervention_dt - timedelta(days=1)).strftime("%Y-%m-%d")
         post_start = intervention_date
-        post_end = (intervention_dt + timedelta(days=post_period_days)).strftime('%Y-%m-%d')
+        post_end = (intervention_dt + timedelta(days=post_period_days)).strftime(
+            "%Y-%m-%d"
+        )
 
         # Build date index
-        dates = pd.date_range(end=post_end, periods=total_days, freq='D')
+        dates = pd.date_range(end=post_end, periods=total_days, freq="D")
 
-        data = pd.DataFrame({'target': target_series}, index=dates)
+        data = pd.DataFrame({"target": target_series}, index=dates)
         for i, cs in enumerate(control_series_list):
-            data[f'control_{i}'] = cs
+            data[f"control_{i}"] = cs
 
         use_py_ci = CAUSALIMPACT_AVAILABLE
 
@@ -441,14 +484,14 @@ class CausalImpactAnalyzer:
                 ci = pyCausalImpact(
                     data=data,
                     pre_period=[pre_start, pre_end],
-                    post_period=[post_start, post_end]
+                    post_period=[post_start, post_end],
                 )
                 summary = ci.summary_data.to_dict()
-                ate = summary.get('abs_effect', -35.0)
-                ate_lower = summary.get('abs_effect_lower', -42.0)
-                ate_upper = summary.get('abs_effect_upper', -28.0)
-                p_value = summary.get('p_value', 0.003)
-                cum_effect = summary.get('cum_abs_effect', -1050.0)
+                ate = summary.get("abs_effect", -35.0)
+                ate_lower = summary.get("abs_effect_lower", -42.0)
+                ate_upper = summary.get("abs_effect_upper", -28.0)
+                p_value = summary.get("p_value", 0.003)
+                cum_effect = summary.get("cum_abs_effect", -1050.0)
             except Exception as e:
                 logger.warning(f"pyCausalImpact execution failed: {e}")
                 use_py_ci = False
@@ -465,23 +508,23 @@ class CausalImpactAnalyzer:
         economic_value = self._estimate_economic_value(abs(ate), population)
 
         return {
-            'ward_id': ward_id,
-            'ward_name': ward_name,
-            'intervention_date': intervention_date,
-            'pre_period': [pre_start, pre_end],
-            'post_period': [post_start, post_end],
-            'average_treatment_effect_ug_m3': float(ate),
-            'confidence_interval': {
-                'lower': float(ate_lower),
-                'upper': float(ate_upper)
+            "ward_id": ward_id,
+            "ward_name": ward_name,
+            "intervention_date": intervention_date,
+            "pre_period": [pre_start, pre_end],
+            "post_period": [post_start, post_end],
+            "average_treatment_effect_ug_m3": float(ate),
+            "confidence_interval": {
+                "lower": float(ate_lower),
+                "upper": float(ate_upper),
             },
-            'p_value': float(p_value),
-            'statistically_significant': p_value < 0.05,
-            'cumulative_effect_ug_m3_days': float(cum_effect),
-            'health_impact': health_impact,
-            'economic_value_inr': economic_value,
-            'causal_graph_base64': "", # Graph visualization generated by client recharts
-            'interpretation': self._generate_interpretation(ate, p_value)
+            "p_value": float(p_value),
+            "statistically_significant": p_value < 0.05,
+            "cumulative_effect_ug_m3_days": float(cum_effect),
+            "health_impact": health_impact,
+            "economic_value_inr": economic_value,
+            "causal_graph_base64": "",  # Graph visualization generated by client recharts
+            "interpretation": self._generate_interpretation(ate, p_value),
         }
 
     def _estimate_health_impact(self, aqi_reduction: float, population: int) -> Dict:
@@ -490,9 +533,9 @@ class CausalImpactAnalyzer:
         """
         if aqi_reduction <= 0:
             return {
-                'lives_saved_annual': 0,
-                'hospital_admissions_prevented': 0,
-                'dalys_saved': 0
+                "lives_saved_annual": 0,
+                "hospital_admissions_prevented": 0,
+                "dalys_saved": 0,
             }
         baseline_mortality_rate = 0.007
         relative_risk_reduction = 0.06 * (aqi_reduction / 10.0)
@@ -502,10 +545,10 @@ class CausalImpactAnalyzer:
         dalys_saved = lives_saved * 12
 
         return {
-            'lives_saved_annual': round(lives_saved, 2),
-            'hospital_admissions_prevented': round(hospital_prevented, 0),
-            'dalys_saved': round(dalys_saved, 2),
-            'method': 'WHO Global Burden of Disease dose-response curves'
+            "lives_saved_annual": round(lives_saved, 2),
+            "hospital_admissions_prevented": round(hospital_prevented, 0),
+            "dalys_saved": round(dalys_saved, 2),
+            "method": "WHO Global Burden of Disease dose-response curves",
         }
 
     def _estimate_economic_value(self, aqi_reduction: float, population: int) -> float:
@@ -514,9 +557,9 @@ class CausalImpactAnalyzer:
         productivity_loss_per_death = 2000000
 
         value = (
-            health['lives_saved_annual'] * self.vsl_inr +
-            health['hospital_admissions_prevented'] * hospital_cost_per_admission +
-            health['lives_saved_annual'] * productivity_loss_per_death
+            health["lives_saved_annual"] * self.vsl_inr
+            + health["hospital_admissions_prevented"] * hospital_cost_per_admission
+            + health["lives_saved_annual"] * productivity_loss_per_death
         )
         return round(value, 2)
 
@@ -538,4 +581,3 @@ class CausalImpactAnalyzer:
             impact = "no detectable impact"
 
         return f"The intervention had a {impact} on air quality, {significance}. The average treatment effect was {abs(ate):.1f} ug/m3 reduction in PM2.5."
-

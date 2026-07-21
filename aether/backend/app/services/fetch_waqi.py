@@ -28,19 +28,40 @@ logger = logging.getLogger(__name__)
 # Bounding boxes for each city [lat_min, lon_min, lat_max, lon_max]
 CITY_BOUNDS: dict[str, tuple[float, float, float, float]] = {
     "Kolkata": (22.40, 88.20, 22.80, 88.50),
-    "Delhi":   (28.40, 76.84, 28.90, 77.40),
-    "Mumbai":  (18.85, 72.74, 19.30, 73.02),
+    "Delhi": (28.40, 76.84, 28.90, 77.40),
+    "Mumbai": (18.85, 72.74, 19.30, 73.02),
 }
 
 WAQI_BOUNDS_URL = "https://api.waqi.info/map/bounds/"
-WAQI_FEED_URL   = "https://api.waqi.info/feed/{station}/"
+WAQI_FEED_URL = "https://api.waqi.info/feed/{station}/"
 
 # Indian AQI breakpoints (CPCB standard)
 AQI_BREAKPOINTS = {
-    "pm25": [(0,30,0,50), (31,60,51,100), (61,90,101,200), (91,120,201,300), (121,250,301,400), (251,500,401,500)],
-    "pm10": [(0,50,0,50), (51,100,51,100), (101,250,101,200), (251,350,201,300), (351,430,301,400), (431,600,401,500)],
+    "pm25": [
+        (0, 30, 0, 50),
+        (31, 60, 51, 100),
+        (61, 90, 101, 200),
+        (91, 120, 201, 300),
+        (121, 250, 301, 400),
+        (251, 500, 401, 500),
+    ],
+    "pm10": [
+        (0, 50, 0, 50),
+        (51, 100, 51, 100),
+        (101, 250, 101, 200),
+        (251, 350, 201, 300),
+        (351, 430, 301, 400),
+        (431, 600, 401, 500),
+    ],
 }
-AQI_CATEGORIES = [(0,50,"Good"), (51,100,"Satisfactory"), (101,200,"Moderate"), (201,300,"Poor"), (301,400,"Very Poor"), (401,500,"Severe")]
+AQI_CATEGORIES = [
+    (0, 50, "Good"),
+    (51, 100, "Satisfactory"),
+    (101, 200, "Moderate"),
+    (201, 300, "Poor"),
+    (301, 400, "Very Poor"),
+    (401, 500, "Severe"),
+]
 
 
 def _aqi_to_category(aqi: float) -> str:
@@ -57,7 +78,9 @@ def _compute_sub_index(concentration: float, pollutant: str) -> float | None:
     return 500.0
 
 
-def compute_indian_aqi(pm25: float | None, pm10: float | None) -> tuple[float | None, str]:
+def compute_indian_aqi(
+    pm25: float | None, pm10: float | None
+) -> tuple[float | None, str]:
     """Compute Indian AQI as max of sub-indices per CPCB standard."""
     subs = []
     if pm25 and pm25 > 0:
@@ -84,7 +107,9 @@ def fetch_waqi_bounds(city: str) -> list[dict] | None:
     token = settings.waqi_token
 
     if not token:
-        logger.warning("WAQI_TOKEN not set — cannot fetch real AQI data. Set WAQI_TOKEN in .env")
+        logger.warning(
+            "WAQI_TOKEN not set — cannot fetch real AQI data. Set WAQI_TOKEN in .env"
+        )
         return None
 
     bounds = CITY_BOUNDS.get(city)
@@ -105,7 +130,9 @@ def fetch_waqi_bounds(city: str) -> list[dict] | None:
         data = resp.json()
 
         if data.get("status") != "ok":
-            logger.error(f"WAQI API error for {city}: {data.get('data', 'unknown error')}")
+            logger.error(
+                f"WAQI API error for {city}: {data.get('data', 'unknown error')}"
+            )
             return None
 
         stations = data.get("data", [])
@@ -140,13 +167,14 @@ def parse_waqi_station(raw: dict) -> dict | None:
         iaqi = raw.get("iaqi", {})
         pm25 = float(iaqi["pm25"]["v"]) if "pm25" in iaqi else None
         pm10 = float(iaqi["pm10"]["v"]) if "pm10" in iaqi else None
-        no2  = float(iaqi["no2"]["v"]) if "no2" in iaqi else None
-        so2  = float(iaqi["so2"]["v"]) if "so2" in iaqi else None
-        co   = float(iaqi["co"]["v"]) if "co" in iaqi else None
-        o3   = float(iaqi["o3"]["v"]) if "o3" in iaqi else None
+        no2 = float(iaqi["no2"]["v"]) if "no2" in iaqi else None
+        so2 = float(iaqi["so2"]["v"]) if "so2" in iaqi else None
+        co = float(iaqi["co"]["v"]) if "co" in iaqi else None
+        o3 = float(iaqi["o3"]["v"]) if "o3" in iaqi else None
 
         # Fallback: estimate PM2.5 and PM10 from general AQI if they are missing (e.g. Map Bounds API doesn't return iaqi)
         import random as _rand
+
         if pm25 is None and aqi is not None:
             pm25 = max(5.0, round(aqi * 0.55 + _rand.uniform(-5, 5), 1))
         if pm10 is None and aqi is not None:
@@ -239,6 +267,7 @@ def _find_nearest_station(lat: float, lon: float, db_stations: list) -> Station 
     if not lat or not lon:
         return None
     import math
+
     best = None
     best_dist = float("inf")
     for st in db_stations:
@@ -258,7 +287,12 @@ def fetch_and_store_waqi(city: str, db: Session) -> dict:
     """
     stations_raw = fetch_waqi_bounds(city)
     if stations_raw is None:
-        return {"status": "error", "city": city, "reason": "no_token_or_api_error", "inserted": 0}
+        return {
+            "status": "error",
+            "city": city,
+            "reason": "no_token_or_api_error",
+            "inserted": 0,
+        }
 
     inserted = upsert_waqi_readings(city, stations_raw, db)
     return {

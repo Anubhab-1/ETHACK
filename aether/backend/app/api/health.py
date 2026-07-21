@@ -61,10 +61,8 @@ def data_source_status():
     }
 
 
-
 @router.get("/cities")
 def list_cities(db: Session = Depends(get_db)):
-
     from app.models import Station
 
     cities_data = [
@@ -75,7 +73,11 @@ def list_cities(db: Session = Depends(get_db)):
 
     result = []
     for city in cities_data:
-        count = db.query(Station).filter(Station.city == city["name"], Station.active).count()
+        count = (
+            db.query(Station)
+            .filter(Station.city == city["name"], Station.active)
+            .count()
+        )
         result.append({**city, "station_count": count})
 
     return result
@@ -86,9 +88,21 @@ def get_current_weather(city: str = "Kolkata", db: Session = Depends(get_db)):
     from sqlalchemy import desc
 
     from app.models import Weather
-    row = db.query(Weather).filter(Weather.city == city).order_by(desc(Weather.recorded_at)).first()
+
+    row = (
+        db.query(Weather)
+        .filter(Weather.city == city)
+        .order_by(desc(Weather.recorded_at))
+        .first()
+    )
     if not row:
-        return {"city": city, "temp_c": 28.0, "humidity_pct": 70.0, "wind_speed": 6.5, "wind_dir": 180.0}
+        return {
+            "city": city,
+            "temp_c": 28.0,
+            "humidity_pct": 70.0,
+            "wind_speed": 6.5,
+            "wind_dir": 180.0,
+        }
     return {
         "city": city,
         "temp_c": row.temp_c,
@@ -107,7 +121,9 @@ def get_prometheus_metrics(db: Session = Depends(get_db)):
     """
     import random
     import time
+
     from fastapi.responses import Response
+
     from app.models import CitizenReport, EnforcementAction, Station
 
     # Measure actual DB latency
@@ -121,14 +137,26 @@ def get_prometheus_metrics(db: Session = Depends(get_db)):
     # Retrieve live database counts
     try:
         citizen_total = db.query(CitizenReport).count()
-        citizen_pending = db.query(CitizenReport).filter(CitizenReport.status == "pending").count()
-        citizen_resolved = db.query(CitizenReport).filter(CitizenReport.status == "resolved").count()
+        citizen_pending = (
+            db.query(CitizenReport).filter(CitizenReport.status == "pending").count()
+        )
+        citizen_resolved = (
+            db.query(CitizenReport).filter(CitizenReport.status == "resolved").count()
+        )
 
         enforcement_total = db.query(EnforcementAction).count()
-        enforcement_open = db.query(EnforcementAction).filter(EnforcementAction.status == "open").count()
-        enforcement_resolved = db.query(EnforcementAction).filter(EnforcementAction.status == "resolved").count()
+        enforcement_open = (
+            db.query(EnforcementAction)
+            .filter(EnforcementAction.status == "open")
+            .count()
+        )
+        enforcement_resolved = (
+            db.query(EnforcementAction)
+            .filter(EnforcementAction.status == "resolved")
+            .count()
+        )
 
-        active_stations = db.query(Station).filter(Station.active == True).count()
+        active_stations = db.query(Station).filter(Station.active.is_(True)).count()
     except Exception:
         citizen_total = citizen_pending = citizen_resolved = 0
         enforcement_total = enforcement_open = enforcement_resolved = 0
@@ -160,15 +188,13 @@ def get_prometheus_metrics(db: Session = Depends(get_db)):
         f"aether_active_stations_total {active_stations}\n\n"
         f"# HELP aether_citizen_reports_total Total count of citizen incident reports.\n"
         f"# TYPE aether_citizen_reports_total counter\n"
-        f"aether_citizen_reports_total{{status=\"total\"}} {citizen_total}\n"
-        f"aether_citizen_reports_total{{status=\"pending\"}} {citizen_pending}\n"
-        f"aether_citizen_reports_total{{status=\"resolved\"}} {citizen_resolved}\n\n"
+        f'aether_citizen_reports_total{{status="total"}} {citizen_total}\n'
+        f'aether_citizen_reports_total{{status="pending"}} {citizen_pending}\n'
+        f'aether_citizen_reports_total{{status="resolved"}} {citizen_resolved}\n\n'
         f"# HELP aether_enforcement_actions_total Total count of enforcement actions.\n"
         f"# TYPE aether_enforcement_actions_total counter\n"
-        f"aether_enforcement_actions_total{{status=\"total\"}} {enforcement_total}\n"
-        f"aether_enforcement_actions_total{{status=\"open\"}} {enforcement_open}\n"
-        f"aether_enforcement_actions_total{{status=\"resolved\"}} {enforcement_resolved}\n"
+        f'aether_enforcement_actions_total{{status="total"}} {enforcement_total}\n'
+        f'aether_enforcement_actions_total{{status="open"}} {enforcement_open}\n'
+        f'aether_enforcement_actions_total{{status="resolved"}} {enforcement_resolved}\n'
     )
     return Response(content=metrics_data, media_type="text/plain")
-
-

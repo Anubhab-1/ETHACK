@@ -10,6 +10,7 @@ import logging
 import math
 import random
 from datetime import datetime, timezone
+
 import requests
 from sqlalchemy.orm import Session
 
@@ -34,7 +35,7 @@ def fetch_openaq_baseline(lat: float, lon: float) -> dict | None:
             "limit": 1,
             "parameter": ["pm25", "pm10"],
             "order_by": "datetime",
-            "sort": "desc"
+            "sort": "desc",
         }
         resp = requests.get(OPENAQ_API_URL, params=params, timeout=2.0)
         if resp.status_code == 200:
@@ -43,10 +44,16 @@ def fetch_openaq_baseline(lat: float, lon: float) -> dict | None:
             if results:
                 res = results[0]
                 return {
-                    "pm25": res.get("value") if res.get("parameter") == "pm25" else None,
-                    "pm10": res.get("value") if res.get("parameter") == "pm10" else None,
-                    "measured_at": datetime.fromisoformat(res["date"]["utc"].replace("Z", "+00:00")),
-                    "source": "OpenAQ Public Network"
+                    "pm25": res.get("value")
+                    if res.get("parameter") == "pm25"
+                    else None,
+                    "pm10": res.get("value")
+                    if res.get("parameter") == "pm10"
+                    else None,
+                    "measured_at": datetime.fromisoformat(
+                        res["date"]["utc"].replace("Z", "+00:00")
+                    ),
+                    "source": "OpenAQ Public Network",
                 }
     except Exception:
         # Fail silently to allow seamless fallback
@@ -70,18 +77,25 @@ def fetch_and_store_verification(city: str, db: Session) -> dict:
     for st in stations:
         # Check if we can get real OpenAQ data
         openaq_data = fetch_openaq_baseline(st.lat, st.lon)
-        
+
         # Primary reference parameters
-        source_name = "Kolkata Municipal Corp IoT Feed" if city == "Kolkata" else f"{city} Green Air Network"
+        source_name = (
+            "Kolkata Municipal Corp IoT Feed"
+            if city == "Kolkata"
+            else f"{city} Green Air Network"
+        )
         pm25 = None
         pm10 = None
         aqi = None
         measured_at = now
 
         # Get latest CPCB reading for baseline
-        latest_reading = db.query(Reading).filter(
-            Reading.station_id == st.id
-        ).order_by(Reading.measured_at.desc()).first()
+        latest_reading = (
+            db.query(Reading)
+            .filter(Reading.station_id == st.id)
+            .order_by(Reading.measured_at.desc())
+            .first()
+        )
 
         if openaq_data:
             pm25 = openaq_data["pm25"]
@@ -90,6 +104,7 @@ def fetch_and_store_verification(city: str, db: Session) -> dict:
             measured_at = openaq_data["measured_at"]
             # Compute estimated AQI from OpenAQ readings
             from app.services.fetch_cpcb import compute_aqi
+
             aqi, _ = compute_aqi(pm25, pm10)
         else:
             # Fallback high-fidelity simulation compared to the ground CPCB station
@@ -105,20 +120,26 @@ def fetch_and_store_verification(city: str, db: Session) -> dict:
 
             # Introduce simulated zero-point calibration drift for demo stations
             # Howrah (in Kolkata) and Anand Vihar (in Delhi) will suffer from calibration drift
-            is_drifting = "howrah" in st.name.lower() or "anand vihar" in st.name.lower() or "bandra kurla" in st.name.lower()
-            
+            is_drifting = (
+                "howrah" in st.name.lower()
+                or "anand vihar" in st.name.lower()
+                or "bandra kurla" in st.name.lower()
+            )
+
             if is_drifting and aqi is not None:
                 # CPCB sensor drifts high, so the verification sensor reads lower
                 # Drift bias has a slow hourly oscillation
                 drift_bias = 28.0 + 6.0 * math.sin(now.hour / 3.8)
-                
+
                 # Subtract drift from verification reading (meaning CPCB reads high by drift_bias)
                 aqi = max(5.0, aqi - drift_bias)
                 if pm25:
                     pm25 = max(1.0, pm25 - (drift_bias * 0.5))
                 if pm10:
                     pm10 = max(2.0, pm10 - (drift_bias * 0.8))
-                logger.info(f"Artificially drifting verification baseline for station {st.name} (bias: -{drift_bias:.1f} AQI)")
+                logger.info(
+                    f"Artificially drifting verification baseline for station {st.name} (bias: -{drift_bias:.1f} AQI)"
+                )
             else:
                 # Add minor random noise for other normal stations
                 if aqi is not None:
@@ -129,10 +150,14 @@ def fetch_and_store_verification(city: str, db: Session) -> dict:
                     pm10 = max(0.0, pm10 + random.uniform(-3.0, 3.0))
 
         # Check if we already have a verification reading for this station and time
-        exists = db.query(VerificationReading).filter(
-            VerificationReading.station_id == st.id,
-            VerificationReading.measured_at == measured_at
-        ).first()
+        exists = (
+            db.query(VerificationReading)
+            .filter(
+                VerificationReading.station_id == st.id,
+                VerificationReading.measured_at == measured_at,
+            )
+            .first()
+        )
 
         if not exists:
             v_reading = VerificationReading(
@@ -141,7 +166,7 @@ def fetch_and_store_verification(city: str, db: Session) -> dict:
                 source_name=source_name,
                 aqi=round(aqi, 1) if aqi is not None else None,
                 pm25=round(pm25, 1) if pm25 is not None else None,
-                pm10=round(pm10, 1) if pm10 is not None else None
+                pm10=round(pm10, 1) if pm10 is not None else None,
             )
             db.add(v_reading)
             inserted += 1
@@ -154,8 +179,4 @@ def fetch_and_store_verification(city: str, db: Session) -> dict:
         db.rollback()
         logger.error(f"Verification Ingest DB error for {city}: {e}")
 
-    return {
-        "status": "ok",
-        "city": city,
-        "inserted": inserted
-    }
+    return {"status": "ok", "city": city, "inserted": inserted}

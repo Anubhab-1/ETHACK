@@ -4,6 +4,7 @@ Predicts AQI 24h, 48h, 72h ahead for any ward using spatial-temporal graph neura
 Uses lagged AQI + weather features as inputs.
 Falls back to XGBoost or intelligent persistence if deep models are not available.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,28 +24,33 @@ logger = logging.getLogger(__name__)
 try:
     import torch  # type: ignore
     import torch.nn as nn  # type: ignore
+
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+
     # Stub nn.Module when PyTorch is not installed
     class nn:
         class Module:
             pass
-    logger.info("PyTorch not available. ST-GCN forecasting model will fall back to XGBoost.")
+
+    logger.info(
+        "PyTorch not available. ST-GCN forecasting model will fall back to XGBoost."
+    )
+
 
 class STGCNBlock(nn.Module):
     """
     Spatio-Temporal Graph Convolutional Block.
     Applies temporal convolution, followed by a spatial graph convolution over wind-aligned edges.
     """
+
     def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3):
         if not TORCH_AVAILABLE:
             return
         super().__init__()
         self.temporal_conv = nn.Conv2d(
-            in_channels, out_channels,
-            (kernel_size, 1),
-            padding=(kernel_size // 2, 0)
+            in_channels, out_channels, (kernel_size, 1), padding=(kernel_size // 2, 0)
         )
         self.spatial_linear = nn.Linear(out_channels, out_channels)
         self.bn = nn.BatchNorm2d(out_channels)
@@ -66,12 +72,20 @@ class STGCNBlock(nn.Module):
         x = x.permute(0, 3, 2, 1)  # Back to (B, C, N, T)
         return torch.relu(self.bn(x))
 
+
 class AetherSTGCN(nn.Module):
     """
     ST-GCN model for multi-station forecasting.
     Uses Haversine distance & wind-aligned Pearson r correlation for graph edge weights.
     """
-    def __init__(self, num_nodes: int, num_features: int, input_timesteps: int, output_timesteps: int):
+
+    def __init__(
+        self,
+        num_nodes: int,
+        num_features: int,
+        input_timesteps: int,
+        output_timesteps: int,
+    ):
         if not TORCH_AVAILABLE:
             return
         super().__init__()
@@ -89,6 +103,7 @@ class AetherSTGCN(nn.Module):
         x = self.block2(x, adjacency_matrix)
         x = x.reshape(x.size(0), -1)
         return self.fc(x)
+
 
 MODEL_PATH = Path(__file__).parent.parent.parent / "models"
 MODEL_PATH.mkdir(exist_ok=True)
@@ -117,20 +132,29 @@ def _get_station_history(city: str, hours: int, db: Session) -> pd.DataFrame:
     stations = db.query(Station).filter(Station.city == city, Station.active).all()
     station_ids = [s.id for s in stations]
 
-    rows = db.query(Reading).filter(
-        Reading.station_id.in_(station_ids),
-        Reading.measured_at >= since,
-    ).order_by(Reading.measured_at.asc()).all()
+    rows = (
+        db.query(Reading)
+        .filter(
+            Reading.station_id.in_(station_ids),
+            Reading.measured_at >= since,
+        )
+        .order_by(Reading.measured_at.asc())
+        .all()
+    )
 
     if not rows:
         return pd.DataFrame()
 
-    data = [{
-        "measured_at": r.measured_at,
-        "aqi": r.aqi or 0,
-        "pm25": r.pm25 or 0,
-        "pm10": r.pm10 or 0,
-    } for r in rows if r.aqi]
+    data = [
+        {
+            "measured_at": r.measured_at,
+            "aqi": r.aqi or 0,
+            "pm25": r.pm25 or 0,
+            "pm10": r.pm10 or 0,
+        }
+        for r in rows
+        if r.aqi
+    ]
 
     if not data:
         return pd.DataFrame()
@@ -145,22 +169,30 @@ def _get_station_history(city: str, hours: int, db: Session) -> pd.DataFrame:
 def _get_weather_history(city: str, hours: int, db: Session) -> pd.DataFrame:
     """Pull weather history for a city."""
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
-    rows = db.query(Weather).filter(
-        Weather.city == city,
-        Weather.recorded_at >= since,
-    ).order_by(Weather.recorded_at.asc()).all()
+    rows = (
+        db.query(Weather)
+        .filter(
+            Weather.city == city,
+            Weather.recorded_at >= since,
+        )
+        .order_by(Weather.recorded_at.asc())
+        .all()
+    )
 
     if not rows:
         return pd.DataFrame()
 
-    data = [{
-        "recorded_at": r.recorded_at,
-        "temp_c": r.temp_c or 28,
-        "humidity_pct": r.humidity_pct or 60,
-        "wind_speed": r.wind_speed or 5,
-        "wind_dir": r.wind_dir or 0,
-        "pressure": r.pressure or 1013,
-    } for r in rows]
+    data = [
+        {
+            "recorded_at": r.recorded_at,
+            "temp_c": r.temp_c or 28,
+            "humidity_pct": r.humidity_pct or 60,
+            "wind_speed": r.wind_speed or 5,
+            "wind_dir": r.wind_dir or 0,
+            "pressure": r.pressure or 1013,
+        }
+        for r in rows
+    ]
 
     df = pd.DataFrame(data)
     df["recorded_at"] = pd.to_datetime(df["recorded_at"])
@@ -173,11 +205,13 @@ def _engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["hour"] = df["measured_at"].dt.hour if "measured_at" in df.columns else 0
     df["month"] = df["measured_at"].dt.month if "measured_at" in df.columns else 1
-    df["day_of_week"] = df["measured_at"].dt.dayofweek if "measured_at" in df.columns else 0
+    df["day_of_week"] = (
+        df["measured_at"].dt.dayofweek if "measured_at" in df.columns else 0
+    )
     df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
     df["is_rush_hour"] = (
-        ((df["hour"] >= 7) & (df["hour"] <= 10)) |
-        ((df["hour"] >= 17) & (df["hour"] <= 20))
+        ((df["hour"] >= 7) & (df["hour"] <= 10))
+        | ((df["hour"] >= 17) & (df["hour"] <= 20))
     ).astype(int)
     df["is_winter"] = df["month"].isin([11, 12, 1, 2]).astype(int)
     df["is_festival_window"] = df["month"].isin([10, 11]).astype(int)
@@ -219,7 +253,9 @@ def _write_model_metrics(city: str, horizon: int, payload: dict) -> None:
         with open(metrics_file, "w", encoding="utf-8") as mf:
             json.dump(metrics_payload, mf, indent=2)
     except Exception as exc:
-        logger.warning("Could not write model metrics file for %s %sh: %s", city, horizon, exc)
+        logger.warning(
+            "Could not write model metrics file for %s %sh: %s", city, horizon, exc
+        )
 
 
 def train_model(city: str, db: Session) -> dict:
@@ -236,11 +272,15 @@ def train_model(city: str, db: Session) -> dict:
                 "error": "xgboost not installed",
                 "model_saved": str(model_file),
             }
-            _write_model_metrics(city, horizon, {
-                "status": "dependency_missing",
-                "message": "xgboost not installed",
-                "model_file": None,
-            })
+            _write_model_metrics(
+                city,
+                horizon,
+                {
+                    "status": "dependency_missing",
+                    "message": "xgboost not installed",
+                    "model_file": None,
+                },
+            )
         return {"error": "xgboost not installed", **results}
 
     logger.info(f"Training XGBoost model for {city}...")
@@ -258,11 +298,15 @@ def train_model(city: str, db: Session) -> dict:
                 "error": f"Insufficient data for {city} (need 48+ hours)",
                 "model_saved": str(model_file),
             }
-            _write_model_metrics(city, horizon, {
-                "status": "insufficient_data",
-                "message": f"Insufficient data for {city} (need 48+ hours)",
-                "model_file": None,
-            })
+            _write_model_metrics(
+                city,
+                horizon,
+                {
+                    "status": "insufficient_data",
+                    "message": f"Insufficient data for {city} (need 48+ hours)",
+                    "model_file": None,
+                },
+            )
         return {"error": f"Insufficient data for {city} (need 48+ hours)", **results}
 
     # Merge AQI + weather
@@ -281,7 +325,9 @@ def train_model(city: str, db: Session) -> dict:
 
     df = _engineer_features(df)
 
-    feature_cols = [c for c in df.columns if c not in ["measured_at", "aqi", "pm25", "pm10"]]
+    feature_cols = [
+        c for c in df.columns if c not in ["measured_at", "aqi", "pm25", "pm10"]
+    ]
 
     results = {}
     for horizon in [24, 48, 72]:
@@ -291,11 +337,15 @@ def train_model(city: str, db: Session) -> dict:
 
         if len(df_clean) < 20:
             results[f"{horizon}h"] = {"error": "insufficient data"}
-            _write_model_metrics(city, horizon, {
-                "status": "insufficient_data",
-                "message": "not enough training rows for a reliable split",
-                "model_file": None,
-            })
+            _write_model_metrics(
+                city,
+                horizon,
+                {
+                    "status": "insufficient_data",
+                    "message": "not enough training rows for a reliable split",
+                    "model_file": None,
+                },
+            )
             continue
 
         try:
@@ -317,7 +367,8 @@ def train_model(city: str, db: Session) -> dict:
                 eval_metric="rmse",
             )
             model.fit(
-                X_train, y_train,
+                X_train,
+                y_train,
                 eval_set=[(X_test, y_test)],
                 verbose=False,
             )
@@ -348,26 +399,36 @@ def train_model(city: str, db: Session) -> dict:
                 "n_test": len(y_test),
                 "model_saved": str(model_file),
             }
-            logger.info(f"  {city} {horizon}h: RMSE={rmse_model:.1f} (baseline={rmse_baseline:.1f})")
-            _write_model_metrics(city, horizon, {
-                "status": "trained",
-                "message": "model trained and saved",
-                "rmse_model": round(rmse_model, 2),
-                "rmse_baseline": round(rmse_baseline, 2),
-                "improvement_pct": improvement_pct,
-                "mae": round(mae, 2),
-                "r2": round(r2, 3),
-                "n_test": len(y_test),
-                "model_file": str(model_file),
-            })
+            logger.info(
+                f"  {city} {horizon}h: RMSE={rmse_model:.1f} (baseline={rmse_baseline:.1f})"
+            )
+            _write_model_metrics(
+                city,
+                horizon,
+                {
+                    "status": "trained",
+                    "message": "model trained and saved",
+                    "rmse_model": round(rmse_model, 2),
+                    "rmse_baseline": round(rmse_baseline, 2),
+                    "improvement_pct": improvement_pct,
+                    "mae": round(mae, 2),
+                    "r2": round(r2, 3),
+                    "n_test": len(y_test),
+                    "model_file": str(model_file),
+                },
+            )
         except Exception as exc:
             logger.exception("Training failed for %s %sh", city, horizon)
             results[f"{horizon}h"] = {"error": str(exc)}
-            _write_model_metrics(city, horizon, {
-                "status": "training_failed",
-                "message": str(exc),
-                "model_file": None,
-            })
+            _write_model_metrics(
+                city,
+                horizon,
+                {
+                    "status": "training_failed",
+                    "message": str(exc),
+                    "model_file": None,
+                },
+            )
 
     return results
 
@@ -422,6 +483,7 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
         if model_file.exists():
             try:
                 import xgboost as xgb
+
                 m = xgb.XGBRegressor()
                 m.load_model(str(model_file))
                 xgb_models[horizon] = m
@@ -436,9 +498,12 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
     df_hist = _get_station_history(city, hours=72, db=db)
     if not df_hist.empty:
         df_hist = _engineer_features(df_hist)
-        feature_cols = [c for c in df_hist.columns
-                        if c not in ["measured_at", "aqi", "pm25", "pm10"]
-                        and not c.startswith("aqi_target")]
+        feature_cols = [
+            c
+            for c in df_hist.columns
+            if c not in ["measured_at", "aqi", "pm25", "pm10"]
+            and not c.startswith("aqi_target")
+        ]
         last_row = df_hist[feature_cols].iloc[-1:].fillna(0)
     else:
         last_row = None
@@ -462,9 +527,13 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
                 pred = float(xgb_models[hour].predict(last_row)[0])
                 predicted_aqi = max(0.0, min(500.0, pred))
             except Exception:
-                predicted_aqi = _weather_adjusted_persistence(prev_aqi, hour, temp_c, humidity, wind_speed, forecast_time)
+                predicted_aqi = _weather_adjusted_persistence(
+                    prev_aqi, hour, temp_c, humidity, wind_speed, forecast_time
+                )
         else:
-            predicted_aqi = _weather_adjusted_persistence(prev_aqi, hour, temp_c, humidity, wind_speed, forecast_time)
+            predicted_aqi = _weather_adjusted_persistence(
+                prev_aqi, hour, temp_c, humidity, wind_speed, forecast_time
+            )
 
         prev_aqi = predicted_aqi  # feed forward for next step
 
@@ -472,17 +541,19 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
         lower = max(0.0, round(predicted_aqi * (1 - ci_width), 1))
         upper = min(500.0, round(predicted_aqi * (1 + ci_width), 1))
 
-        forecasts.append({
-            "forecast_for": forecast_time.isoformat(),
-            "horizon_hours": hour,
-            "predicted_aqi": round(predicted_aqi, 1),
-            "predicted_category": aqi_to_category(predicted_aqi),
-            "confidence_lower": lower,
-            "confidence_upper": upper,
-            "temp_c": round(temp_c, 1),
-            "wind_speed": round(wind_speed, 1),
-            "method": method,
-        })
+        forecasts.append(
+            {
+                "forecast_for": forecast_time.isoformat(),
+                "horizon_hours": hour,
+                "predicted_aqi": round(predicted_aqi, 1),
+                "predicted_category": aqi_to_category(predicted_aqi),
+                "confidence_lower": lower,
+                "confidence_upper": upper,
+                "temp_c": round(temp_c, 1),
+                "wind_speed": round(wind_speed, 1),
+                "method": method,
+            }
+        )
 
     # ── 6. Persist summary anchor points (24h, 48h, 72h) to DB ─────────────
     anchors = [f for f in forecasts if f["horizon_hours"] in (24, 48, 72)]
@@ -506,7 +577,14 @@ def predict_aqi(ward: Ward, db: Session) -> list[dict]:
     return forecasts
 
 
-def _weather_adjusted_persistence(base_aqi: float, hour: int, temp_c: float, humidity: float, wind_speed: float, forecast_time: datetime) -> float:
+def _weather_adjusted_persistence(
+    base_aqi: float,
+    hour: int,
+    temp_c: float,
+    humidity: float,
+    wind_speed: float,
+    forecast_time: datetime,
+) -> float:
     """
     Physics-informed persistence forecast using real weather parameters.
 
@@ -526,7 +604,7 @@ def _weather_adjusted_persistence(base_aqi: float, hour: int, temp_c: float, hum
     # Two peaks: 8am rush (coefficient +0.18) and 7pm rush (coefficient +0.12)
     morning_rush = _math.exp(-0.5 * ((fh - 8) / 1.5) ** 2) * 0.18
     evening_rush = _math.exp(-0.5 * ((fh - 19) / 1.5) ** 2) * 0.12
-    night_dip    = -0.08 if 1 <= fh <= 5 else 0.0
+    night_dip = -0.08 if 1 <= fh <= 5 else 0.0
     diurnal = 1.0 + morning_rush + evening_rush + night_dip
 
     # ── Humidity effect ─────────────────────────────────────────────────────
@@ -544,10 +622,9 @@ def _weather_adjusted_persistence(base_aqi: float, hour: int, temp_c: float, hum
     # Uncertainty increases, revert slightly toward city mean over 72h
     city_mean = 150.0
     decay = 0.97 ** min(hour, 48)  # flatten after 48h
-    mean_reversion = 1.0 - decay   # weight toward city mean
+    mean_reversion = 1.0 - decay  # weight toward city mean
 
     base_projection = base_aqi * decay + city_mean * mean_reversion
     adjusted = base_projection * diurnal * humidity_factor * wind_factor * winter_factor
 
     return max(0.0, min(500.0, adjusted))
-

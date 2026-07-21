@@ -25,7 +25,7 @@ def seed_all_stations(db: Session):
     total = 0
     for city, stations in CITY_STATIONS.items():
         for i, s in enumerate(stations):
-            code = f"{city[:3].upper()}-{i+1:03d}"
+            code = f"{city[:3].upper()}-{i + 1:03d}"
             existing = db.query(Station).filter(Station.station_code == code).first()
             if not existing:
                 station = Station(
@@ -46,6 +46,7 @@ def seed_all_stations(db: Session):
 
 if __name__ == "__main__":
     from app.database import SessionLocal, create_tables
+
     create_tables()
     db = SessionLocal()
     seed_all_stations(db)

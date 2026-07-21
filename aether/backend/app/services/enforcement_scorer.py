@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 
 # Actionability scores by source type
 ACTIONABILITY = {
-    "construction": 0.9,   # Can halt work immediately
-    "industrial": 0.7,     # Can inspect, reduce load
-    "traffic": 0.6,        # Can divert, enforce odd-even
-    "biomass": 0.3,        # Hard to control quickly
-    "residential": 0.2,    # Very hard to control
+    "construction": 0.9,  # Can halt work immediately
+    "industrial": 0.7,  # Can inspect, reduce load
+    "traffic": 0.6,  # Can divert, enforce odd-even
+    "biomass": 0.3,  # Hard to control quickly
+    "residential": 0.2,  # Very hard to control
 }
 
 ACTION_TEMPLATES = {
@@ -73,10 +73,10 @@ def compute_priority(
     population_score = (ward.population or 100000) / 100000
     svi = getattr(ward, "svi_index", 0.0) or 0.0
     exposure = (
-        population_score * 0.10 +
-        min(ward.school_count * 2, 20) * 0.04 +
-        min(ward.hospital_count * 3, 15) * 0.04 +
-        svi * 10.0 * 0.07
+        population_score * 0.10
+        + min(ward.school_count * 2, 20) * 0.04
+        + min(ward.hospital_count * 3, 15) * 0.04
+        + svi * 10.0 * 0.07
     )
 
     # Actionability
@@ -87,10 +87,10 @@ def compute_priority(
     trend = 1.0 if forecast_24h > current_aqi else 0.7
 
     priority = (
-        severity * 0.35 +
-        exposure * 0.25 +
-        actionability * 20 * 0.20 +
-        trend * 10 * 0.20
+        severity * 0.35
+        + exposure * 0.25
+        + actionability * 20 * 0.20
+        + trend * 10 * 0.20
     )
     return round(min(priority, 100), 1)
 
@@ -118,9 +118,12 @@ def recompute_enforcement_queue(city: str, db: Session, limit: int = 20):
                 continue  # Skip wards with good air quality
 
             # Get latest attribution (or compute fresh)
-            attribution_rec = db.query(Attribution).filter(
-                Attribution.ward_id == ward.id
-            ).order_by(Attribution.computed_at.desc()).first()
+            attribution_rec = (
+                db.query(Attribution)
+                .filter(Attribution.ward_id == ward.id)
+                .order_by(Attribution.computed_at.desc())
+                .first()
+            )
 
             if not attribution_rec:
                 attr_result = run_attribution_for_ward(ward, db)
@@ -137,25 +140,39 @@ def recompute_enforcement_queue(city: str, db: Session, limit: int = 20):
                 }
 
             # Get 24h forecast
-            forecast_rec = db.query(Forecast).filter(
-                Forecast.ward_id == ward.id,
-                Forecast.horizon_hours == 24,
-            ).order_by(Forecast.generated_at.desc()).first()
-            forecast_24h = forecast_rec.predicted_aqi if forecast_rec else current_aqi * 1.1
+            forecast_rec = (
+                db.query(Forecast)
+                .filter(
+                    Forecast.ward_id == ward.id,
+                    Forecast.horizon_hours == 24,
+                )
+                .order_by(Forecast.generated_at.desc())
+                .first()
+            )
+            forecast_24h = (
+                forecast_rec.predicted_aqi if forecast_rec else current_aqi * 1.1
+            )
 
             priority = compute_priority(ward, current_aqi, forecast_24h, attr_result)
             action_text = generate_action_text(ward, attr_result)
 
             # Only create if no open action exists for this ward
-            existing = db.query(EnforcementAction).filter(
-                EnforcementAction.ward_id == ward.id,
-                EnforcementAction.status == "open",
-            ).first()
+            existing = (
+                db.query(EnforcementAction)
+                .filter(
+                    EnforcementAction.ward_id == ward.id,
+                    EnforcementAction.status == "open",
+                )
+                .first()
+            )
 
             if not existing:
                 import random
                 from datetime import timedelta
-                detected_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 15))
+
+                detected_time = datetime.utcnow() - timedelta(
+                    minutes=random.randint(5, 15)
+                )
                 action = EnforcementAction(
                     ward_id=ward.id,
                     city=city,
@@ -179,7 +196,9 @@ def recompute_enforcement_queue(city: str, db: Session, limit: int = 20):
 
     try:
         db.commit()
-        logger.info("Enforcement queue updated: %d new actions created for %s", created, city)
+        logger.info(
+            "Enforcement queue updated: %d new actions created for %s", created, city
+        )
     except Exception as e:
         logger.error("Failed to commit enforcement queue update: %s", e)
         db.rollback()
@@ -204,13 +223,17 @@ def detect_spikes_and_auto_escalate(db: Session, city: str = "Kolkata") -> int:
         try:
             current_aqi = get_current_aqi_for_ward(ward, db)
             if current_aqi < 200:
-                continue # Only check moderate/severe conditions
+                continue  # Only check moderate/severe conditions
 
             # Check if there is an existing open action
-            existing = db.query(EnforcementAction).filter(
-                EnforcementAction.ward_id == ward.id,
-                EnforcementAction.status == "open"
-            ).first()
+            existing = (
+                db.query(EnforcementAction)
+                .filter(
+                    EnforcementAction.ward_id == ward.id,
+                    EnforcementAction.status == "open",
+                )
+                .first()
+            )
 
             if existing:
                 continue
@@ -227,13 +250,21 @@ def detect_spikes_and_auto_escalate(db: Session, city: str = "Kolkata") -> int:
 
             if is_anomaly:
                 import random
-                # Retrieve primary source attribution
-                attribution_rec = db.query(Attribution).filter(
-                    Attribution.ward_id == ward.id
-                ).order_by(Attribution.computed_at.desc()).first()
-                primary_source = attribution_rec.primary_source if attribution_rec else "traffic"
 
-                detected_time = datetime.utcnow() - timedelta(minutes=random.randint(5, 12))
+                # Retrieve primary source attribution
+                attribution_rec = (
+                    db.query(Attribution)
+                    .filter(Attribution.ward_id == ward.id)
+                    .order_by(Attribution.computed_at.desc())
+                    .first()
+                )
+                primary_source = (
+                    attribution_rec.primary_source if attribution_rec else "traffic"
+                )
+
+                detected_time = datetime.utcnow() - timedelta(
+                    minutes=random.randint(5, 12)
+                )
 
                 action = EnforcementAction(
                     ward_id=ward.id,
@@ -242,11 +273,13 @@ def detect_spikes_and_auto_escalate(db: Session, city: str = "Kolkata") -> int:
                     action_text=f"🚨 AUTOMATED SPIKE DETECTION: {trigger_reason} Priority deployment recommended for {primary_source} abatement in Ward {ward.ward_no}.",
                     target_type=primary_source,
                     status="open",
-                    detected_at=detected_time
+                    detected_at=detected_time,
                 )
                 db.add(action)
                 created += 1
-                logger.info(f"🚨 Anomaly spike detected in Ward {ward.ward_no} ({ward.name}) - Auto-escalated enforcement action created.")
+                logger.info(
+                    f"🚨 Anomaly spike detected in Ward {ward.ward_no} ({ward.name}) - Auto-escalated enforcement action created."
+                )
         except Exception as e:
             logger.warning(f"Error checking anomalies for ward {ward.id}: {e}")
             continue

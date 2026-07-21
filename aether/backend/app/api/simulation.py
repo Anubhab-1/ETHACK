@@ -23,6 +23,7 @@ from app.services.pinn_dispersion import simulate_dispersion
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
 class SimulationRequest(BaseModel):
     ward_id: int
     traffic_reduction: int  # 0 to 100
@@ -30,6 +31,7 @@ class SimulationRequest(BaseModel):
     industrial_restriction: int  # 0 to 100
     wind_speed: Optional[float] = None
     wind_dir: Optional[float] = None
+
 
 class SimulatedWardAQI(BaseModel):
     ward_id: int
@@ -39,6 +41,7 @@ class SimulatedWardAQI(BaseModel):
     is_downwind: bool
     distance_km: float
 
+
 class SimulationResponse(BaseModel):
     target_ward_id: int
     city: str
@@ -46,10 +49,12 @@ class SimulationResponse(BaseModel):
     wind_dir: float
     results: List[SimulatedWardAQI]
 
+
 class CalibrationPoint(BaseModel):
     ward_name: str
     ground_aqi: float
     satellite_no2: float
+
 
 class CalibrationResponse(BaseModel):
     r_squared: float
@@ -58,11 +63,9 @@ class CalibrationResponse(BaseModel):
     intercept: float
     points: List[CalibrationPoint]
 
+
 @router.post("/simulation/evaluate", response_model=SimulationResponse)
-def evaluate_simulation(
-    req: SimulationRequest,
-    db: Session = Depends(get_db)
-):
+def evaluate_simulation(req: SimulationRequest, db: Session = Depends(get_db)):
     """
     Evaluates the localized policy simulation.
     Reduces AQI in the target ward and propagates the cleaner air downwind.
@@ -75,9 +78,24 @@ def evaluate_simulation(
     city = target_ward.city
 
     # 2. Get current weather (for wind parameters)
-    weather = db.query(Weather).filter(Weather.city == city).order_by(Weather.recorded_at.desc()).first()
-    wind_speed = req.wind_speed if req.wind_speed is not None else (weather.wind_speed if (weather and weather.wind_speed is not None) else 6.5)
-    wind_dir = req.wind_dir if req.wind_dir is not None else (weather.wind_dir if (weather and weather.wind_dir is not None) else 180.0)
+    weather = (
+        db.query(Weather)
+        .filter(Weather.city == city)
+        .order_by(Weather.recorded_at.desc())
+        .first()
+    )
+    wind_speed = (
+        req.wind_speed
+        if req.wind_speed is not None
+        else (
+            weather.wind_speed if (weather and weather.wind_speed is not None) else 6.5
+        )
+    )
+    wind_dir = (
+        req.wind_dir
+        if req.wind_dir is not None
+        else (weather.wind_dir if (weather and weather.wind_dir is not None) else 180.0)
+    )
 
     # Meteorological wind direction: blows FROM wind_dir
     # Downwind blow direction is (wind_dir + 180) % 360
@@ -94,18 +112,27 @@ def evaluate_simulation(
     latest_readings = {}
     if station_ids:
         from sqlalchemy import func
+
         subq = (
-            db.query(Reading.station_id, func.max(Reading.measured_at).label("max_measured"))
+            db.query(
+                Reading.station_id, func.max(Reading.measured_at).label("max_measured")
+            )
             .filter(Reading.station_id.in_(station_ids))
             .group_by(Reading.station_id)
             .subquery()
         )
         latest_rows = (
             db.query(Reading)
-            .join(subq, (Reading.station_id == subq.c.station_id) & (Reading.measured_at == subq.c.max_measured))
+            .join(
+                subq,
+                (Reading.station_id == subq.c.station_id)
+                & (Reading.measured_at == subq.c.max_measured),
+            )
             .all()
         )
-        latest_readings = {r.station_id: r.aqi for r in latest_rows if r.aqi is not None}
+        latest_readings = {
+            r.station_id: r.aqi for r in latest_rows if r.aqi is not None
+        }
 
     # Pre-calculate active ward AQIs and attributions
     now = datetime.utcnow()
@@ -119,19 +146,31 @@ def evaluate_simulation(
     current_aqis = {}
     attributions = {}
     for w in wards:
-        aqi = get_current_aqi_for_ward(w, db, stations=stations, latest_readings=latest_readings)
+        aqi = get_current_aqi_for_ward(
+            w, db, stations=stations, latest_readings=latest_readings
+        )
         current_aqis[w.id] = aqi
         # Run local source attribution to check weights
-        attributions[w.id] = attribute_sources(w, aqi, {"wind_speed": wind_speed, "wind_dir": wind_dir}, time_features)
+        attributions[w.id] = attribute_sources(
+            w, aqi, {"wind_speed": wind_speed, "wind_dir": wind_dir}, time_features
+        )
 
     target_current_aqi = current_aqis[target_ward.id]
     target_attr = attributions[target_ward.id]["breakdown"]
 
     # 4. Calculate direct percentage reduction on target ward
     # We factor in policy efficacy and source weights
-    traffic_red = (req.traffic_reduction / 100.0) * target_attr.get("traffic", 20.0) * 0.85
-    construction_red = (0.90 if req.construction_halt else 0.0) * target_attr.get("construction", 20.0)
-    industrial_red = (req.industrial_restriction / 100.0) * target_attr.get("industrial", 20.0) * 0.80
+    traffic_red = (
+        (req.traffic_reduction / 100.0) * target_attr.get("traffic", 20.0) * 0.85
+    )
+    construction_red = (0.90 if req.construction_halt else 0.0) * target_attr.get(
+        "construction", 20.0
+    )
+    industrial_red = (
+        (req.industrial_restriction / 100.0)
+        * target_attr.get("industrial", 20.0)
+        * 0.80
+    )
 
     total_pct_red = traffic_red + construction_red + industrial_red
     target_simulated_aqi = max(10.0, target_current_aqi * (1.0 - total_pct_red / 100.0))
@@ -144,14 +183,16 @@ def evaluate_simulation(
     # 5. Propagate clean air to all wards based on wind vector and downwind dispersion
     for w in wards:
         if w.id == target_ward.id:
-            results.append(SimulatedWardAQI(
-                ward_id=w.id,
-                ward_name=w.name,
-                original_aqi=target_current_aqi,
-                simulated_aqi=target_simulated_aqi,
-                is_downwind=False,
-                distance_km=0.0
-            ))
+            results.append(
+                SimulatedWardAQI(
+                    ward_id=w.id,
+                    ward_name=w.name,
+                    original_aqi=target_current_aqi,
+                    simulated_aqi=target_simulated_aqi,
+                    is_downwind=False,
+                    distance_km=0.0,
+                )
+            )
             continue
 
         # Calculate displacement vector from target ward (source) to other ward
@@ -185,33 +226,36 @@ def evaluate_simulation(
                 wind_dir=wind_dir,
                 target_lat=w.lat,
                 target_lon=w.lon,
-                hours=1.0
+                hours=1.0,
             )
 
             # Apply reduction to downwind ward
             sim_aqi = max(10.0, sim_aqi - downwind_drop)
 
-        results.append(SimulatedWardAQI(
-            ward_id=w.id,
-            ward_name=w.name,
-            original_aqi=current_aqis[w.id],
-            simulated_aqi=round(sim_aqi, 1),
-            is_downwind=is_downwind,
-            distance_km=round(distance_km, 2)
-        ))
+        results.append(
+            SimulatedWardAQI(
+                ward_id=w.id,
+                ward_name=w.name,
+                original_aqi=current_aqis[w.id],
+                simulated_aqi=round(sim_aqi, 1),
+                is_downwind=is_downwind,
+                distance_km=round(distance_km, 2),
+            )
+        )
 
     return SimulationResponse(
         target_ward_id=req.ward_id,
         city=city,
         wind_speed=wind_speed,
         wind_dir=wind_dir,
-        results=results
+        results=results,
     )
+
 
 @router.get("/simulation/calibrate", response_model=CalibrationResponse)
 def get_satellite_calibration(
     city: str = Query("Kolkata", description="City to calibrate"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Computes statistical correlation (R² and Pearson R) between ground sensors
@@ -227,49 +271,64 @@ def get_satellite_calibration(
     latest_readings = {}
     if station_ids:
         from sqlalchemy import func
+
         subq = (
-            db.query(Reading.station_id, func.max(Reading.measured_at).label("max_measured"))
+            db.query(
+                Reading.station_id, func.max(Reading.measured_at).label("max_measured")
+            )
             .filter(Reading.station_id.in_(station_ids))
             .group_by(Reading.station_id)
             .subquery()
         )
         latest_rows = (
             db.query(Reading)
-            .join(subq, (Reading.station_id == subq.c.station_id) & (Reading.measured_at == subq.c.max_measured))
+            .join(
+                subq,
+                (Reading.station_id == subq.c.station_id)
+                & (Reading.measured_at == subq.c.max_measured),
+            )
             .all()
         )
-        latest_readings = {r.station_id: r.aqi for r in latest_rows if r.aqi is not None}
+        latest_readings = {
+            r.station_id: r.aqi for r in latest_rows if r.aqi is not None
+        }
 
     from app.services.satellite import fetch_calibrated_satellite_grid
+
     sat_grid_data = fetch_calibrated_satellite_grid(city)
     grid_points = sat_grid_data.get("grid", [])
 
     points = []
     for w in wards:
-        ground_aqi = get_current_aqi_for_ward(w, db, stations=stations, latest_readings=latest_readings)
-        
+        ground_aqi = get_current_aqi_for_ward(
+            w, db, stations=stations, latest_readings=latest_readings
+        )
+
         # Find nearest satellite pixel
         nearest_pixel = None
         min_dist = float("inf")
         for p in grid_points:
-            dist = math.sqrt((w.lat - p["lat"])**2 + (w.lon - p["lon"])**2)
+            dist = math.sqrt((w.lat - p["lat"]) ** 2 + (w.lon - p["lon"]) ** 2)
             if dist < min_dist:
                 min_dist = dist
                 nearest_pixel = p
-        
+
         satellite_no2 = nearest_pixel["value"] if nearest_pixel else 1.0
 
-        points.append(CalibrationPoint(
-            ward_name=w.name,
-            ground_aqi=ground_aqi,
-            satellite_no2=round(satellite_no2, 2)
-        ))
-
+        points.append(
+            CalibrationPoint(
+                ward_name=w.name,
+                ground_aqi=ground_aqi,
+                satellite_no2=round(satellite_no2, 2),
+            )
+        )
 
     # Calculate regression metrics
     n = len(points)
     if n < 2:
-        return CalibrationResponse(r_squared=0.0, pearson_r=0.0, slope=0.0, intercept=0.0, points=points)
+        return CalibrationResponse(
+            r_squared=0.0, pearson_r=0.0, slope=0.0, intercept=0.0, points=points
+        )
 
     xs = [p.ground_aqi for p in points]
     ys = [p.satellite_no2 for p in points]
@@ -278,11 +337,13 @@ def get_satellite_calibration(
     mean_y = sum(ys) / n
 
     num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
-    den_x = sum((x - mean_x)**2 for x in xs)
-    den_y = sum((y - mean_y)**2 for y in ys)
+    den_x = sum((x - mean_x) ** 2 for x in xs)
+    den_y = sum((y - mean_y) ** 2 for y in ys)
 
     if den_x == 0 or den_y == 0:
-        return CalibrationResponse(r_squared=0.0, pearson_r=0.0, slope=0.0, intercept=0.0, points=points)
+        return CalibrationResponse(
+            r_squared=0.0, pearson_r=0.0, slope=0.0, intercept=0.0, points=points
+        )
 
     pearson_r = num / math.sqrt(den_x * den_y)
     r_squared = pearson_r**2
@@ -295,5 +356,5 @@ def get_satellite_calibration(
         pearson_r=round(pearson_r, 4),
         slope=round(slope, 5),
         intercept=round(intercept, 4),
-        points=points
+        points=points,
     )

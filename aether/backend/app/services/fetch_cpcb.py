@@ -52,13 +52,15 @@ def compute_sub_index(concentration: float, pollutant: str) -> float | None:
     """Compute Indian AQI sub-index for a pollutant."""
     if pollutant not in AQI_BREAKPOINTS:
         return None
-    for (c_lo, c_hi, i_lo, i_hi, _) in AQI_BREAKPOINTS[pollutant]:
+    for c_lo, c_hi, i_lo, i_hi, _ in AQI_BREAKPOINTS[pollutant]:
         if c_lo <= concentration <= c_hi:
             return i_lo + (i_hi - i_lo) * (concentration - c_lo) / (c_hi - c_lo)
     return 500.0  # capped at severe
 
 
-def compute_aqi(pm25: float | None, pm10: float | None) -> tuple[float | None, str | None]:
+def compute_aqi(
+    pm25: float | None, pm10: float | None
+) -> tuple[float | None, str | None]:
     """Compute overall AQI as max of sub-indices."""
     sub_indices = []
     if pm25 is not None:
@@ -123,16 +125,18 @@ def _generate_fallback_data(city: str) -> list[dict]:
         local_aqi = max(30, min(450, local_aqi))
         pm25 = local_aqi * 0.55 + random.uniform(-5, 5)
         pm10 = local_aqi * 0.85 + random.uniform(-10, 10)
-        results.append({
-            "station": s["name"],
-            "city": city,
-            "latitude": s["lat"],
-            "longitude": s["lon"],
-            "pollutant_avg": round(pm25, 1),
-            "pm10_avg": round(pm10, 1),
-            "aqi": round(local_aqi, 1),
-            "last_update": datetime.now(timezone.utc).isoformat(),
-        })
+        results.append(
+            {
+                "station": s["name"],
+                "city": city,
+                "latitude": s["lat"],
+                "longitude": s["lon"],
+                "pollutant_avg": round(pm25, 1),
+                "pm10_avg": round(pm10, 1),
+                "aqi": round(local_aqi, 1),
+                "last_update": datetime.now(timezone.utc).isoformat(),
+            }
+        )
     return results
 
 
@@ -140,33 +144,88 @@ def _get_city_station_defaults(city: str) -> list[dict]:
     """Return known CPCB station coordinates per city."""
     stations = {
         "Kolkata": [
-            {"name": "Rabindra Bharati University", "lat": 22.5974, "lon": 88.3694, "local_modifier": 20},
-            {"name": "Victoria Memorial", "lat": 22.5448, "lon": 88.3426, "local_modifier": 5},
-            {"name": "Fort William", "lat": 22.5587, "lon": 88.3394, "local_modifier": -5},
+            {
+                "name": "Rabindra Bharati University",
+                "lat": 22.5974,
+                "lon": 88.3694,
+                "local_modifier": 20,
+            },
+            {
+                "name": "Victoria Memorial",
+                "lat": 22.5448,
+                "lon": 88.3426,
+                "local_modifier": 5,
+            },
+            {
+                "name": "Fort William",
+                "lat": 22.5587,
+                "lon": 88.3394,
+                "local_modifier": -5,
+            },
             {"name": "Jadavpur", "lat": 22.4975, "lon": 88.3714, "local_modifier": 10},
-            {"name": "Bidhannagar", "lat": 22.5834, "lon": 88.4323, "local_modifier": -10},
+            {
+                "name": "Bidhannagar",
+                "lat": 22.5834,
+                "lon": 88.4323,
+                "local_modifier": -10,
+            },
             {"name": "Howrah", "lat": 22.5958, "lon": 88.2636, "local_modifier": 35},
-            {"name": "Ballygunge", "lat": 22.5266, "lon": 88.3670, "local_modifier": 15},
-            {"name": "Barrackpore", "lat": 22.7620, "lon": 88.3806, "local_modifier": 25},
+            {
+                "name": "Ballygunge",
+                "lat": 22.5266,
+                "lon": 88.3670,
+                "local_modifier": 15,
+            },
+            {
+                "name": "Barrackpore",
+                "lat": 22.7620,
+                "lon": 88.3806,
+                "local_modifier": 25,
+            },
             {"name": "Durgapur", "lat": 23.5204, "lon": 87.3119, "local_modifier": 60},
             {"name": "Asansol", "lat": 23.6840, "lon": 86.9658, "local_modifier": 55},
         ],
         "Delhi": [
-            {"name": "Anand Vihar", "lat": 28.6469, "lon": 77.3161, "local_modifier": 80},
+            {
+                "name": "Anand Vihar",
+                "lat": 28.6469,
+                "lon": 77.3161,
+                "local_modifier": 80,
+            },
             {"name": "ITO", "lat": 28.6289, "lon": 77.2409, "local_modifier": 60},
-            {"name": "Punjabi Bagh", "lat": 28.6720, "lon": 77.1310, "local_modifier": 70},
+            {
+                "name": "Punjabi Bagh",
+                "lat": 28.6720,
+                "lon": 77.1310,
+                "local_modifier": 70,
+            },
             {"name": "RK Puram", "lat": 28.5633, "lon": 77.1734, "local_modifier": 50},
             {"name": "Dwarka", "lat": 28.5821, "lon": 77.0508, "local_modifier": 55},
             {"name": "Okhla", "lat": 28.5355, "lon": 77.2726, "local_modifier": 75},
             {"name": "Bawana", "lat": 28.7892, "lon": 77.0411, "local_modifier": 90},
-            {"name": "Jahangirpuri", "lat": 28.7338, "lon": 77.1641, "local_modifier": 85},
+            {
+                "name": "Jahangirpuri",
+                "lat": 28.7338,
+                "lon": 77.1641,
+                "local_modifier": 85,
+            },
         ],
         "Mumbai": [
-            {"name": "Bandra Kurla", "lat": 19.0596, "lon": 72.8656, "local_modifier": 20},
+            {
+                "name": "Bandra Kurla",
+                "lat": 19.0596,
+                "lon": 72.8656,
+                "local_modifier": 20,
+            },
             {"name": "Colaba", "lat": 18.9067, "lon": 72.8147, "local_modifier": -10},
             {"name": "Worli", "lat": 19.0176, "lon": 72.8183, "local_modifier": 15},
             {"name": "Sion", "lat": 19.0390, "lon": 72.8619, "local_modifier": 30},
-            {"name": "Navi Mumbai", "lat": 19.0330, "lon": 73.0297, "local_modifier": 10},
+            {
+                "name": "Navi Mumbai",
+                "lat": 19.0330,
+                "lon": 73.0297,
+                "local_modifier": 10,
+            },
             {"name": "Borivali", "lat": 19.2183, "lon": 72.8564, "local_modifier": -5},
         ],
     }
@@ -182,7 +241,10 @@ def upsert_readings(records: list[dict], station_map: dict, db: Session):
         # Find station by name fuzzy match
         station = None
         for code, st in station_map.items():
-            if st.name.lower() in station_name.lower() or station_name.lower() in st.name.lower():
+            if (
+                st.name.lower() in station_name.lower()
+                or station_name.lower() in st.name.lower()
+            ):
                 station = st
                 break
         if not station:
@@ -195,7 +257,9 @@ def upsert_readings(records: list[dict], station_map: dict, db: Session):
         except (TypeError, ValueError):
             continue
 
-        aqi, category = compute_aqi(pm25 if pm25 > 0 else None, pm10 if pm10 > 0 else None)
+        aqi, category = compute_aqi(
+            pm25 if pm25 > 0 else None, pm10 if pm10 > 0 else None
+        )
         # Use pre-computed AQI if available
         if "aqi" in rec and rec["aqi"]:
             try:
