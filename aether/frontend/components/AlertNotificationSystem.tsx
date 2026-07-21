@@ -148,7 +148,7 @@ export function AlertNotificationSystem({
 
     if (newAlerts.length > 0) {
       setAlerts((prev) => [...newAlerts, ...prev].slice(0, 50));
-      setToasts((prev) => [...prev, ...newAlerts.slice(0, 3)]);
+      // Toast popups disabled per user preference
     }
   }, [liveAQI, city]);
 
@@ -168,7 +168,7 @@ export function AlertNotificationSystem({
 
     if (newWsAlerts.length > 0) {
       setAlerts((prev) => [...newWsAlerts, ...prev].slice(0, 50));
-      setToasts((prev) => [...prev, ...newWsAlerts.slice(0, 3)]);
+      // Toast popups disabled per user preference
     }
   }, [wsAlerts]);
 
