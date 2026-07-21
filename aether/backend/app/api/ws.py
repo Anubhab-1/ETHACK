@@ -162,10 +162,15 @@ async def websocket_live_aqi(websocket: WebSocket, city: str = "Kolkata"):
             except WebSocketDisconnect:
                 break
             except RuntimeError as e:
-                if "close message has been sent" in str(e) or "send" in str(e):
+                err_msg = str(e).lower()
+                if "close" in err_msg or "send" in err_msg or "disconnect" in err_msg:
                     break
-                logger.error(f"Error sending telemetry package inside WebSocket: {e}")
+                logger.warning(f"WebSocket runtime event: {e}")
+                break
             except Exception as e:
+                err_msg = str(e).lower()
+                if "close" in err_msg or "cannot call" in err_msg or "send" in err_msg:
+                    break
                 logger.error(f"Error preparing telemetry package inside WebSocket: {e}")
             finally:
                 db.close()
