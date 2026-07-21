@@ -302,6 +302,49 @@ interface Message {
   timestamp: Date;
 }
 
+function generateLocalAdvisoryResponse(q: string, lang: string, aqi: number, wardName?: string): string {
+  const query = q.toLowerCase();
+  const wardTxt = wardName ? ` in ${wardName}` : "";
+
+  if (lang === "bn") {
+    if (query.includes("মাস্ক") || query.includes("mask")) {
+      return `বর্তমানে বায়ু সূচক **AQI ${aqi}**${wardTxt}। বাইরে বেরোনোর সময় N95 অথবা FFP2 মাস্ক ব্যবহার করা অত্যন্ত জরুরি। সাধারণ কাপড়ের মাস্ক ক্ষুদ্র PM2.5 কণা আটকাতে সক্ষম নয়।`;
+    }
+    if (query.includes("জগিং") || query.includes("jogging") || query.includes("ব্যায়াম") || query.includes("exercise")) {
+      return `আজ সকালে আউটডোর জগিং বা ভারী ব্যায়াম না করাই শ্রেয়। বায়ুতে ধূলিকণা ও PM2.5 মাত্রা বেশি থাকায় ইনডোর ব্যায়াম করার পরামর্শ দেওয়া হচ্ছে।`;
+    }
+    if (query.includes("স্কুল") || query.includes("বাচ্চা") || query.includes("school") || query.includes("child")) {
+      return `শিশুদের জন্য বর্তমানে বায়ুর গুণমান ঝুঁকিপূর্ণ। স্কুলে যাওয়ার সময় মাস্ক পরিধান নিশ্চিত করুন এবং মাঠে দীর্ঘক্ষণ খেলাধুলা এড়িয়ে চলতে বলুন।`;
+    }
+    return `বর্তমানে এলাকায় বায়ুর গুণমান **AQI ${aqi} (ঝুঁকিপূর্ণ)**${wardTxt}। বয়স্ক, শিশু এবং অ্যাজমা রোগীদের অপ্রয়োজনে বাইরে বেরোনো এড়িয়ে চলার পরামর্শ দেওয়া হচ্ছে।`;
+  }
+
+  if (lang === "hi") {
+    if (query.includes("मास्क") || query.includes("mask")) {
+      return `वर्तमान में वायु गुणवत्ता **AQI ${aqi}**${wardTxt} है। बाहर निकलते समय N95 या FFP2 मास्क अवश्य पहनें। साधारण कपड़ा मास्क हानिकारक PM2.5 कणों को रोकने में सक्षम नहीं है।`;
+    }
+    if (query.includes("जॉगिंग") || query.includes("व्यायाम") || query.includes("jogging") || query.includes("exercise")) {
+      return `आज सुबह बाहर जॉगिंग या भारी व्यायाम करने से बचें। हवा में PM2.5 का स्तर अधिक है, इसलिए घर के अंदर ही हल्का व्यायाम करें।`;
+    }
+    if (query.includes("स्कूल") || query.includes("बच्चे") || query.includes("school") || query.includes("child")) {
+      return `बच्चों के स्वास्थ्य के लिए हवा की स्थिति गंभीर है। स्कूल भेजते समय N95 मास्क पहनाएं और खेल के मैदान में ज्यादा देर रहने से मना करें।`;
+    }
+    return `आपके क्षेत्र में वर्तमान वायु गुणवत्ता **AQI ${aqi} (खराब)**${wardTxt} है। बुजुर्गों और सांस के मरीजों को सलाह दी जाती है कि वे आवश्यक न होने पर बाहर न निकलें।`;
+  }
+
+  // English
+  if (query.includes("mask")) {
+    return `Current AQI${wardTxt} is **${aqi} (Poor)**. Wearing an N95 or FFP2 respirator mask is strongly advised when outdoors. Cloth masks provide insufficient filtration against fine PM2.5 particulates.`;
+  }
+  if (query.includes("jog") || query.includes("exercise") || query.includes("run")) {
+    return `Outdoor morning jogging${wardTxt} is **not recommended** today due to surface temperature inversion trapping PM2.5 particulates. Postpone cardiovascular activities to indoor facilities.`;
+  }
+  if (query.includes("school") || query.includes("kid") || query.includes("child")) {
+    return `Children are particularly susceptible at **AQI ${aqi}**${wardTxt}. Ensure children wear N95 masks during school commutes and restrict prolonged outdoor physical training.`;
+  }
+  return `Current atmospheric conditions indicate **AQI ${aqi} (Poor)**${wardTxt}. Sensitive demographics (asthmatics, elderly, children) should limit prolonged outdoor exertion and keep indoor air purifiers active.`;
+}
+
 // ─── Main Advisory Page ─────────────────────────────────────────────────────
 
 export default function AdvisoryPage() {
