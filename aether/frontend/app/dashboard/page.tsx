@@ -128,6 +128,13 @@ export default function DashboardPage() {
   const [twinSimMinimized, setTwinSimMinimized] = useState(false);
   const [controlsMinimized, setControlsMinimized] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setTwinSimMinimized(true);
+      setControlsMinimized(true);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);

@@ -337,7 +337,33 @@ export function AppShell({ children, city = "Kolkata", liveAQI }: AppShellProps)
           )}
         </div>
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto pb-16 md:pb-0">{children}</main>
+
+        {/* ── Mobile Bottom Navigation Bar (Phone Screens) ── */}
+        <div className="fixed bottom-0 left-0 right-0 z-[9999] md:hidden bg-gray-950/95 backdrop-blur-xl border-t border-white/10 px-2 py-1 flex items-center justify-around shadow-2xl pointer-events-auto">
+          {[
+            { href: "/dashboard", icon: LayoutDashboard, label: "Map" },
+            { href: "/forecast", icon: TrendingUp, label: "Forecast" },
+            { href: "/enforcement", icon: Shield, label: "Enforce" },
+            { href: "/advisory", icon: MessageSquare, label: "Advisory" },
+            { href: "/field-officer", icon: Briefcase, label: "Field" },
+          ].map((navItem) => {
+            const isActive = pathname === navItem.href || (navItem.href !== "/" && pathname.startsWith(navItem.href));
+            const IconComponent = navItem.icon;
+            return (
+              <Link
+                key={navItem.href}
+                href={navItem.href}
+                className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${
+                  isActive ? "text-orange-400 font-bold" : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                <IconComponent size={18} strokeWidth={isActive ? 2.5 : 1.8} />
+                <span className="text-[10px] font-medium tracking-tight">{navItem.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

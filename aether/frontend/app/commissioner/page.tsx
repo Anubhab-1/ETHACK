@@ -514,24 +514,26 @@ export default function CommissionerPage() {
                   </div>
                 ) : (
                   causalHistory.map((rec, i) => (
-                    <div key={i} className="flex items-center gap-4 p-3 bg-slate-900/40 rounded-lg border border-slate-700/30">
+                    <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-900/40 rounded-lg border border-slate-700/30">
                       <div className="flex-1">
                         <div className="text-slate-200 text-sm font-medium">{rec.intervention}</div>
                         <div className="text-slate-500 text-xs">{rec.ward} · {rec.date}</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-emerald-400 font-bold text-lg">↓{Math.abs(rec.ate_ugm3)}</div>
-                        <div className="text-slate-500 text-xs">μg/m³ ATE</div>
-                      </div>
-                      <div className="text-center">
-                        <div className={`font-bold text-sm ${rec.p_value < 0.01 ? "text-emerald-300" : "text-yellow-300"}`}>
-                          p={rec.p_value.toFixed(4)}
+                      <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-4 border-t sm:border-t-0 border-white/5 pt-2 sm:pt-0">
+                        <div className="text-center">
+                          <div className="text-emerald-400 font-bold text-sm sm:text-lg">↓{Math.abs(rec.ate_ugm3)}</div>
+                          <div className="text-slate-500 text-[10px] sm:text-xs">μg/m³ ATE</div>
                         </div>
-                        <div className="text-slate-500 text-xs">{rec.p_value < 0.05 ? "✅ Significant" : "⚠️ Marginal"}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-emerald-400 font-bold text-sm">₹{rec.health_savings.toFixed(1)}L</div>
-                        <div className="text-slate-500 text-xs">Saved</div>
+                        <div className="text-center">
+                          <div className={`font-bold text-xs sm:text-sm ${rec.p_value < 0.01 ? "text-emerald-300" : "text-yellow-300"}`}>
+                            p={rec.p_value.toFixed(4)}
+                          </div>
+                          <div className="text-slate-500 text-[10px] sm:text-xs">{rec.p_value < 0.05 ? "✅ Significant" : "⚠️ Marginal"}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-emerald-400 font-bold text-xs sm:text-sm">₹{rec.health_savings.toFixed(1)}L</div>
+                          <div className="text-slate-500 text-[10px] sm:text-xs">Saved</div>
+                        </div>
                       </div>
                     </div>
                   ))
