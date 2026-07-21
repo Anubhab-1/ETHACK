@@ -226,10 +226,10 @@ export function AlertNotificationSystem({
           )}
         </button>
 
-        {/* Notification Panel — fixed so it is never clipped by overflow-hidden parents */}
+        {/* Notification Panel — fixed so it is never clipped by headers or overflow-hidden parents */}
         {panelOpen && (
           <div
-            className="fixed top-[52px] right-4 z-[1200] w-80 max-h-[70vh] overflow-y-auto glass-card border border-white/10 shadow-2xl rounded-2xl animate-slide-up"
+            className="fixed top-[104px] md:top-[64px] right-3 sm:right-4 z-[10005] w-[calc(100vw-24px)] sm:w-80 md:w-96 max-h-[70vh] overflow-y-auto glass-card border border-orange-500/30 shadow-2xl rounded-2xl animate-slide-up"
             style={{ background: "rgba(5,5,12,0.97)" }}
           >
             {/* Panel Header */}
@@ -339,9 +339,9 @@ export function AlertNotificationSystem({
         )}
       </div>
 
-      {/* Toast stack (bottom-right of screen) */}
+      {/* Toast stack (bottom-right of screen, above mobile bottom bar) */}
       {toasts.length > 0 && (
-        <div className="fixed bottom-6 right-4 z-[1200] flex flex-col gap-2 pointer-events-auto">
+        <div className="fixed bottom-20 md:bottom-6 right-3 sm:right-4 z-[10005] flex flex-col gap-2 pointer-events-auto max-w-[calc(100vw-24px)]">
           {toasts.map((toast) => (
             <AlertToast key={toast.id} alert={toast} onDismiss={dismissToast} />
           ))}
