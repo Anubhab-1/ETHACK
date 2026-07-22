@@ -270,59 +270,55 @@ def get_current_weather_for_ward(ward: Ward, db: Session) -> Dict:
     }
 
 
+from sqlalchemy import func
+from app.utils.aqi_utils import idw_interpolate, DEFAULT_AQI
+
+
 def get_current_aqi_for_ward(
     ward: Ward,
     db: Session,
     stations: Optional[List[Station]] = None,
     latest_readings: Optional[Dict[int, float]] = None,
 ) -> float:  # noqa
-    """Get interpolated AQI for a ward using nearest stations."""
-    # Get all stations in the same city if not pre-fetched
+    """Get interpolated AQI for a ward using IDW spatial interpolation across active stations."""
     if stations is None:
         stations = (
             db.query(Station).filter(Station.city == ward.city, Station.active).all()
         )
     if not stations:
-        return 150.0  # Default moderate
+        return DEFAULT_AQI
 
-    # Calculate distance to each station
-    distances = []
-    for st in stations:
-        dist = math.sqrt((st.lat - ward.lat) ** 2 + (st.lon - ward.lon) ** 2)
-        distances.append((dist, st))
+    station_map = {st.id: st for st in stations}
 
-    # Sort by distance, take nearest 3
-    distances.sort(key=lambda x: x[0])
-    nearest = distances[:3]
-
-    # Inverse distance weighted average
-    weights = []
-    aqis = []
-    for dist, st in nearest:
-        if latest_readings is not None:
-            aqi_val = latest_readings.get(st.id)
-            if aqi_val is not None:
-                w = 1.0 / max(dist, 0.001)
-                weights.append(w)
-                aqis.append(aqi_val)
-        else:
-            reading = (
-                db.query(Reading)
-                .filter(Reading.station_id == st.id)
-                .order_by(Reading.measured_at.desc())
-                .first()
+    if latest_readings is not None:
+        points = [
+            (st.lat, st.lon, latest_readings[st.id])
+            for st in stations
+            if st.id in latest_readings and latest_readings[st.id] is not None
+        ]
+    else:
+        subq = (
+            db.query(Reading.station_id, func.max(Reading.measured_at).label("latest_time"))
+            .filter(Reading.station_id.in_(list(station_map.keys())))
+            .group_by(Reading.station_id)
+            .subquery()
+        )
+        latest_data = (
+            db.query(Reading)
+            .join(
+                subq,
+                (Reading.station_id == subq.c.station_id)
+                & (Reading.measured_at == subq.c.latest_time),
             )
-            if reading and reading.aqi:
-                w = 1.0 / max(dist, 0.001)
-                weights.append(w)
-                aqis.append(reading.aqi)
+            .all()
+        )
+        points = [
+            (station_map[r.station_id].lat, station_map[r.station_id].lon, r.aqi)
+            for r in latest_data
+            if r.station_id in station_map and r.aqi is not None
+        ]
 
-    if not aqis:
-        return 150.0
-
-    total_w = sum(weights)
-    aqi = sum(a * w for a, w in zip(aqis, weights)) / total_w
-    return round(aqi, 1)
+    return idw_interpolate(ward.lat, ward.lon, points, power=2.0)
 
 
 def get_pm_ratio(ward: Ward, db: Session) -> float:  # noqa

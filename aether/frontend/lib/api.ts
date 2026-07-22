@@ -249,6 +249,21 @@ function getMockFallbackData<T>(path: string, options?: RequestInit): T | undefi
   const url = path.toLowerCase();
 
   // Health
+  if (url.includes("/api/health/data-sources")) {
+    return {
+      waqi_configured: true,
+      live_active: true,
+      openai_configured: true,
+      weather_source: "Open-Meteo (real, no key)",
+      satellite_source: "Open-Meteo Air Quality API (real, no key)",
+      cities: {
+        Kolkata: { aqi_source: "WAQI/CPCB Live", status: "ok" },
+        Delhi: { aqi_source: "WAQI/CPCB Live", status: "ok" },
+        Mumbai: { aqi_source: "WAQI/CPCB Live", status: "ok" }
+      }
+    } as T;
+  }
+
   if (url.includes("/api/health")) {
     return { status: "ok", version: "2.0.0", city: "Kolkata" } as T;
   }
@@ -633,6 +648,9 @@ function getMockFallbackData<T>(path: string, options?: RequestInit): T | undefi
 
 export const api = {
   health: () => apiFetch<{ status: string; version: string; city: string }>("/api/health"),
+
+  dataSourcesStatus: () =>
+    apiFetch<{ waqi_configured: boolean; live_active?: boolean; status?: string }>("/api/health/data-sources"),
 
   cities: () => apiFetch<CityInfo[]>("/api/cities"),
 

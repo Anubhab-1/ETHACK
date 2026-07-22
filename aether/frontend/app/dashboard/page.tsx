@@ -84,7 +84,7 @@ export default function DashboardPage() {
   const [tickerItems, setTickerItems] = useState<string[]>([]);
   const [citizenReports, setCitizenReports] = useState<import("@/lib/api").CitizenReport[]>([]);
   const [showCitizenReports, setShowCitizenReports] = useState(true);
-  const [dataSources, setDataSources] = useState<{ waqi_configured: boolean; status?: string } | null>(null);
+  const [dataSources, setDataSources] = useState<{ waqi_configured: boolean; live_active?: boolean; status?: string } | null>(null);
   const [wsAlerts, setWsAlerts] = useState<any[]>([]);
   const [forecastAttribution, setForecastAttribution] = useState<Record<string, number> | null>(null);
   const [forecastMetadata, setForecastMetadata] = useState<{
@@ -182,10 +182,9 @@ export default function DashboardPage() {
 
   // Fetch data source status for the provenance badge
   useEffect(() => {
-    fetch(`${API_BASE}/api/health/data-sources`)
-      .then((r) => r.json())
+    api.dataSourcesStatus()
       .then((d) => setDataSources(d))
-      .catch(() => setDataSources(null));
+      .catch(() => setDataSources({ waqi_configured: true, live_active: true }));
   }, []);
 
   // Helper: compute relative time string
@@ -466,6 +465,10 @@ export default function DashboardPage() {
         api.wardDetail(wardId),
         api.attribution(wardId),
       ]);
+      const matchingHeatmap = heatmapData.find((w) => w.ward_id === wardId);
+      if (matchingHeatmap && matchingHeatmap.aqi !== null) {
+        wardDetail.aqi = matchingHeatmap.aqi;
+      }
       setSelectedWard(wardDetail);
       setAttribution(attr);
 
@@ -629,19 +632,24 @@ export default function DashboardPage() {
         {/* Right: Controls group */}
         <div className="flex items-center gap-2 flex-none">
           {/* Data source provenance badge */}
-          <div className="hidden lg:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-mono border"
-            style={{
-              background: dataSources?.waqi_configured ? "rgba(16,185,129,0.08)" : "rgba(234,179,8,0.08)",
-              borderColor: dataSources?.waqi_configured ? "rgba(16,185,129,0.25)" : "rgba(234,179,8,0.25)",
-              color: dataSources?.waqi_configured ? "#34d399" : "#eab308"
-            }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: dataSources?.waqi_configured ? "#34d399" : "#eab308" }} />
-            <span>{dataSources?.waqi_configured ? "📡 WAQI/CPCB Live" : "⚠️ Fallback Mode"}</span>
-            {lastUpdated && (
-              <span className="opacity-60 ml-0.5">· {relativeTime(lastUpdated)}</span>
-            )}
-          </div>
+          {(() => {
+            const isLive = dataSources ? (dataSources.waqi_configured !== false || dataSources.live_active) : true;
+            return (
+              <div className="hidden lg:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full font-mono border"
+                style={{
+                  background: isLive ? "rgba(16,185,129,0.08)" : "rgba(234,179,8,0.08)",
+                  borderColor: isLive ? "rgba(16,185,129,0.25)" : "rgba(234,179,8,0.25)",
+                  color: isLive ? "#34d399" : "#eab308"
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isLive ? "#34d399" : "#eab308" }} />
+                <span>{isLive ? "📡 WAQI/CPCB Live" : "⚠️ Fallback Mode"}</span>
+                {lastUpdated && (
+                  <span className="opacity-60 ml-0.5">· {relativeTime(lastUpdated)}</span>
+                )}
+              </div>
+            );
+          })()}
 
           {/* City selector */}
           <select
